@@ -6,118 +6,75 @@ Created on Mon Jun 12 16:28:04 2023
 adpated from Shadi Sartipi's mice_3signal_june2023.ipynb
 """
 
-import logging
 
 from scipy import signal
 from scipy.io import savemat, loadmat
 import numpy as np
 from numpy.random import seed
+
 seed(1)
-import matplotlib.pyplot as plt
-from sklearn.model_selection import (
-    GroupKFold,
-    KFold,
-    StratifiedKFold,
-)
-import tensorflow as tf
-from tensorflow.keras.models import Model
-from tensorflow.keras import regularizers
-from tensorflow.keras.layers import (
-    Dense,
-    LSTM,
-    Bidirectional,
-    Conv1D,
-    TimeDistributed,
-    Concatenate,
-    Input,
-    Flatten,
-    MaxPooling1D,
-    Dropout
-)
 
 from utils import segment_dataset
-from model import load_model
-
-log = logging.getLogger(__name__)
-
-######################################
-# variable path
-# this should be the same as your data.mat directory in your google drive
-# as an example
-path = "C:\\Users\\Yue\\python_projects\\sleep_scoring\\"
-model_path = path + "weighteegxnexemg-[3. 5. 7.].h5"
-# testmodel_mice is the name of the folder which can be changed based on the name of the folder you put the data.mat and
-# weighteegxnexemg-[3. 5. 7.].h5
+from model import Sleep_Scoring_Model
 
 
-def evaluate_model(
-    testX1, testX2, testX3
-):
-    model = load_model(model_path)
-    pred = model.predict([testX1, testX2, testX3])
-    pred_labels = np.argmax(pred, axis=1)
-    probs = np.max(pred, axis=1)
-    return pred_labels, probs
+def run_inference(data, model_path=None, output_path=None):
+    if model_path is None:
+        model_path = "./weighteegxnexemg-[3. 5. 7.].h5"
+    if output_path is None:
+        output_path = "./final_results.mat"
 
-#%%
+    fs = 10
+    eeg = data["trial_eeg"]
+    emg = data["trial_emg"]
+    ne = data["trial_ne"]
 
-Fs = 512
-FS = 1017
-fs = 10
+    ne_resample = signal.resample(ne, fs, axis=1)
 
-eeg = loadmat(path + "data.mat")["trial_eeg"]
-emg = loadmat(path + "data.mat")["trial_emg"]
-ne = loadmat(path + "data.mat")["trial_ne"]
+    test_eeg7, test_emg7, test_ne7 = (
+        np.expand_dims(eeg, axis=-1),
+        np.expand_dims(emg, axis=-1),
+        np.expand_dims(ne_resample, axis=-1),
+    )
 
-Ne = np.zeros((ne.shape[0], fs))
-for i in range(ne.shape[0]):
-    temp = ne[i, :]
-    temp = np.squeeze(temp)
-    temp = signal.resample(temp, fs)
-    Ne[i, :] = temp
+    test7 = np.zeros((test_eeg7.shape[0], 7, 128, 1))
+    for tr in range(test_eeg7.shape[0]):
+        temp1 = np.squeeze(test_eeg7[tr, :, :])
+        temp3 = segment_dataset(temp1, 128, 64)
+        temp4 = temp3.reshape(7, 128, 1)
+        test7[tr, :, :, :] = temp4
 
-test_eeg7, test_emg7, test_ne7 = (
-    eeg.reshape([-1, Fs, 1]),
-    emg.reshape([-1, Fs, 1]),
-    Ne.reshape([-1, fs, 1]),
-)
+    test7_emg = np.zeros((test_emg7.shape[0], 7, 128, 1))
+    for tr in range(test_emg7.shape[0]):
+        temp1 = np.squeeze(test_emg7[tr, :, :])
+        temp3 = segment_dataset(temp1, 128, 64)
+        temp4 = temp3.reshape(7, 128, 1)
+        test7_emg[tr, :, :, :] = temp4
 
-test7 = np.zeros((test_eeg7.shape[0], 7, 128, 1))
-for tr in range(test_eeg7.shape[0]):
-    temp1 = np.squeeze(test_eeg7[tr, :, :])
-    temp3 = segment_dataset(temp1, 128, 64)
-    temp4 = temp3.reshape(7, 128, 1)
-    test7[tr, :, :, :] = temp4
+    EEG = test7
+    EMG = test7_emg
+    NE = test_ne7
 
-test7_emg = np.zeros((test_emg7.shape[0], 7, 128, 1))
-for tr in range(test_emg7.shape[0]):
-    temp1 = np.squeeze(test_emg7[tr, :, :])
-    temp3 = segment_dataset(temp1, 128, 64)
-    temp4 = temp3.reshape(7, 128, 1)
-    test7_emg[tr, :, :, :] = temp4
+    model = Sleep_Scoring_Model(model_path)
+    pred_labels, probs = model.infer(EEG, NE, EMG)
+    final_labels = pred_labels
+    for i in range(1, len(pred_labels) - 1):
+        if pred_labels[i] == 1 and pred_labels[i - 1] == 0 and pred_labels[i + 1] == 0:
+            final_labels[i] = 0
+        if pred_labels[i] == 2 and pred_labels[i - 1] == 0:
+            final_labels[i] = 0
 
-EEG = test7
-EMG = test7_emg
-NE = test_ne7
+    results = {
+        "pred_labels": final_labels,
+        "scores": probs,
+        "eeg": eeg,
+        "emg": emg,
+        "ne": ne,
+        # "pred_beforcorrecting": pred_labels,
+    }
+    savemat(output_path, results)
 
 
-##############################################for test the model
-pred_labels, probs  = evaluate_model(EEG, NE, EMG)
-final_labels = pred_labels
-for i in range(1, len(pred_labels) - 1):
-    if pred_labels[i] == 1 and pred_labels[i - 1] == 0 and pred_labels[i + 1] == 0:
-        final_labels[i] = 0
-    if pred_labels[i] == 2 and pred_labels[i - 1] == 0:
-        final_labels[i] = 0
-
-################################
-
-mdict = {
-    "pred_labels": final_labels,
-    "score": probs,
-    "eeg": EEG,
-    "emg": EMG,
-    "ne": NE,
-    "pred_beforcorrecting": pred_labels,
-}
-#savemat(path + "/finalresults.mat", mdict)
+if __name__ == "__main__":
+    data = loadmat("C:\\Users\\Yue\\python_projects\\sleep_scoring\\data.mat")
+    run_inference(data)

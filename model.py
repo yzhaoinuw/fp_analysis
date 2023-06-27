@@ -3,8 +3,10 @@
 Created on Tue Jun 13 13:48:24 2023
 
 @author: Yue
+adpated from Shadi Sartipi's mice_3signal_june2023.ipynb
 """
 
+import numpy as np
 import tensorflow as tf
 from tensorflow.keras.models import Model
 from tensorflow.keras import regularizers
@@ -20,7 +22,7 @@ from tensorflow.keras.layers import (
     Input,
     Flatten,
     MaxPooling1D,
-    Dropout
+    Dropout,
 )
 
 
@@ -49,61 +51,71 @@ class attention(Layer):
 
     def get_config(self):
         return super(attention, self).get_config()
-    
-def load_model(model_path):
-    tf.keras.backend.clear_session()
-    input_shape1 = (7, 128, 1)
-    input_shape2 = (10, 1)
-    input_shape3 = (7, 128, 1)
-    input_flow1 = Input(shape=input_shape1)
-    input_flow2 = Input(shape=input_shape2)
-    input_flow3 = Input(shape=input_shape3)
-    
-    x = TimeDistributed(Conv1D(64, 64, activation="relu"))(input_flow1)
-    
-    x = TimeDistributed(MaxPooling1D(pool_size=2))(x)
-    x = TimeDistributed(Dropout(0.5))(x)
-    x = TimeDistributed(Flatten())(x)
-    
-    lstm1 = (LSTM(32, return_sequences=False, dropout=0.4, activation="relu"))(x)
-    lstm1 = Dense(32, activation="relu")(lstm1)
-    
-    lstm2 = Bidirectional(
-        LSTM(
-            64,
-            return_sequences=True,
-            dropout=0.4,
-            activation="relu",
-            recurrent_regularizer=regularizers.l2(0.01),
-            bias_regularizer=regularizers.l2(0.01),
-        )
-    )(input_flow2)
-    lstm2 = Bidirectional(
-        LSTM(32, return_sequences=True, dropout=0.3, activation="relu")
-    )(lstm2)
-    lstm2 = attention()(lstm2)
-    lstm2 = Dense(32, activation="relu")(lstm2)
-    
-    x = TimeDistributed(Conv1D(64, 64, activation="relu"))(input_flow3)
-    x = TimeDistributed(MaxPooling1D(pool_size=2))(x)
-    x = TimeDistributed(Dropout(0.5))(x)
-    x = TimeDistributed(Flatten())(x)
-    
-    lstm3 = (LSTM(32, return_sequences=False, dropout=0.4, activation="relu"))(x)
-    lstm3 = Dense(32, activation="relu")(lstm3)
-    
-    lstm = Concatenate(axis=1)([lstm1, lstm2, lstm3])
-    
-    out = Dense(3, activation="softmax")(lstm)
-    model = Model(inputs=[input_flow1, input_flow2, input_flow3], outputs=out)
-    #model.summary()
-    
-    # 400
-    model.compile(
-        loss="categorical_crossentropy",
-        optimizer=tf.keras.optimizers.Adam(0.0001),
-        metrics=["accuracy"],
-    )
 
-    model.load_weights(model_path)
-    return model
+
+class Sleep_Scoring_Model:
+    def __init__(self, model_path):
+        self.model = self.load_model(model_path)
+
+    def load_model(self, model_path):
+        tf.keras.backend.clear_session()
+        input_shape1 = (7, 128, 1)
+        input_shape2 = (10, 1)
+        input_shape3 = (7, 128, 1)
+        input_flow1 = Input(shape=input_shape1)
+        input_flow2 = Input(shape=input_shape2)
+        input_flow3 = Input(shape=input_shape3)
+
+        x = TimeDistributed(Conv1D(64, 64, activation="relu"))(input_flow1)
+
+        x = TimeDistributed(MaxPooling1D(pool_size=2))(x)
+        x = TimeDistributed(Dropout(0.5))(x)
+        x = TimeDistributed(Flatten())(x)
+
+        lstm1 = (LSTM(32, return_sequences=False, dropout=0.4, activation="relu"))(x)
+        lstm1 = Dense(32, activation="relu")(lstm1)
+
+        lstm2 = Bidirectional(
+            LSTM(
+                64,
+                return_sequences=True,
+                dropout=0.4,
+                activation="relu",
+                recurrent_regularizer=regularizers.l2(0.01),
+                bias_regularizer=regularizers.l2(0.01),
+            )
+        )(input_flow2)
+        lstm2 = Bidirectional(
+            LSTM(32, return_sequences=True, dropout=0.3, activation="relu")
+        )(lstm2)
+        lstm2 = attention()(lstm2)
+        lstm2 = Dense(32, activation="relu")(lstm2)
+
+        x = TimeDistributed(Conv1D(64, 64, activation="relu"))(input_flow3)
+        x = TimeDistributed(MaxPooling1D(pool_size=2))(x)
+        x = TimeDistributed(Dropout(0.5))(x)
+        x = TimeDistributed(Flatten())(x)
+
+        lstm3 = (LSTM(32, return_sequences=False, dropout=0.4, activation="relu"))(x)
+        lstm3 = Dense(32, activation="relu")(lstm3)
+
+        lstm = Concatenate(axis=1)([lstm1, lstm2, lstm3])
+
+        out = Dense(3, activation="softmax")(lstm)
+        model = Model(inputs=[input_flow1, input_flow2, input_flow3], outputs=out)
+        # model.summary()
+
+        model.compile(
+            loss="categorical_crossentropy",
+            optimizer=tf.keras.optimizers.Adam(0.0001),
+            metrics=["accuracy"],
+        )
+
+        model.load_weights(model_path)
+        return model
+
+    def infer(self, testX1, testX2, testX3):
+        pred = self.model.predict([testX1, testX2, testX3])
+        pred_labels = np.argmax(pred, axis=1)
+        probs = np.max(pred, axis=1)
+        return pred_labels, probs

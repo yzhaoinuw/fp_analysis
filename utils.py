@@ -8,6 +8,7 @@ adpated from Shadi Sartipi's mice_3signal_june2023.ipynb
 
 import numpy as np
 
+
 def windows(data, size, step):
     start = 0
     while (start + size) <= data.shape[0]:
