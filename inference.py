@@ -22,7 +22,7 @@ def run_inference(data, model_path=None, output_path=None):
     if model_path is None:
         model_path = "./weighteegxnexemg-[3. 5. 7.].h5"
     if output_path is None:
-        output_path = "./final_results.mat"
+        output_path = "./results.mat"
 
     fs = 10
     eeg = data["trial_eeg"]

@@ -7,12 +7,12 @@ Created on Mon Jun 26 15:53:49 2023
 
 import base64
 import webbrowser
-from threading import Timer
 from io import BytesIO
+from threading import Timer
 
 import dash
-import dash_core_components as dcc
-import dash_html_components as html
+from dash import dcc
+from dash import html
 from dash.exceptions import PreventUpdate
 from dash.dependencies import Input, Output, State
 
@@ -23,20 +23,25 @@ from make_figure import make_figure
 
 
 app = dash.Dash(__name__)
+port = 8050
 
-app.layout = html.Div(
-    [
-        dcc.RadioItems(
-            id="task-selection",
-            options=[
-                {"label": "Generate prediction", "value": "gen"},
-                {"label": "Visualize existing prediction", "value": "vis"},
-            ],
-        ),
-        html.Div(id="upload-container"),
-        html.Div(id="output-data-upload"),
-    ]
-)
+
+def run_app():
+    # server = app.server
+
+    app.layout = html.Div(
+        [
+            dcc.RadioItems(
+                id="task-selection",
+                options=[
+                    {"label": "Generate prediction", "value": "gen"},
+                    {"label": "Visualize existing prediction", "value": "vis"},
+                ],
+            ),
+            html.Div(id="upload-container"),
+            html.Div(id="output-data-upload"),
+        ]
+    )
 
 
 @app.callback(Output("upload-container", "children"), Input("task-selection", "value"))
@@ -76,7 +81,7 @@ def update_output(contents, filename, task):
         mat = loadmat(BytesIO(decoded))
 
         if task == "gen":
-            run_inference(mat)
+            run_inference(mat, model_path=None, output_path=None)
             return html.Div(["The results.mat file has been generated successfully."])
         else:  # task == 'vis'
             try:
@@ -87,13 +92,11 @@ def update_output(contents, filename, task):
                 return html.Div(["There was an error processing this file."])
 
 
-port = 8050
-
-
 def open_browser():
     webbrowser.open_new(f"http://127.0.0.1:{port}/")
 
 
 if __name__ == "__main__":
-    Timer(3, open_browser).start()
-    app.run_server(debug=False)
+    run_app()
+    Timer(1, open_browser).start()
+    app.run_server(debug=False, port=8050)

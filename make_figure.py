@@ -109,7 +109,7 @@ def make_figure(pred):
     )
     fig.add_trace(heatmap, row=4, col=1)
 
-    stage_names = ["Stage 1", "Stage 2", "Stage 3"]  # Adjust this to match your stages
+    stage_names = ["Wake", "SWS", "REM"]  # Adjust this to match your stages
     for i, color in enumerate(stage_colors):
         fig.add_trace(
             go.Scatter(
