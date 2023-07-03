@@ -77,4 +77,4 @@ def run_inference(data, model_path=None, output_path=None):
 
 if __name__ == "__main__":
     data = loadmat("C:\\Users\\Yue\\python_projects\\sleep_scoring\\data.mat")
-    run_inference(data)
+    # run_inference(data)

@@ -8,10 +8,7 @@ Created on Mon Jun 26 15:36:14 2023
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from plotly_resampler import register_plotly_resampler
-
-
-register_plotly_resampler(mode="auto")
+from plotly_resampler import FigureResampler
 
 
 def make_figure(pred):
@@ -36,12 +33,14 @@ def make_figure(pred):
     predictions = pred["pred_labels"].flatten()
     confidence = pred["scores"].flatten()
 
-    fig = make_subplots(
-        rows=4,
-        cols=1,
-        shared_xaxes=True,
-        vertical_spacing=0.04,
-        subplot_titles=("EEG", "EMG", "NE", "Predicted Sleep Scores"),
+    fig = FigureResampler(
+        make_subplots(
+            rows=4,
+            cols=1,
+            shared_xaxes=True,
+            vertical_spacing=0.04,
+            subplot_titles=("EEG", "EMG", "NE", "Predicted Sleep Scores"),
+        )
     )
 
     # Define custom colorscale
@@ -69,41 +68,41 @@ def make_figure(pred):
 
     # Add the time series to the figure
     fig.add_trace(
-        go.Scatter(
-            x=time_x1,
-            y=y_x1,
+        go.Scattergl(
+            line=dict(width=1),
+            marker=dict(size=3),
+            showlegend=False,
             mode="lines+markers",
             hoverinfo="x+y",
-            line=dict(width=1),
-            marker=dict(size=2),
-            showlegend=False,
         ),
+        hf_x=time_x1,
+        hf_y=y_x1,
         row=1,
         col=1,
     )
     fig.add_trace(
-        go.Scatter(
-            x=time_x2,
-            y=y_x2,
+        go.Scattergl(
+            line=dict(width=1),
+            marker=dict(size=3),
+            showlegend=False,
             mode="lines+markers",
             hoverinfo="x+y",
-            line=dict(width=1),
-            marker=dict(size=2),
-            showlegend=False,
         ),
+        hf_x=time_x2,
+        hf_y=y_x2,
         row=2,
         col=1,
     )
     fig.add_trace(
-        go.Scatter(
-            x=time_x3,
-            y=y_x3,
+        go.Scattergl(
+            line=dict(width=1),
+            marker=dict(size=3),
+            showlegend=False,
             mode="lines+markers",
             hoverinfo="x+y",
-            line=dict(width=1),
-            marker=dict(size=2),
-            showlegend=False,
         ),
+        hf_x=time_x3,
+        hf_y=y_x3,
         row=3,
         col=1,
     )

@@ -10,11 +10,12 @@ import webbrowser
 from io import BytesIO
 from threading import Timer
 
-import dash
-from dash import dcc
-from dash import html
+from trace_updater import TraceUpdater
+from dash import Dash, dcc, html
 from dash.exceptions import PreventUpdate
 from dash.dependencies import Input, Output, State
+
+from plotly_resampler import FigureResampler
 
 from scipy.io import loadmat
 
@@ -22,13 +23,15 @@ from inference import run_inference
 from make_figure import make_figure
 
 
-app = dash.Dash(__name__)
+app = Dash(__name__)
 port = 8050
+fig = FigureResampler()
+fig.register_update_graph_callback(
+    app=app, graph_id="graph-1", trace_updater_id="trace-updater-1"
+)
 
 
 def run_app():
-    # server = app.server
-
     app.layout = html.Div(
         [
             dcc.RadioItems(
@@ -51,7 +54,7 @@ def show_upload(task):
     else:
         return dcc.Upload(
             id="upload-data",
-            children=html.Div(["Drag and Drop or ", html.A("Select Files")]),
+            children=html.Div(["Select File"], className="upload-button"),
             style={
                 "width": "100%",
                 "height": "60px",
@@ -75,21 +78,28 @@ def show_upload(task):
 def update_output(contents, filename, task):
     if contents is None:
         return html.Div(["Please upload a .mat file"])
-    else:
-        content_type, content_string = contents.split(",")
-        decoded = base64.b64decode(content_string)
-        mat = loadmat(BytesIO(decoded))
 
-        if task == "gen":
-            run_inference(mat, model_path=None, output_path=None)
-            return html.Div(["The results.mat file has been generated successfully."])
-        else:  # task == 'vis'
-            try:
-                fig = make_figure(mat)
-                return dcc.Graph(figure=fig)
-            except Exception as e:
-                print(e)
-                return html.Div(["There was an error processing this file."])
+    content_type, content_string = contents.split(",")
+    decoded = base64.b64decode(content_string)
+    mat = loadmat(BytesIO(decoded))
+
+    if task == "gen":
+        run_inference(mat, model_path=None, output_path=None)
+        return html.Div(["The results.mat file has been generated successfully."])
+    else:  # task == 'vis'
+        try:
+            fig.replace(make_figure(mat))
+            div = html.Div(
+                children=[
+                    dcc.Graph(id="graph-1", figure=fig),
+                    TraceUpdater(id="trace-updater-1", gdID="graph-1"),
+                ],
+            )
+
+            return div
+        except Exception as e:
+            print(e)
+            return html.Div(["There was an error processing this file."])
 
 
 def open_browser():
