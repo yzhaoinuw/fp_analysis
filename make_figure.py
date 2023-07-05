@@ -35,27 +35,34 @@ def make_figure(pred):
 
     fig = FigureResampler(
         make_subplots(
-            rows=4,
+            rows=5,
             cols=1,
             shared_xaxes=True,
             vertical_spacing=0.04,
-            subplot_titles=("EEG", "EMG", "NE", "Predicted Sleep Scores"),
+            subplot_titles=(
+                "EEG",
+                "EMG",
+                "NE",
+                "Predicted Sleep Scores",
+                "Prediction Confidence",
+            ),
         )
     )
 
     # Define custom colorscale
     stage_colors = [
-        "rgb(255, 51, 153)",
-        "rgb(51, 255, 51)",
-        "rgb(153, 51, 255)",
+        "rgb(102, 178, 255)",
+        "rgb(255, 102, 255)",
+        "rgb(102, 255, 102)",
     ]  # colors for the legend
     colorscale = [[0, stage_colors[0]], [0.5, stage_colors[1]], [1, stage_colors[2]]]
+
     # Create a heatmap for stages
     hovertext = [
         f"time: {time[i]}\nconfidence: {confidence[i]:.2f}"
         for i in range(len(confidence))
     ]
-    heatmap = go.Heatmap(
+    sleep_scores = go.Heatmap(
         x=time,
         z=[predictions],
         text=[hovertext],
@@ -63,6 +70,27 @@ def make_figure(pred):
         colorscale=colorscale,
         colorbar=dict(y=0.8, len=0.5),
         showscale=False,
+        opacity=0.6,
+    )
+
+    conf = go.Heatmap(
+        x=time,
+        z=[confidence],
+        text=[hovertext],
+        hoverinfo="text",
+        colorscale="speed",
+        colorbar=dict(
+            thicknessmode="fraction",  # set the mode of thickness to fraction
+            thickness=0.01,  # the thickness of the colorbar
+            lenmode="fraction",  # set the mode of length to fraction
+            len=0.2,  # the length of the colorbar
+            yanchor="bottom",  # anchor the colorbar at the top
+            y=0.16,  # the y position of the colorbar
+            xanchor="right",  # anchor the colorbar at the left
+            x=0.8,  # the x position of the colorbar
+            tickfont=dict(size=8),
+        ),
+        showscale=True,
         opacity=0.6,
     )
 
@@ -106,7 +134,8 @@ def make_figure(pred):
         row=3,
         col=1,
     )
-    fig.add_trace(heatmap, row=4, col=1)
+    fig.add_trace(sleep_scores, row=4, col=1)
+    fig.add_trace(conf, row=5, col=1)
 
     stage_names = ["Wake", "SWS", "REM"]  # Adjust this to match your stages
     for i, color in enumerate(stage_colors):
@@ -123,7 +152,6 @@ def make_figure(pred):
             col=1,
         )
 
-    # Update layout to include yaxis2 with its own range
     fig.update_layout(
         autosize=True,
         margin=dict(t=50, l=20, r=20, b=20),
@@ -131,19 +159,22 @@ def make_figure(pred):
         hovermode="x unified",  # gives crosshair in one subplot
         # title_text="EMG, EEG and NE with Predicted Sleep Scores",
         yaxis4=dict(tickvals=[]),  # suppress y ticks on the heatmap
-        xaxis4_title="Time (s)",
+        yaxis5=dict(tickvals=[]),
+        xaxis5_title="Time (s)",
         legend=dict(
             x=0.6,  # adjust these values to position the legend
-            y=0.26,  # adjust these values to position the legend
+            y=0.41,  # adjust these values to position the legend
             orientation="h",  # makes legend items horizontal
             bgcolor="rgba(0,0,0,0)",  # transparent legend background
             font=dict(size=10),  # adjust legend text size
         ),
     )
 
-    fig.update_traces(xaxis="x4")  # gives crosshair across all subplots
+    fig.update_traces(xaxis="x5")  # gives crosshair across all subplots
+    fig.update_traces(colorbar_orientation="h", selector=dict(type="heatmap"))
     fig.update_xaxes(range=[start_time, end_time], row=1, col=1)
     fig.update_xaxes(range=[start_time, end_time], row=2, col=1)
     fig.update_xaxes(range=[start_time, end_time], row=3, col=1)
     fig.update_xaxes(range=[start_time, end_time], row=4, col=1)
+    fig.update_xaxes(range=[start_time, end_time], row=5, col=1)
     return fig
