@@ -186,7 +186,7 @@ def make_figure(pred):
         ),
     )
 
-    fig.update_traces(xaxis="x5")  # gives crosshair across all subplots
+    fig.update_traces(xaxis="x6")  # gives crosshair across all subplots
     fig.update_traces(colorbar_orientation="h", selector=dict(type="heatmap"))
     fig.update_xaxes(range=[start_time, end_time], row=1, col=1)
     fig.update_xaxes(range=[start_time, end_time], row=2, col=1)
