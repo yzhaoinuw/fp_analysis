@@ -35,17 +35,19 @@ def make_figure(pred):
 
     fig = FigureResampler(
         make_subplots(
-            rows=5,
+            rows=6,
             cols=1,
             shared_xaxes=True,
-            vertical_spacing=0.04,
+            vertical_spacing=0.03,
             subplot_titles=(
                 "EEG",
                 "EMG",
                 "NE",
                 "Predicted Sleep Scores",
                 "Prediction Confidence",
+                "",
             ),
+            row_heights=[0.25, 0.25, 0.25, 0.05, 0.05, 0.15],
         )
     )
 
@@ -68,7 +70,6 @@ def make_figure(pred):
         text=[hovertext],
         hoverinfo="text",
         colorscale=colorscale,
-        colorbar=dict(y=0.8, len=0.5),
         showscale=False,
         opacity=0.6,
     )
@@ -81,17 +82,16 @@ def make_figure(pred):
         colorscale="speed",
         colorbar=dict(
             thicknessmode="fraction",  # set the mode of thickness to fraction
-            thickness=0.01,  # the thickness of the colorbar
+            thickness=0.005,  # the thickness of the colorbar
             lenmode="fraction",  # set the mode of length to fraction
-            len=0.2,  # the length of the colorbar
+            len=0.15,  # the length of the colorbar
             yanchor="bottom",  # anchor the colorbar at the top
-            y=0.16,  # the y position of the colorbar
+            y=0.19,  # the y position of the colorbar
             xanchor="right",  # anchor the colorbar at the left
-            x=0.8,  # the x position of the colorbar
+            x=0.75,  # the x position of the colorbar
             tickfont=dict(size=8),
         ),
         showscale=True,
-        opacity=0.6,
     )
 
     # Add the time series to the figure
@@ -142,9 +142,9 @@ def make_figure(pred):
         fig.add_trace(
             go.Scatter(
                 x=[-100],
-                y=[0.4],
+                y=[0.2],
                 mode="markers",
-                marker=dict(size=10, color=color, symbol="square"),
+                marker=dict(size=6, color=color, symbol="square"),
                 name=stage_names[i],
                 showlegend=True,
             ),
@@ -152,21 +152,37 @@ def make_figure(pred):
             col=1,
         )
 
+    fig.add_annotation(
+        dict(
+            x=0.5,
+            y=0.12,  # you may need to adjust this
+            showarrow=False,
+            text="<b>Time (s)</b>",
+            xref="paper",
+            yref="paper",
+            xanchor="center",
+            yanchor="top",
+        )
+    )
+
     fig.update_layout(
         autosize=True,
         margin=dict(t=50, l=20, r=20, b=20),
         height=800,
         hovermode="x unified",  # gives crosshair in one subplot
-        # title_text="EMG, EEG and NE with Predicted Sleep Scores",
+        title_text="EEG, EMG, and NE with Predicted Sleep Scores",
         yaxis4=dict(tickvals=[]),  # suppress y ticks on the heatmap
         yaxis5=dict(tickvals=[]),
-        xaxis5_title="Time (s)",
+        # xaxis5_title="Time (s)",
         legend=dict(
             x=0.6,  # adjust these values to position the legend
-            y=0.41,  # adjust these values to position the legend
+            y=0.3,  # stage_names
             orientation="h",  # makes legend items horizontal
             bgcolor="rgba(0,0,0,0)",  # transparent legend background
-            font=dict(size=10),  # adjust legend text size
+            font=dict(size=9),  # adjust legend text size
+        ),
+        font=dict(
+            size=10,  # title font size
         ),
     )
 
@@ -176,5 +192,20 @@ def make_figure(pred):
     fig.update_xaxes(range=[start_time, end_time], row=2, col=1)
     fig.update_xaxes(range=[start_time, end_time], row=3, col=1)
     fig.update_xaxes(range=[start_time, end_time], row=4, col=1)
-    fig.update_xaxes(range=[start_time, end_time], row=5, col=1)
+    fig.update_xaxes(range=[start_time, end_time], row=5, col=1, showticklabels=True)
+    fig.update_annotations(font_size=12)
+    fig["layout"]["annotations"][-1]["font"]["size"] = 14
     return fig
+
+
+if __name__ == "__main__":
+    import plotly.io as io
+    from scipy.io import loadmat
+
+    io.renderers.default = "browser"
+    # register_plotly_resampler(mode="auto")
+
+    path = "C:\\Users\\Yue\\python_projects\\sleep_scoring\\"
+    pred = loadmat(path + "final_results.mat")
+    fig = make_figure(pred)
+    fig.show_dash()
