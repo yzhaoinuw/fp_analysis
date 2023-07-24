@@ -98,7 +98,7 @@ def make_figure(pred):
     fig.add_trace(
         go.Scattergl(
             line=dict(width=1),
-            marker=dict(size=3),
+            marker=dict(size=2),
             showlegend=False,
             mode="lines+markers",
             hoverinfo="x+y",
@@ -111,7 +111,7 @@ def make_figure(pred):
     fig.add_trace(
         go.Scattergl(
             line=dict(width=1),
-            marker=dict(size=3),
+            marker=dict(size=2),
             showlegend=False,
             mode="lines+markers",
             hoverinfo="x+y",
@@ -124,7 +124,7 @@ def make_figure(pred):
     fig.add_trace(
         go.Scattergl(
             line=dict(width=1),
-            marker=dict(size=3),
+            marker=dict(size=2),
             showlegend=False,
             mode="lines+markers",
             hoverinfo="x+y",
@@ -155,7 +155,7 @@ def make_figure(pred):
     fig.add_annotation(
         dict(
             x=0.5,
-            y=0.12,  # you may need to adjust this
+            y=0.12,
             showarrow=False,
             text="<b>Time (s)</b>",
             xref="paper",
@@ -173,7 +173,11 @@ def make_figure(pred):
         title_text="EEG, EMG, and NE with Predicted Sleep Scores",
         yaxis4=dict(tickvals=[]),  # suppress y ticks on the heatmap
         yaxis5=dict(tickvals=[]),
-        # xaxis5_title="Time (s)",
+        xaxis = dict(
+            tickmode='linear',
+            tick0=0,
+            dtick=1000,
+        ),
         legend=dict(
             x=0.6,  # adjust these values to position the legend
             y=0.3,  # stage_names
@@ -188,11 +192,13 @@ def make_figure(pred):
 
     fig.update_traces(xaxis="x6")  # gives crosshair across all subplots
     fig.update_traces(colorbar_orientation="h", selector=dict(type="heatmap"))
-    fig.update_xaxes(range=[start_time, end_time], row=1, col=1)
+    fig.update_xaxes(range=[start_time, end_time], row=1, col=1, showticklabels=False)
     fig.update_xaxes(range=[start_time, end_time], row=2, col=1)
-    fig.update_xaxes(range=[start_time, end_time], row=3, col=1)
+    fig.update_xaxes(range=[start_time, end_time], row=3, col=1, showticklabels=True)
     fig.update_xaxes(range=[start_time, end_time], row=4, col=1)
-    fig.update_xaxes(range=[start_time, end_time], row=5, col=1, showticklabels=True)
+    fig.update_xaxes(range=[start_time, end_time], row=5, col=1)
+    fig.update_yaxes(fixedrange=True, row=4, col=1)
+    fig.update_yaxes(fixedrange=True, row=5, col=1)
     fig.update_annotations(font_size=12)
     fig["layout"]["annotations"][-1]["font"]["size"] = 14
     return fig
