@@ -20,7 +20,7 @@ from plotly_resampler import FigureResampler
 from scipy.io import loadmat
 
 from inference import run_inference
-from make_figure import make_figure
+from make_figure import make_figure, stage_colors
 
 
 app = Dash(__name__)
@@ -91,8 +91,38 @@ def update_output(contents, filename, task):
             fig.replace(make_figure(mat))
             div = html.Div(
                 children=[
-                    dcc.Graph(id="graph-1", figure=fig),
+                    dcc.Graph(
+                        id="graph-1",
+                        config={
+                            "editable": True,
+                            "edits": {
+                                "axisTitleText": False,
+                                "titleText": False,
+                                "colorbarTitleText": False,
+                                "annotationText": False,
+                            },
+                        },
+                        figure=fig,
+                    ),
                     TraceUpdater(id="trace-updater-1", gdID="graph-1"),
+                    html.Div(
+                        children=[
+                            dcc.Input(id="start", type="number", placeholder="start"),
+                            dcc.Input(id="end", type="number", placeholder="end"),
+                            dcc.Dropdown(
+                                id="label",
+                                options=[
+                                    {"label": "0: Wake", "value": 0},
+                                    {"label": "1: SWS", "value": 1},
+                                    {"label": "2: REM", "value": 2},
+                                ],
+                                placeholder="Select a Sleep Score",
+                                style={"width": "200px"},
+                            ),
+                            html.Button("Add Annotation", id="add-button"),
+                        ],
+                        style={"display": "flex"},
+                    ),
                 ],
             )
 
@@ -100,6 +130,41 @@ def update_output(contents, filename, task):
         except Exception as e:
             print(e)
             return html.Div(["There was an error processing this file."])
+
+
+@app.callback(
+    Output("graph-1", "figure"),
+    Input("add-button", "n_clicks"),
+    State("start", "value"),
+    State("end", "value"),
+    State("label", "value"),
+    State("graph-1", "figure"),
+)
+def add_annotation(n_clicks, start, end, label, figure):
+    if start is None or end is None or label is None:
+        return figure
+
+    shape = dict(
+        type="rect",
+        # coordinates in data reference
+        xref="x6",
+        yref="y6",
+        x0=start,
+        y0=-1,
+        x1=end,
+        y1=2,
+        fillcolor=stage_colors[label],
+        opacity=0.5,
+        layer="above",
+        line_width=0,
+    )
+
+    # figure['layout'].update(shapes=shapes)
+    if "shapes" in figure["layout"]:
+        figure["layout"]["shapes"].append(shape)
+    else:
+        figure["layout"]["shapes"] = [shape]
+    return figure
 
 
 def open_browser():

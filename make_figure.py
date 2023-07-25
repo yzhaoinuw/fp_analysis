@@ -11,6 +11,14 @@ from plotly.subplots import make_subplots
 from plotly_resampler import FigureResampler
 
 
+# Define custom colorscale
+stage_colors = [
+    "rgb(102, 178, 255)",
+    "rgb(255, 102, 255)",
+    "rgb(102, 255, 102)",
+]  # colors for the legend
+
+
 def make_figure(pred):
     # Time span and frequencies
     start_time, end_time = 0, pred["eeg"].shape[0]
@@ -32,6 +40,7 @@ def make_figure(pred):
     y_x3 = pred["ne"].flatten()
     predictions = pred["pred_labels"].flatten()
     confidence = pred["scores"].flatten()
+    user_annotation_dummy = np.zeros(end_time)
 
     fig = FigureResampler(
         make_subplots(
@@ -45,18 +54,12 @@ def make_figure(pred):
                 "NE",
                 "Predicted Sleep Scores",
                 "Prediction Confidence",
-                "",
+                "User Annotation",
             ),
             row_heights=[0.25, 0.25, 0.25, 0.05, 0.05, 0.15],
         )
     )
 
-    # Define custom colorscale
-    stage_colors = [
-        "rgb(102, 178, 255)",
-        "rgb(255, 102, 255)",
-        "rgb(102, 255, 102)",
-    ]  # colors for the legend
     colorscale = [[0, stage_colors[0]], [0.5, stage_colors[1]], [1, stage_colors[2]]]
 
     # Create a heatmap for stages
@@ -92,6 +95,15 @@ def make_figure(pred):
             tickfont=dict(size=8),
         ),
         showscale=True,
+    )
+
+    user_annotation = go.Heatmap(
+        x=time,
+        z=[user_annotation_dummy],
+        hoverinfo="x",
+        colorscale="gray",
+        showscale=False,
+        opacity=0.1,
     )
 
     # Add the time series to the figure
@@ -136,6 +148,7 @@ def make_figure(pred):
     )
     fig.add_trace(sleep_scores, row=4, col=1)
     fig.add_trace(conf, row=5, col=1)
+    fig.add_trace(user_annotation, row=6, col=1)
 
     stage_names = ["Wake", "SWS", "REM"]  # Adjust this to match your stages
     for i, color in enumerate(stage_colors):
@@ -144,7 +157,7 @@ def make_figure(pred):
                 x=[-100],
                 y=[0.2],
                 mode="markers",
-                marker=dict(size=6, color=color, symbol="square"),
+                marker=dict(size=5, color=color, symbol="square"),
                 name=stage_names[i],
                 showlegend=True,
             ),
@@ -155,7 +168,7 @@ def make_figure(pred):
     fig.add_annotation(
         dict(
             x=0.5,
-            y=0.12,
+            y=0,
             showarrow=False,
             text="<b>Time (s)</b>",
             xref="paper",
@@ -173,11 +186,7 @@ def make_figure(pred):
         title_text="EEG, EMG, and NE with Predicted Sleep Scores",
         yaxis4=dict(tickvals=[]),  # suppress y ticks on the heatmap
         yaxis5=dict(tickvals=[]),
-        xaxis = dict(
-            tickmode='linear',
-            tick0=0,
-            dtick=1000,
-        ),
+        yaxis6=dict(tickvals=[]),
         legend=dict(
             x=0.6,  # adjust these values to position the legend
             y=0.3,  # stage_names
@@ -192,13 +201,15 @@ def make_figure(pred):
 
     fig.update_traces(xaxis="x6")  # gives crosshair across all subplots
     fig.update_traces(colorbar_orientation="h", selector=dict(type="heatmap"))
-    fig.update_xaxes(range=[start_time, end_time], row=1, col=1, showticklabels=False)
+    fig.update_xaxes(range=[start_time, end_time], row=1, col=1)
     fig.update_xaxes(range=[start_time, end_time], row=2, col=1)
-    fig.update_xaxes(range=[start_time, end_time], row=3, col=1, showticklabels=True)
+    fig.update_xaxes(range=[start_time, end_time], row=3, col=1)
     fig.update_xaxes(range=[start_time, end_time], row=4, col=1)
     fig.update_xaxes(range=[start_time, end_time], row=5, col=1)
+    fig.update_xaxes(range=[start_time, end_time], row=6, col=1)
     fig.update_yaxes(fixedrange=True, row=4, col=1)
     fig.update_yaxes(fixedrange=True, row=5, col=1)
+    fig.update_yaxes(range=[0, 0.5], fixedrange=True, row=6, col=1)
     fig.update_annotations(font_size=12)
     fig["layout"]["annotations"][-1]["font"]["size"] = 14
     return fig
@@ -209,8 +220,6 @@ if __name__ == "__main__":
     from scipy.io import loadmat
 
     io.renderers.default = "browser"
-    # register_plotly_resampler(mode="auto")
-
     path = "C:\\Users\\Yue\\python_projects\\sleep_scoring\\"
     pred = loadmat(path + "final_results.mat")
     fig = make_figure(pred)
