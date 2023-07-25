@@ -165,22 +165,9 @@ def make_figure(pred):
             col=1,
         )
 
-    fig.add_annotation(
-        dict(
-            x=0.5,
-            y=0,
-            showarrow=False,
-            text="<b>Time (s)</b>",
-            xref="paper",
-            yref="paper",
-            xanchor="center",
-            yanchor="top",
-        )
-    )
-
     fig.update_layout(
         autosize=True,
-        margin=dict(t=50, l=20, r=20, b=20),
+        margin=dict(t=50, l=20, r=20, b=40),
         height=800,
         hovermode="x unified",  # gives crosshair in one subplot
         title_text="EEG, EMG, and NE with Predicted Sleep Scores",
@@ -206,7 +193,9 @@ def make_figure(pred):
     fig.update_xaxes(range=[start_time, end_time], row=3, col=1)
     fig.update_xaxes(range=[start_time, end_time], row=4, col=1)
     fig.update_xaxes(range=[start_time, end_time], row=5, col=1)
-    fig.update_xaxes(range=[start_time, end_time], row=6, col=1)
+    fig.update_xaxes(
+        range=[start_time, end_time], row=6, col=1, title_text="<b>Time (s)</b>"
+    )
     fig.update_yaxes(fixedrange=True, row=4, col=1)
     fig.update_yaxes(fixedrange=True, row=5, col=1)
     fig.update_yaxes(range=[0, 0.5], fixedrange=True, row=6, col=1)

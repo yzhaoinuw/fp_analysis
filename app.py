@@ -5,12 +5,14 @@ Created on Mon Jun 26 15:53:49 2023
 @author: Yue
 """
 
+import json
 import base64
 import webbrowser
 from io import BytesIO
 from threading import Timer
 
 from trace_updater import TraceUpdater
+import dash
 from dash import Dash, dcc, html
 from dash.exceptions import PreventUpdate
 from dash.dependencies import Input, Output, State
@@ -43,6 +45,7 @@ def run_app():
             ),
             html.Div(id="upload-container"),
             html.Div(id="output-data-upload"),
+            html.Div(id="output", style={"display": "none"}),
         ]
     )
 
@@ -120,6 +123,8 @@ def update_output(contents, filename, task):
                                 style={"width": "200px"},
                             ),
                             html.Button("Add Annotation", id="add-button"),
+                            html.Button("Undo Annotation", id="undo-button"),
+                            html.Button("Save Annotation", id="save-button"),
                         ],
                         style={"display": "flex"},
                     ),
@@ -135,36 +140,64 @@ def update_output(contents, filename, task):
 @app.callback(
     Output("graph-1", "figure"),
     Input("add-button", "n_clicks"),
+    Input("undo-button", "n_clicks"),
     State("start", "value"),
     State("end", "value"),
     State("label", "value"),
     State("graph-1", "figure"),
+    prevent_initial_call=True,
 )
-def add_annotation(n_clicks, start, end, label, figure):
-    if start is None or end is None or label is None:
+def add_annotation(add_n_clicks, undo_n_clicks, start, end, label, figure):
+    ctx = dash.callback_context
+    if not ctx.triggered:
         return figure
-
-    shape = dict(
-        type="rect",
-        # coordinates in data reference
-        xref="x6",
-        yref="y6",
-        x0=start,
-        y0=-1,
-        x1=end,
-        y1=2,
-        fillcolor=stage_colors[label],
-        opacity=0.5,
-        layer="above",
-        line_width=0,
-    )
-
-    # figure['layout'].update(shapes=shapes)
-    if "shapes" in figure["layout"]:
-        figure["layout"]["shapes"].append(shape)
     else:
-        figure["layout"]["shapes"] = [shape]
+        button_id = ctx.triggered[0]["prop_id"].split(".")[0]
+
+    # If 'shapes' key doesn't exist in the layout, create an empty list
+    if "shapes" not in figure["layout"]:
+        figure["layout"]["shapes"] = []
+
+    if button_id == "add-button":
+        if start is None or end is None or label is None:
+            return figure
+
+        shape = dict(
+            type="rect",
+            # coordinates in data reference
+            xref="x6",
+            yref="y6",
+            x0=start,
+            y0=-1,
+            x1=end,
+            y1=2,
+            fillcolor=stage_colors[label],
+            opacity=0.5,
+            layer="above",
+            line_width=0,
+        )
+        figure["layout"]["shapes"].append(shape)
+
+    elif button_id == "undo-button":
+        # If 'shapes' key doesn't exist in the layout or there's no shape to remove, do nothing
+        if figure["layout"]["shapes"]:
+            # Remove the last shape
+            figure["layout"]["shapes"].pop()
     return figure
+
+
+@app.callback(
+    Output("output", "children"),  # You need to add this hidden div to your layout
+    Input("save-button", "n_clicks"),
+    State("graph-1", "figure"),
+    prevent_initial_call=True,
+)
+def save_annotations(n_clicks, figure):
+    if n_clicks:
+        shapes = figure["layout"].get("shapes", [])
+        with open("annotations.json", "w") as f:
+            json.dump(shapes, f)
+    return "annotations saved."
 
 
 def open_browser():
