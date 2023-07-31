@@ -10,13 +10,10 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from plotly_resampler import FigureResampler
 
+from config import annotation_config, annotation_color_map
 
-# Define custom colorscale
-stage_colors = [
-    "rgb(102, 178, 255)",
-    "rgb(255, 102, 255)",
-    "rgb(102, 255, 102)",
-]  # colors for the legend
+# load custom colorscale
+stage_colors = list(annotation_color_map.keys())
 
 
 def make_figure(pred):
@@ -200,6 +197,22 @@ def make_figure(pred):
     fig.update_yaxes(fixedrange=True, row=5, col=1)
     fig.update_yaxes(range=[0, 0.5], fixedrange=True, row=6, col=1)
     fig.update_annotations(font_size=12)
+
+    # load annotations if exist
+    if "annotated" in pred:
+        x0, x1, fillcolor = (
+            pred["annotation_x0"].squeeze(),
+            pred["annotation_x1"].squeeze(),
+            pred["annotation_fillcolor"].squeeze(),
+        )
+        for i in range(len(x0)):
+            fig.add_shape(
+                x0=x0[i],
+                x1=x1[i],
+                fillcolor=fillcolor[i],
+                **annotation_config,
+            )
+
     fig["layout"]["annotations"][-1]["font"]["size"] = 14
     return fig
 
@@ -210,6 +223,6 @@ if __name__ == "__main__":
 
     io.renderers.default = "browser"
     path = "C:\\Users\\Yue\\python_projects\\sleep_scoring\\"
-    pred = loadmat(path + "final_results.mat")
+    pred = loadmat(path + "results.mat")
     fig = make_figure(pred)
     fig.show_dash()
