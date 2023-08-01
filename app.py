@@ -311,4 +311,4 @@ def open_browser():
 if __name__ == "__main__":
     run_app()
     Timer(1, open_browser).start()
-    app.run_server(debug=True, port=8050)
+    app.run_server(debug=False, port=8050)
