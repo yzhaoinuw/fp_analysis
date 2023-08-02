@@ -198,12 +198,12 @@ def make_figure(pred):
     fig.update_yaxes(range=[0, 0.5], fixedrange=True, row=6, col=1)
     fig.update_annotations(font_size=12)
 
-    # load annotations if exist
-    if "annotated" in pred:
+    # load annotations if exist and non-empty
+    if pred.get("annotated", False):
         x0, x1, fillcolor = (
-            pred["annotation_x0"].squeeze(),
-            pred["annotation_x1"].squeeze(),
-            pred["annotation_fillcolor"].squeeze(),
+            pred["annotation_x0"].squeeze(axis=0),
+            pred["annotation_x1"].squeeze(axis=0),
+            pred["annotation_fillcolor"],
         )
         for i in range(len(x0)):
             fig.add_shape(
@@ -223,6 +223,6 @@ if __name__ == "__main__":
 
     io.renderers.default = "browser"
     path = "C:\\Users\\Yue\\python_projects\\sleep_scoring\\"
-    pred = loadmat(path + "results.mat")
+    pred = loadmat(path + "data_predictions.mat")
     fig = make_figure(pred)
     fig.show_dash()

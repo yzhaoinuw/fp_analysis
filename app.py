@@ -263,10 +263,7 @@ def add_annotation(add_n_clicks, undo_n_clicks, start, end, label, figure):
     prevent_initial_call=True,
 )
 def show_save_annotation_status(n_clicks, figure):
-    shapes = figure["layout"].get("shapes", [])
-    if not shapes:
-        return dash.no_update, dash.no_update
-
+    #shapes = figure["layout"].get("shapes", [])
     return 5, "Saving annotations. This may take up to 10 seconds."
 
 
@@ -292,14 +289,15 @@ def save_annotations(n_clicks, figure, mat_filename):
     mat = loadmat(temp_mat_path)
     shapes = figure["layout"].get("shapes", [])
     if not shapes:
-        return None
+        mat["annotated"] = False
+    else:
+        mat["annotated"] = True
     annotations = defaultdict(list)
     for shape in shapes:
         for k in ["x0", "x1", "fillcolor"]:
             annotations[k].append(shape[k])
     for k, v in annotations.items():
         mat["annotation_" + k] = np.array(v)
-    mat["annotated"] = True
     savemat(temp_mat_path, mat)
     return dcc.send_file(temp_mat_path)
 
