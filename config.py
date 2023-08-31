@@ -5,13 +5,15 @@ Created on Mon Jul 31 11:48:52 2023
 @author: Yue
 """
 
+sleep_score_opacity = 0.5
+
 annotation_config = {
     "type": "rect",
-    "xref": "x6",
-    "yref": "y6",
+    "xref": "x5",
+    "yref": "y5",
     "y0": -1,
     "y1": 2,
-    "opacity": 0.5,
+    "opacity": sleep_score_opacity,
     "layer": "above",
     "line_width": 0,
 }

@@ -25,6 +25,7 @@ import numpy as np
 from scipy.io import loadmat, savemat
 
 from inference import run_inference
+from config import annotation_config
 from make_figure import make_figure, stage_colors
 
 
@@ -231,20 +232,10 @@ def add_annotation(add_n_clicks, undo_n_clicks, start, end, label, figure):
             return figure
 
         if end > start:
-            shape = dict(
-                type="rect",
-                # coordinates in data reference
-                xref="x6",
-                yref="y6",
-                x0=start,
-                y0=-1,
-                x1=end,
-                y1=2,
-                fillcolor=stage_colors[label],
-                opacity=0.5,
-                layer="above",
-                line_width=0,
-            )
+            shape = annotation_config
+            shape["x0"] = start
+            shape["x1"] = end
+            shape["fillcolor"] = stage_colors[label]
             figure["layout"]["shapes"].append(shape)
 
     elif button_id == "undo-button":
@@ -263,7 +254,7 @@ def add_annotation(add_n_clicks, undo_n_clicks, start, end, label, figure):
     prevent_initial_call=True,
 )
 def show_save_annotation_status(n_clicks, figure):
-    #shapes = figure["layout"].get("shapes", [])
+    # shapes = figure["layout"].get("shapes", [])
     return 5, "Saving annotations. This may take up to 10 seconds."
 
 

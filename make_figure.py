@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from plotly_resampler import FigureResampler
 
-from config import annotation_config, annotation_color_map
+from config import annotation_config, annotation_color_map, sleep_score_opacity
 
 # load custom colorscale
 stage_colors = list(annotation_color_map.keys())
@@ -35,25 +35,27 @@ def make_figure(pred):
     y_x1 = pred["eeg"].flatten()
     y_x2 = pred["emg"].flatten()
     y_x3 = pred["ne"].flatten()
+    eeg_min, eeg_max = min(y_x1), max(y_x2)
+    emg_min, emg_max = min(y_x2), max(y_x2)
+    ne_min, ne_max = min(y_x3), max(y_x3)
     predictions = pred["pred_labels"].flatten()
     confidence = pred["scores"].flatten()
     user_annotation_dummy = np.zeros(end_time)
 
     fig = FigureResampler(
         make_subplots(
-            rows=6,
+            rows=5,
             cols=1,
             shared_xaxes=True,
-            vertical_spacing=0.03,
+            vertical_spacing=0.05,
             subplot_titles=(
                 "EEG",
                 "EMG",
                 "NE",
-                "Predicted Sleep Scores",
                 "Prediction Confidence",
                 "User Annotation",
             ),
-            row_heights=[0.25, 0.25, 0.25, 0.05, 0.05, 0.15],
+            row_heights=[0.25, 0.25, 0.25, 0.1, 0.15],
         )
     )
 
@@ -66,12 +68,14 @@ def make_figure(pred):
     ]
     sleep_scores = go.Heatmap(
         x=time,
+        y0=0,
+        dy=20,  # assuming that the max abs value of eeg, emg, or ne is no more than 10
         z=[predictions],
         text=[hovertext],
         hoverinfo="text",
         colorscale=colorscale,
         showscale=False,
-        opacity=0.6,
+        opacity=sleep_score_opacity,
     )
 
     conf = go.Heatmap(
@@ -86,7 +90,7 @@ def make_figure(pred):
             lenmode="fraction",  # set the mode of length to fraction
             len=0.15,  # the length of the colorbar
             yanchor="bottom",  # anchor the colorbar at the top
-            y=0.19,  # the y position of the colorbar
+            y=0.24,  # the y position of the colorbar
             xanchor="right",  # anchor the colorbar at the left
             x=0.75,  # the x position of the colorbar
             tickfont=dict(size=8),
@@ -143,9 +147,11 @@ def make_figure(pred):
         row=3,
         col=1,
     )
-    fig.add_trace(sleep_scores, row=4, col=1)
-    fig.add_trace(conf, row=5, col=1)
-    fig.add_trace(user_annotation, row=6, col=1)
+    fig.add_trace(sleep_scores, row=1, col=1)
+    fig.add_trace(sleep_scores, row=2, col=1)
+    fig.add_trace(sleep_scores, row=3, col=1)
+    fig.add_trace(conf, row=4, col=1)
+    fig.add_trace(user_annotation, row=5, col=1)
 
     stage_names = ["Wake", "SWS", "REM"]  # Adjust this to match your stages
     for i, color in enumerate(stage_colors):
@@ -154,11 +160,13 @@ def make_figure(pred):
                 x=[-100],
                 y=[0.2],
                 mode="markers",
-                marker=dict(size=5, color=color, symbol="square"),
+                marker=dict(
+                    size=5, color=color, symbol="square", opacity=sleep_score_opacity
+                ),
                 name=stage_names[i],
                 showlegend=True,
             ),
-            row=4,
+            row=1,
             col=1,
         )
 
@@ -167,23 +175,24 @@ def make_figure(pred):
         margin=dict(t=50, l=20, r=20, b=40),
         height=800,
         hovermode="x unified",  # gives crosshair in one subplot
-        title_text="EEG, EMG, and NE with Predicted Sleep Scores",
+        title_text="Predicted Sleep Scores on EEG, EMG, and NE.",
         yaxis4=dict(tickvals=[]),  # suppress y ticks on the heatmap
         yaxis5=dict(tickvals=[]),
-        yaxis6=dict(tickvals=[]),
         legend=dict(
-            x=0.6,  # adjust these values to position the legend
-            y=0.3,  # stage_names
+            x=0.6,  # adjust these values to position the sleep score legend
+            y=1.05,  # stage_names
             orientation="h",  # makes legend items horizontal
             bgcolor="rgba(0,0,0,0)",  # transparent legend background
-            font=dict(size=9),  # adjust legend text size
+            font=dict(size=10),  # adjust legend text size
         ),
         font=dict(
-            size=10,  # title font size
+            size=12,  # title font size
         ),
+        modebar_remove=["lasso2d"],
+        modebar_add=["eraseshape"],
     )
 
-    fig.update_traces(xaxis="x6")  # gives crosshair across all subplots
+    fig.update_traces(xaxis="x5")  # gives crosshair across all subplots
     fig.update_traces(colorbar_orientation="h", selector=dict(type="heatmap"))
     fig.update_xaxes(range=[start_time, end_time], row=1, col=1)
     fig.update_xaxes(range=[start_time, end_time], row=2, col=1)
@@ -191,12 +200,37 @@ def make_figure(pred):
     fig.update_xaxes(range=[start_time, end_time], row=4, col=1)
     fig.update_xaxes(range=[start_time, end_time], row=5, col=1)
     fig.update_xaxes(
-        range=[start_time, end_time], row=6, col=1, title_text="<b>Time (s)</b>"
+        range=[start_time, end_time], row=5, col=1, title_text="<b>Time (s)</b>"
     )
+
+    fig.update_yaxes(
+        range=[
+            eeg_min - 0.1 * (eeg_max - eeg_min),
+            eeg_max + 0.1 * (eeg_max - eeg_min),
+        ],
+        fixedrange=True,
+        row=1,
+        col=1,
+    )
+    fig.update_yaxes(
+        range=[
+            emg_min - 0.1 * (emg_max - emg_min),
+            emg_max + 0.1 * (emg_max - emg_min),
+        ],
+        fixedrange=True,
+        row=2,
+        col=1,
+    )
+    fig.update_yaxes(
+        range=[ne_min - 0.1 * (ne_max - ne_min), ne_max + 0.1 * (ne_max - ne_min)],
+        fixedrange=True,
+        row=3,
+        col=1,
+    )
+
     fig.update_yaxes(fixedrange=True, row=4, col=1)
-    fig.update_yaxes(fixedrange=True, row=5, col=1)
-    fig.update_yaxes(range=[0, 0.5], fixedrange=True, row=6, col=1)
-    fig.update_annotations(font_size=12)
+    fig.update_yaxes(range=[0, 0.5], fixedrange=True, row=5, col=1)
+    fig.update_annotations(font_size=14)  # subplot title size
 
     # load annotations if exist and non-empty
     if pred.get("annotated", False):
@@ -214,6 +248,7 @@ def make_figure(pred):
             )
 
     fig["layout"]["annotations"][-1]["font"]["size"] = 14
+
     return fig
 
 
@@ -222,7 +257,7 @@ if __name__ == "__main__":
     from scipy.io import loadmat
 
     io.renderers.default = "browser"
-    path = "C:\\Users\\Yue\\python_projects\\sleep_scoring\\"
+    path = ".\\"
     pred = loadmat(path + "data_predictions.mat")
     fig = make_figure(pred)
     fig.show_dash()
