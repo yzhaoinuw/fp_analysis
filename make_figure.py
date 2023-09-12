@@ -56,7 +56,8 @@ def make_figure(pred):
                 "User Annotation",
             ),
             row_heights=[0.25, 0.25, 0.25, 0.1, 0.15],
-        )
+        ),
+        default_n_shown_samples=2000,
     )
 
     colorscale = [[0, stage_colors[0]], [0.5, stage_colors[1]], [1, stage_colors[2]]]
@@ -189,7 +190,7 @@ def make_figure(pred):
             size=12,  # title font size
         ),
         modebar_remove=["lasso2d"],
-        modebar_add=["eraseshape"],
+        modebar_add=["drawrect", "eraseshape"],
     )
 
     fig.update_traces(xaxis="x5")  # gives crosshair across all subplots

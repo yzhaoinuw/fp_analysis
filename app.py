@@ -31,7 +31,7 @@ from make_figure import make_figure, stage_colors
 
 app = Dash(__name__)
 port = 8050
-fig = FigureResampler()
+fig = FigureResampler(default_n_shown_samples=2000)
 fig.register_update_graph_callback(
     app=app, graph_id="graph-1", trace_updater_id="trace-updater-1"
 )
