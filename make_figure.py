@@ -44,7 +44,7 @@ def make_figure(pred):
 
     fig = FigureResampler(
         make_subplots(
-            rows=5,
+            rows=4,
             cols=1,
             shared_xaxes=True,
             vertical_spacing=0.05,
@@ -53,9 +53,9 @@ def make_figure(pred):
                 "EMG",
                 "NE",
                 "Prediction Confidence",
-                "User Annotation",
+                # "User Annotation",
             ),
-            row_heights=[0.25, 0.25, 0.25, 0.1, 0.15],
+            row_heights=[0.3, 0.3, 0.3, 0.1],
         ),
         default_n_shown_samples=2000,
     )
@@ -91,21 +91,12 @@ def make_figure(pred):
             lenmode="fraction",  # set the mode of length to fraction
             len=0.15,  # the length of the colorbar
             yanchor="bottom",  # anchor the colorbar at the top
-            y=0.24,  # the y position of the colorbar
+            y=0.08,  # the y position of the colorbar
             xanchor="right",  # anchor the colorbar at the left
             x=0.75,  # the x position of the colorbar
             tickfont=dict(size=8),
         ),
         showscale=True,
-    )
-
-    user_annotation = go.Heatmap(
-        x=time,
-        z=[user_annotation_dummy],
-        hoverinfo="x",
-        colorscale="gray",
-        showscale=False,
-        opacity=0.1,
     )
 
     # Add the time series to the figure
@@ -152,9 +143,8 @@ def make_figure(pred):
     fig.add_trace(sleep_scores, row=2, col=1)
     fig.add_trace(sleep_scores, row=3, col=1)
     fig.add_trace(conf, row=4, col=1)
-    fig.add_trace(user_annotation, row=5, col=1)
 
-    stage_names = ["Wake", "SWS", "REM"]  # Adjust this to match your stages
+    stage_names = ["Wake: 0", "SWS: 1", "REM: 2"]  # Adjust this to match your stages
     for i, color in enumerate(stage_colors):
         fig.add_trace(
             go.Scatter(
@@ -178,7 +168,6 @@ def make_figure(pred):
         hovermode="x unified",  # gives crosshair in one subplot
         title_text="Predicted Sleep Scores on EEG, EMG, and NE.",
         yaxis4=dict(tickvals=[]),  # suppress y ticks on the heatmap
-        yaxis5=dict(tickvals=[]),
         legend=dict(
             x=0.6,  # adjust these values to position the sleep score legend
             y=1.05,  # stage_names
@@ -190,18 +179,17 @@ def make_figure(pred):
             size=12,  # title font size
         ),
         modebar_remove=["lasso2d"],
-        modebar_add=["drawrect", "eraseshape"],
+        clickmode="event",
     )
 
-    fig.update_traces(xaxis="x5")  # gives crosshair across all subplots
+    fig.update_traces(xaxis="x4")  # gives crosshair across all subplots
     fig.update_traces(colorbar_orientation="h", selector=dict(type="heatmap"))
     fig.update_xaxes(range=[start_time, end_time], row=1, col=1)
     fig.update_xaxes(range=[start_time, end_time], row=2, col=1)
     fig.update_xaxes(range=[start_time, end_time], row=3, col=1)
     fig.update_xaxes(range=[start_time, end_time], row=4, col=1)
-    fig.update_xaxes(range=[start_time, end_time], row=5, col=1)
     fig.update_xaxes(
-        range=[start_time, end_time], row=5, col=1, title_text="<b>Time (s)</b>"
+        range=[start_time, end_time], row=4, col=1, title_text="<b>Time (s)</b>"
     )
 
     fig.update_yaxes(
@@ -229,25 +217,8 @@ def make_figure(pred):
         col=1,
     )
 
-    fig.update_yaxes(fixedrange=True, row=4, col=1)
-    fig.update_yaxes(range=[0, 0.5], fixedrange=True, row=5, col=1)
+    fig.update_yaxes(range=[0, 0.5], fixedrange=True, row=4, col=1)
     fig.update_annotations(font_size=14)  # subplot title size
-
-    # load annotations if exist and non-empty
-    if pred.get("annotated", False):
-        x0, x1, fillcolor = (
-            pred["annotation_x0"].squeeze(axis=0),
-            pred["annotation_x1"].squeeze(axis=0),
-            pred["annotation_fillcolor"],
-        )
-        for i in range(len(x0)):
-            fig.add_shape(
-                x0=x0[i],
-                x1=x1[i],
-                fillcolor=fillcolor[i],
-                **annotation_config,
-            )
-
     fig["layout"]["annotations"][-1]["font"]["size"] = 14
 
     return fig
