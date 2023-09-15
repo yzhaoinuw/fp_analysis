@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from plotly_resampler import FigureResampler
 
-from config import annotation_config, annotation_color_map, sleep_score_opacity
+from config import annotation_color_map, sleep_score_opacity
 
 # load custom colorscale
 stage_colors = list(annotation_color_map.keys())
@@ -39,8 +39,7 @@ def make_figure(pred):
     emg_min, emg_max = min(y_x2), max(y_x2)
     ne_min, ne_max = min(y_x3), max(y_x3)
     predictions = pred["pred_labels"].flatten()
-    confidence = pred["scores"].flatten()
-    user_annotation_dummy = np.zeros(end_time)
+    confidence = pred["confidence"].flatten()
 
     fig = FigureResampler(
         make_subplots(
@@ -152,7 +151,7 @@ def make_figure(pred):
                 y=[0.2],
                 mode="markers",
                 marker=dict(
-                    size=5, color=color, symbol="square", opacity=sleep_score_opacity
+                    size=8, color=color, symbol="square", opacity=sleep_score_opacity
                 ),
                 name=stage_names[i],
                 showlegend=True,

@@ -12,7 +12,6 @@ import tempfile
 import webbrowser
 from io import BytesIO
 from threading import Timer
-from collections import defaultdict
 
 from trace_updater import TraceUpdater
 import dash
@@ -23,12 +22,10 @@ from dash_extensions import EventListener
 
 from plotly_resampler import FigureResampler
 
-import numpy as np
 from scipy.io import loadmat, savemat
 
 from inference import run_inference
-from config import annotation_config
-from make_figure import make_figure, stage_colors
+from make_figure import make_figure
 
 
 app = Dash(__name__)
@@ -231,6 +228,9 @@ def update_sleep_scores(box_select_range, keyboard_nevents, keyboard_event, figu
                 figure["data"][3]["z"][0][start : end + 1] = [label] * (end - start + 1)
                 figure["data"][4]["z"][0][start : end + 1] = [label] * (end - start + 1)
                 figure["data"][5]["z"][0][start : end + 1] = [label] * (end - start + 1)
+                figure["data"][6]["z"][0][start : end + 1] = [1] * (
+                    end - start + 1
+                )  # change conf to 1
             return figure
     return dash.no_update
 
@@ -266,6 +266,8 @@ def clear_display(n):
 def save_annotations(n_clicks, figure, mat_filename):
     temp_mat_path = os.path.join(TEMP_PATH, mat_filename)
     mat = loadmat(temp_mat_path)
+    mat["pred_labels"] = figure["data"][3]["z"][0]
+    mat["confidence"] = figure["data"][6]["z"][0]
     savemat(temp_mat_path, mat)
     return dcc.send_file(temp_mat_path)
 
@@ -277,4 +279,4 @@ def open_browser():
 if __name__ == "__main__":
     run_app()
     Timer(1, open_browser).start()
-    app.run_server(debug=True, port=8050)
+    app.run_server(debug=False, port=8050)

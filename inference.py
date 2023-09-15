@@ -66,7 +66,7 @@ def run_inference(data, model_path=None, output_path=None):
 
     results = {
         "pred_labels": final_labels,
-        "scores": probs,
+        "confidence": probs,
         "eeg": eeg,
         "emg": emg,
         "ne": ne,
