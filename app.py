@@ -6,31 +6,31 @@ Created on Mon Jun 26 15:53:49 2023
 """
 
 import os
+import json
 import base64
 import tempfile
 import webbrowser
 from io import BytesIO
 from threading import Timer
-from collections import defaultdict
 
 from trace_updater import TraceUpdater
 import dash
 from dash import Dash, dcc, html
 from dash.exceptions import PreventUpdate
 from dash.dependencies import Input, Output, State
+from dash_extensions import EventListener
 
 from plotly_resampler import FigureResampler
 
-import numpy as np
 from scipy.io import loadmat, savemat
 
 from inference import run_inference
-from make_figure import make_figure, stage_colors
+from make_figure import make_figure
 
 
 app = Dash(__name__)
 port = 8050
-fig = FigureResampler()
+fig = FigureResampler(default_n_shown_samples=2000)
 fig.register_update_graph_callback(
     app=app, graph_id="graph-1", trace_updater_id="trace-updater-1"
 )
@@ -163,27 +163,14 @@ def update_output(file_validated, contents, filename, task):
                     html.Div(
                         style={"display": "flex"},
                         children=[
+                            dcc.Store(id="box-select-store"),
+                            EventListener(
+                                id="keyboard",
+                                events=[{"event": "keydown", "props": ["key"]}],
+                            ),
                             html.Div(
                                 style={"display": "flex", "margin-right": "5px"},
                                 children=[
-                                    dcc.Input(
-                                        id="start", type="number", placeholder="start"
-                                    ),
-                                    dcc.Input(
-                                        id="end", type="number", placeholder="end"
-                                    ),
-                                    dcc.Dropdown(
-                                        id="label",
-                                        options=[
-                                            {"label": "0: Wake", "value": 0},
-                                            {"label": "1: SWS", "value": 1},
-                                            {"label": "2: REM", "value": 2},
-                                        ],
-                                        placeholder="Select a Sleep Score",
-                                        style={"width": "200px"},
-                                    ),
-                                    html.Button("Add Annotation", id="add-button"),
-                                    html.Button("Undo Annotation", id="undo-button"),
                                     html.Button("Save Annotations", id="save-button"),
                                     dcc.Download(id="download-annotations"),
                                 ],
@@ -193,7 +180,7 @@ def update_output(file_validated, contents, filename, task):
                                 interval=1 * 1000,  # in milliseconds
                                 max_intervals=0,  # stop after the first interval
                             ),
-                            html.Div(id="save-annotation-status"),
+                            html.Div(id="annotation-message"),
                         ],
                     ),
                 ],
@@ -206,69 +193,61 @@ def update_output(file_validated, contents, filename, task):
 
 
 @app.callback(
+    Output("box-select-store", "data"),
+    Output("annotation-message", "children", allow_duplicate=True),
+    Input("graph-1", "selectedData"),
+    prevent_initial_call=True,
+)
+def read_box_select(box_select):
+    try:
+        start, end = box_select["range"]["x4"]
+    except KeyError:
+        return None, ""
+    start = round(start)
+    end = round(end)
+    return json.dumps([start, end]), "Press 0 for Wake, 1 for SWS, and 2 for REM."
+
+
+@app.callback(
     Output("graph-1", "figure"),
-    Input("add-button", "n_clicks"),
-    Input("undo-button", "n_clicks"),
-    State("start", "value"),
-    State("end", "value"),
-    State("label", "value"),
+    Input("box-select-store", "data"),
+    Input("keyboard", "n_events"),
+    State("keyboard", "event"),
     State("graph-1", "figure"),
     prevent_initial_call=True,
 )
-def add_annotation(add_n_clicks, undo_n_clicks, start, end, label, figure):
+def update_sleep_scores(box_select_range, keyboard_nevents, keyboard_event, figure):
     ctx = dash.callback_context
-    if not ctx.triggered:
-        return figure
-    else:
-        button_id = ctx.triggered[0]["prop_id"].split(".")[0]
-
-    # If 'shapes' key doesn't exist in the layout, create an empty list
-    if "shapes" not in figure["layout"]:
-        figure["layout"]["shapes"] = []
-
-    if button_id == "add-button":
-        if start is None or end is None or label is None:
+    if ctx.triggered:
+        input_id = ctx.triggered[0]["prop_id"].split(".")[0]
+        if input_id == "keyboard":
+            label = keyboard_event.get("key")
+            if label in ["0", "1", "2"] and box_select_range:
+                label = int(label)
+                start, end = json.loads(box_select_range)
+                figure["data"][3]["z"][0][start : end + 1] = [label] * (end - start + 1)
+                figure["data"][4]["z"][0][start : end + 1] = [label] * (end - start + 1)
+                figure["data"][5]["z"][0][start : end + 1] = [label] * (end - start + 1)
+                figure["data"][6]["z"][0][start : end + 1] = [1] * (
+                    end - start + 1
+                )  # change conf to 1
             return figure
-
-        if end > start:
-            shape = dict(
-                type="rect",
-                # coordinates in data reference
-                xref="x6",
-                yref="y6",
-                x0=start,
-                y0=-1,
-                x1=end,
-                y1=2,
-                fillcolor=stage_colors[label],
-                opacity=0.5,
-                layer="above",
-                line_width=0,
-            )
-            figure["layout"]["shapes"].append(shape)
-
-    elif button_id == "undo-button":
-        # If 'shapes' key doesn't exist in the layout or there's no shape to remove, do nothing
-        if figure["layout"]["shapes"]:
-            # Remove the last shape
-            figure["layout"]["shapes"].pop()
-    return figure
+    return dash.no_update
 
 
 @app.callback(
     Output("interval-component", "max_intervals"),
-    Output("save-annotation-status", "children", allow_duplicate=True),
+    Output("annotation-message", "children", allow_duplicate=True),
     Input("save-button", "n_clicks"),
     State("graph-1", "figure"),
     prevent_initial_call=True,
 )
 def show_save_annotation_status(n_clicks, figure):
-    #shapes = figure["layout"].get("shapes", [])
     return 5, "Saving annotations. This may take up to 10 seconds."
 
 
 @app.callback(
-    Output("save-annotation-status", "children"),
+    Output("annotation-message", "children"),
     Input("interval-component", "n_intervals"),
 )
 def clear_display(n):
@@ -287,17 +266,8 @@ def clear_display(n):
 def save_annotations(n_clicks, figure, mat_filename):
     temp_mat_path = os.path.join(TEMP_PATH, mat_filename)
     mat = loadmat(temp_mat_path)
-    shapes = figure["layout"].get("shapes", [])
-    if not shapes:
-        mat["annotated"] = False
-    else:
-        mat["annotated"] = True
-    annotations = defaultdict(list)
-    for shape in shapes:
-        for k in ["x0", "x1", "fillcolor"]:
-            annotations[k].append(shape[k])
-    for k, v in annotations.items():
-        mat["annotation_" + k] = np.array(v)
+    mat["pred_labels"] = figure["data"][3]["z"][0]
+    mat["confidence"] = figure["data"][6]["z"][0]
     savemat(temp_mat_path, mat)
     return dcc.send_file(temp_mat_path)
 

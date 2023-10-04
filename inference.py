@@ -10,9 +10,10 @@ adpated from Shadi Sartipi's mice_3signal_june2023.ipynb
 from scipy import signal
 from scipy.io import savemat, loadmat
 import numpy as np
-from numpy.random import seed
 
-seed(1)
+# from numpy.random import seed
+
+# seed(1)
 
 from utils import segment_dataset
 from model import Sleep_Scoring_Model
@@ -61,12 +62,12 @@ def run_inference(data, model_path=None, output_path=None):
     for i in range(1, len(pred_labels) - 1):
         if pred_labels[i] == 1 and pred_labels[i - 1] == 0 and pred_labels[i + 1] == 0:
             final_labels[i] = 0
-        if pred_labels[i] == 2 and pred_labels[i - 1] == 0:
+        elif pred_labels[i] == 2 and pred_labels[i - 1] == 0:
             final_labels[i] = 0
 
     results = {
         "pred_labels": final_labels,
-        "scores": probs,
+        "confidence": probs,
         "eeg": eeg,
         "emg": emg,
         "ne": ne,
