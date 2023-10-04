@@ -203,8 +203,8 @@ def read_box_select(box_select):
         start, end = box_select["range"]["x4"]
     except KeyError:
         return None, ""
-    start = int(start)
-    end = int(end)
+    start = round(start)
+    end = round(end)
     return json.dumps([start, end]), "Press 0 for Wake, 1 for SWS, and 2 for REM."
 
 

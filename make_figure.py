@@ -102,7 +102,7 @@ def make_figure(pred):
     fig.add_trace(
         go.Scattergl(
             line=dict(width=1),
-            marker=dict(size=2),
+            marker=dict(size=2, color="black"),
             showlegend=False,
             mode="lines+markers",
             hoverinfo="x+y",
@@ -115,7 +115,7 @@ def make_figure(pred):
     fig.add_trace(
         go.Scattergl(
             line=dict(width=1),
-            marker=dict(size=2),
+            marker=dict(size=2, color="black"),
             showlegend=False,
             mode="lines+markers",
             hoverinfo="x+y",
@@ -128,7 +128,7 @@ def make_figure(pred):
     fig.add_trace(
         go.Scattergl(
             line=dict(width=1),
-            marker=dict(size=2),
+            marker=dict(size=2, color="black"),
             showlegend=False,
             mode="lines+markers",
             hoverinfo="x+y",
