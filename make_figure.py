@@ -177,7 +177,8 @@ def make_figure(pred):
         font=dict(
             size=12,  # title font size
         ),
-        modebar_remove=["lasso2d"],
+        modebar_remove=["lasso2d", "zoom"],
+        dragmode="pan",
         clickmode="event",
     )
 
@@ -196,7 +197,7 @@ def make_figure(pred):
             eeg_min - 0.1 * (eeg_max - eeg_min),
             eeg_max + 0.1 * (eeg_max - eeg_min),
         ],
-        fixedrange=True,
+        # fixedrange=True,
         row=1,
         col=1,
     )
@@ -205,13 +206,13 @@ def make_figure(pred):
             emg_min - 0.1 * (emg_max - emg_min),
             emg_max + 0.1 * (emg_max - emg_min),
         ],
-        fixedrange=True,
+        # fixedrange=True,
         row=2,
         col=1,
     )
     fig.update_yaxes(
         range=[ne_min - 0.1 * (ne_max - ne_min), ne_max + 0.1 * (ne_max - ne_min)],
-        fixedrange=True,
+        # fixedrange=True,
         row=3,
         col=1,
     )
@@ -231,4 +232,4 @@ if __name__ == "__main__":
     path = ".\\"
     pred = loadmat(path + "data_predictions.mat")
     fig = make_figure(pred)
-    fig.show_dash()
+    fig.show_dash(config={"scrollZoom": True})

@@ -114,7 +114,9 @@ def show_mat_read_status(contents, filename, task):
         Output("mat-filename", "data"),
         Output("download-prediction", "data"),
     ],
-    Input("validate-file-extension", "data"),
+    Input(
+        "validate-file-extension", "data"
+    ),  # must pass file extension check to trigger this callback
     State("upload-data", "contents"),
     State("upload-data", "filename"),
     State("task-selection", "value"),
@@ -149,6 +151,7 @@ def update_output(file_validated, contents, filename, task):
                     dcc.Graph(
                         id="graph-1",
                         config={
+                            "scrollZoom": True,
                             "editable": True,
                             "edits": {
                                 "axisTitleText": False,
