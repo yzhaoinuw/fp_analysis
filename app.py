@@ -13,13 +13,14 @@ import webbrowser
 from io import BytesIO
 from threading import Timer
 
-from trace_updater import TraceUpdater
 import dash
 from dash import Dash, dcc, html
 from dash.exceptions import PreventUpdate
 from dash.dependencies import Input, Output, State
 from dash_extensions import EventListener
 
+from flask_caching import Cache
+from trace_updater import TraceUpdater
 from plotly_resampler import FigureResampler
 
 from scipy.io import loadmat, savemat
@@ -35,6 +36,18 @@ fig.register_update_graph_callback(
     app=app, graph_id="graph-1", trace_updater_id="trace-updater-1"
 )
 TEMP_PATH = os.path.join(tempfile.gettempdir(), "sleep_scoring_app_data")
+if not os.path.exists(TEMP_PATH):
+    os.makedirs(TEMP_PATH)
+
+cache = Cache(
+    app.server,
+    config={
+        "CACHE_TYPE": "filesystem",
+        "CACHE_DIR": TEMP_PATH,
+        "CACHE_THRESHOLD": 10,
+        "CACHE_DEFAULT_TIMEOUT": 86400,  # to save cache for 1 day
+    },
+)
 
 
 def run_app():
@@ -50,7 +63,7 @@ def run_app():
             html.Div(id="upload-container"),
             html.Div(id="output-data-upload"),
             dcc.Store(id="validate-file-extension"),
-            dcc.Store(id="mat-filename"),
+            # dcc.Store(id="mat-filename"),
             dcc.Download(id="download-prediction"),
         ]
     )
@@ -111,7 +124,7 @@ def show_mat_read_status(contents, filename, task):
 @app.callback(
     [
         Output("output-data-upload", "children"),
-        Output("mat-filename", "data"),
+        # Output("mat-filename", "data"),
         Output("download-prediction", "data"),
     ],
     Input(
@@ -131,7 +144,8 @@ def update_output(file_validated, contents, filename, task):
 
     # clear TEMP_PATH regularly
     for temp_file in os.listdir(TEMP_PATH):
-        os.remove(os.path.join(TEMP_PATH, temp_file))
+        if temp_file.endswith(".mat"):
+            os.remove(os.path.join(TEMP_PATH, temp_file))
     temp_mat_path = os.path.join(TEMP_PATH, filename)
 
     if task == "gen":
@@ -139,12 +153,11 @@ def update_output(file_validated, contents, filename, task):
         run_inference(mat, model_path=None, output_path=output_path)
         return (
             html.Div(["The predictions have been generated successfully."]),
-            None,
             dcc.send_file(output_path),
         )
     else:  # task == 'vis'
         try:
-            savemat(temp_mat_path, mat)
+            # savemat(temp_mat_path, mat)
             fig.replace(make_figure(mat))
             div = html.Div(
                 children=[
@@ -188,11 +201,12 @@ def update_output(file_validated, contents, filename, task):
                     ),
                 ],
             )
-
-            return div, filename, None
+            cache.set("filename", filename)
+            cache.set("mat", mat)
+            return div, None
         except Exception as e:
             print(e)
-            return html.Div(["There was an error processing this file."]), None, None
+            return html.Div(["There was an error processing this file."]), None
 
 
 @app.callback(
@@ -263,12 +277,14 @@ def clear_display(n):
     Output("download-annotations", "data"),
     Input("save-button", "n_clicks"),
     State("graph-1", "figure"),
-    State("mat-filename", "data"),
+    # State("mat-filename", "data"),
     prevent_initial_call=True,
 )
-def save_annotations(n_clicks, figure, mat_filename):
+def save_annotations(n_clicks, figure):
+    mat_filename = cache.get("filename")
     temp_mat_path = os.path.join(TEMP_PATH, mat_filename)
-    mat = loadmat(temp_mat_path)
+    # mat = loadmat(temp_mat_path)
+    mat = cache.get("mat")
     mat["pred_labels"] = figure["data"][3]["z"][0]
     mat["confidence"] = figure["data"][6]["z"][0]
     savemat(temp_mat_path, mat)

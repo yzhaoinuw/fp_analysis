@@ -68,9 +68,9 @@ def run_inference(data, model_path=None, output_path=None):
     results = {
         "pred_labels": final_labels,
         "confidence": probs,
-        "eeg": eeg,
-        "emg": emg,
-        "ne": ne,
+        "trial_eeg": eeg,
+        "trial_emg": emg,
+        "trial_ne": ne,
         # "pred_beforcorrecting": pred_labels,
     }
     savemat(output_path, results)

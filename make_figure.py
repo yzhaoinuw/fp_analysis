@@ -18,11 +18,12 @@ stage_colors = list(annotation_color_map.keys())
 
 def make_figure(pred):
     # Time span and frequencies
-    start_time, end_time = 0, pred["eeg"].shape[0]
+    start_time, end_time = 0, pred["trial_eeg"].shape[0]
+    eeg, emg, ne = pred["trial_eeg"], pred["trial_emg"], pred["trial_ne"]
     freq_x1, freq_x2, freq_x3 = (
-        pred["eeg"].shape[1] * pred["eeg"].shape[0],
-        pred["emg"].shape[1] * pred["emg"].shape[0],
-        pred["ne"].shape[1] * pred["ne"].shape[0],  # example frequencies
+        eeg.shape[1] * eeg.shape[0],
+        emg.shape[1] * emg.shape[0],
+        ne.shape[1] * ne.shape[0],  # example frequencies
     )
 
     # Create the time sequences
@@ -32,9 +33,9 @@ def make_figure(pred):
     time = np.arange(start_time, end_time)
 
     # Create some example y-values
-    y_x1 = pred["eeg"].flatten()
-    y_x2 = pred["emg"].flatten()
-    y_x3 = pred["ne"].flatten()
+    y_x1 = eeg.flatten()
+    y_x2 = emg.flatten()
+    y_x3 = ne.flatten()
     eeg_min, eeg_max = min(y_x1), max(y_x2)
     emg_min, emg_max = min(y_x2), max(y_x2)
     ne_min, ne_max = min(y_x3), max(y_x3)
@@ -191,7 +192,6 @@ def make_figure(pred):
     fig.update_xaxes(
         range=[start_time, end_time], row=4, col=1, title_text="<b>Time (s)</b>"
     )
-
     fig.update_yaxes(
         range=[
             eeg_min - 0.1 * (eeg_max - eeg_min),
@@ -216,7 +216,6 @@ def make_figure(pred):
         row=3,
         col=1,
     )
-
     fig.update_yaxes(range=[0, 0.5], fixedrange=True, row=4, col=1)
     fig.update_annotations(font_size=14)  # subplot title size
     fig["layout"]["annotations"][-1]["font"]["size"] = 14
@@ -230,6 +229,6 @@ if __name__ == "__main__":
 
     io.renderers.default = "browser"
     path = ".\\"
-    pred = loadmat(path + "data_predictions.mat")
+    pred = loadmat(path + "data_prediction.mat")
     fig = make_figure(pred)
     fig.show_dash(config={"scrollZoom": True})

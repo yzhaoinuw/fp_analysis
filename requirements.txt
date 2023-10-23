@@ -4,3 +4,4 @@ numpy==1.23.5
 dash>=2.10.2
 plotly-resampler>=0.8.3.2
 plotly==5.15.0
+flask-caching==2.0.2
