@@ -18,13 +18,11 @@ import dash
 from dash import Dash, dcc, html
 from dash.exceptions import PreventUpdate
 from dash.dependencies import Input, Output, State
-from dash_extensions import EventListener
 
+import numpy as np
 from flask_caching import Cache
-from trace_updater import TraceUpdater
-from plotly_resampler import FigureResampler
-
 from scipy.io import loadmat, savemat
+from plotly_resampler import FigureResampler
 
 from inference import run_inference
 from make_figure import make_figure
@@ -57,12 +55,10 @@ def create_fig(default_n_shown_samples=2000):
     return fig
 
 
-def initiate_cache(cache):
-    cache.set("filename", "")
-    cache.set("mat", None)
+def initiate_cache(cache, filename, mat):
+    cache.set("filename", filename)
+    cache.set("mat", mat)
     cache.set("annotation_history", deque(maxlen=3))
-    cache.set("updated_pred", None)
-    cache.set("updated_conf", None)
 
 
 def run_app():
@@ -148,9 +144,7 @@ def read_mat(extension_validated, contents, filename, task):
             dash.no_update,
         )
 
-    initiate_cache(cache)
-    cache.set("filename", filename)
-    cache.set("mat", mat)
+    initiate_cache(cache, filename, mat)
     if task == "gen":
         return (
             html.Div(
@@ -207,7 +201,6 @@ def create_visualization(ready):
 
 @app.callback(
     Output("graph", "figure"),
-    Output("debug-message", "children"),
     Input("n-sample-dropdown", "value"),
     prevent_initial_call=True,
 )
@@ -215,15 +208,10 @@ def change_sampling_level(sampling_level):
     sampling_level_map = {"x1": 2000, "x2": 4000, "x4": 8000}
     n_samples = sampling_level_map[sampling_level]
     mat = cache.get("mat")
-    updated_pred, updated_conf = cache.get("updated_pred"), cache.get("updated_conf")
     fig = create_fig(default_n_shown_samples=n_samples)
     figure = make_figure(mat)
-    figure["data"][3]["z"][0][:] = updated_pred
-    figure["data"][4]["z"][0][:] = updated_pred
-    figure["data"][5]["z"][0][:] = updated_pred
-    figure["data"][6]["z"][0][:] = updated_conf
     fig.replace(figure)
-    return fig, str(type(figure["data"][3]["z"][0]))
+    return fig
 
 
 @app.callback(
@@ -247,6 +235,7 @@ def read_box_select(box_select, figure):
 
 @app.callback(
     Output("graph", "figure", allow_duplicate=True),
+    Output("undo-button", "style"),
     Input("box-select-store", "data"),
     Input("keyboard", "n_events"),
     State("keyboard", "event"),
@@ -283,26 +272,76 @@ def update_sleep_scores(box_select_range, keyboard_nevents, keyboard_event, figu
                     end - start + 1
                 )  # change conf to 1
 
-                cache.set("updated_pred", figure["data"][3]["z"][0])
-                cache.set("updated_conf", figure["data"][6]["z"][0])
-                return figure
-    return dash.no_update
+                mat = cache.get("mat")
+                mat["pred_labels"] = np.array(figure["data"][3]["z"][0])
+                mat["confidence"] = np.array(figure["data"][6]["z"][0])
+                cache.set("mat", mat)
+                return figure, {"display": "block"}
+    return dash.no_update, dash.no_update
+
+
+@app.callback(
+    Output("graph", "figure", allow_duplicate=True),
+    Output("undo-button", "style", allow_duplicate=True),
+    Input("undo-button", "n_clicks"),
+    State("graph", "figure"),
+    prevent_initial_call=True,
+)
+def undo_annotation(n_clicks, figure):
+    annotation_history = cache.get("annotation_history")
+    prev_annotation = annotation_history.pop()
+    (start, end, prev_pred, prev_conf) = prev_annotation
+
+    # undo figure
+    figure["data"][3]["z"][0][start:end] = prev_pred
+    figure["data"][4]["z"][0][start:end] = prev_pred
+    figure["data"][5]["z"][0][start:end] = prev_pred
+    figure["data"][6]["z"][0][start:end] = prev_conf
+
+    # undo cache
+    mat = cache.get("mat")
+    mat["pred_labels"] = np.array(figure["data"][3]["z"][0])
+    mat["confidence"] = np.array(figure["data"][6]["z"][0])
+    cache.set("mat", mat)
+
+    # update annotation_history
+    cache.set("annotation_history", annotation_history)
+    if not annotation_history:
+        return figure, {"display": "none"}
+    return figure, {"display": "block"}
 
 
 @app.callback(
     Output("download-annotations", "data"),
     Input("save-button", "n_clicks"),
-    State("graph", "figure"),
     prevent_initial_call=True,
 )
-def save_annotations(n_clicks, figure):
+def save_annotations(n_clicks):
     mat_filename = cache.get("filename")
     temp_mat_path = os.path.join(TEMP_PATH, mat_filename)
     mat = cache.get("mat")
-    mat["pred_labels"] = figure["data"][3]["z"][0]
-    mat["confidence"] = figure["data"][6]["z"][0]
     savemat(temp_mat_path, mat)
     return dcc.send_file(temp_mat_path)
+
+
+@app.callback(
+    Output("interval-component", "max_intervals"),
+    Output("annotation-message", "children", allow_duplicate=True),
+    Input("save-button", "n_clicks"),
+    prevent_initial_call=True,
+)
+def show_save_annotation_status(n_clicks, figure):
+    return 5, "Saving annotations. This may take up to 10 seconds."
+
+
+@app.callback(
+    Output("annotation-message", "children"),
+    Input("interval-component", "n_intervals"),
+)
+def clear_display(n):
+    if n == 5:
+        return ""
+    return dash.no_update
 
 
 def open_browser():
