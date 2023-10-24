@@ -42,16 +42,18 @@ cache = Cache(
         "CACHE_TYPE": "filesystem",
         "CACHE_DIR": TEMP_PATH,
         "CACHE_THRESHOLD": 10,
-        #'CACHE_DEFAULT_TIMEOUT': 86400, # to save cache for 1 day
+        "CACHE_DEFAULT_TIMEOUT": 86400,  # to save cache for 1 day, otherwise it is default to 300 s
     },
 )
 
 
-def create_fig(default_n_shown_samples=2000):
+def create_fig(mat, default_n_shown_samples=2000):
     fig = FigureResampler(default_n_shown_samples=default_n_shown_samples)
     fig.register_update_graph_callback(
         app=app, graph_id="graph", trace_updater_id="trace-updater"
     )
+    figure = make_figure(mat)
+    fig.replace(figure)
     return fig
 
 
@@ -192,9 +194,7 @@ def generate_prediction(ready):
 )
 def create_visualization(ready):
     mat = cache.get("mat")
-    fig = create_fig(default_n_shown_samples=2000)
-    figure = make_figure(mat)
-    fig.replace(figure)
+    fig = create_fig(mat, default_n_shown_samples=2000)
     graph.figure = fig
     return visualization_div
 
@@ -205,12 +205,12 @@ def create_visualization(ready):
     prevent_initial_call=True,
 )
 def change_sampling_level(sampling_level):
+    if sampling_level is None:
+        return dash.no_update
     sampling_level_map = {"x1": 2000, "x2": 4000, "x4": 8000}
     n_samples = sampling_level_map[sampling_level]
     mat = cache.get("mat")
-    fig = create_fig(default_n_shown_samples=n_samples)
-    figure = make_figure(mat)
-    fig.replace(figure)
+    fig = create_fig(mat, default_n_shown_samples=n_samples)
     return fig
 
 
