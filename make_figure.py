@@ -229,6 +229,6 @@ if __name__ == "__main__":
 
     io.renderers.default = "browser"
     path = ".\\"
-    pred = loadmat(path + "data_prediction.mat")
+    pred = loadmat(path + "data_prediction_msda_3class.mat")
     fig = make_figure(pred)
     fig.show_dash(config={"scrollZoom": True})

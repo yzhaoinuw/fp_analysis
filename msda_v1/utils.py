@@ -3,6 +3,7 @@
 Created on Thu Oct 26 16:41:54 2023
 
 @author: yzhao
+adpated from Shadi Sartipi's msda_version1_utils_byShadi.py
 """
 
 import warnings
@@ -13,95 +14,57 @@ import numpy as np
 
 import torch
 import torch.utils.data
-from torch.autograd import Variable
-import torch.backends.cudnn as cudnn
+
+from tqdm import tqdm
 
 from msda_v1.models import DSN, DSN2
 
 
-def test(model, dataloader, signaling):
+def run_test(num_class, batch_size, test_dataset, signaling):
     ###################
     # params          #
     ###################
     # mcf1s = MulticlassF1Score(num_classes=3, average='macro')
-    cuda = False
-    cudnn.benchmark = False
+    code_size_map = {100: 128, 200: 96, 400: 64, 300: 96, 600: 32, 500: 32}
+    model_path = f"./msda_{num_class}class_v1.pth"
+    code_size = code_size_map[signaling]
+    test_loader = torch.utils.data.DataLoader(
+        dataset=test_dataset, batch_size=batch_size, shuffle=False
+    )
+    if num_class == 3:
+        model = DSN(code_size=code_size)
+    else:
+        model = DSN2(code_size=code_size)
 
-    if signaling == 100:
-        my_net = DSN(code_size=128)
-    elif signaling == 200:
-        my_net = DSN(code_size=96)
-    elif signaling == 400:
-        my_net = DSN(code_size=64)
-    elif signaling == 300:
-        my_net = DSN(code_size=96)
-    elif signaling == 600:
-        my_net = DSN(code_size=32)
-    elif signaling == 500:
-        my_net = DSN(code_size=32)
+    model.load_state_dict(torch.load(model_path, map_location=torch.device("cpu")))
+    model.eval()
 
-    # my_net=DSN()
-    model_root = model
-    my_net.load_state_dict(torch.load(model_root, map_location=torch.device("cpu")))
-    my_net.eval()
-    # my_net.cuda()
-    len_dataloader = len(dataloader)
-    data_iter = iter(dataloader)
+    predictions = []
+    confidence = []
+    with tqdm(total=len(test_dataset), unit=" seconds of signal") as pbar:
+        with torch.no_grad():
+            for batch, (eeg_signal, ne_signal, emg_signal, fft_signal) in enumerate(
+                test_loader, 1
+            ):
+                output = model(
+                    eeg_signal,
+                    ne_signal,
+                    emg_signal,
+                    fft_signal,
+                    mode="source",
+                    signaling=signaling,
+                )
+                probs = output[3]
+                preds = torch.argmax(probs, axis=1)
+                conf = torch.max(probs, axis=1).values
+                predictions.extend(preds.tolist())
+                confidence.extend(conf.tolist())
+                pbar.update(batch_size)
+            pbar.set_postfix({"Batch": batch})
 
-    i = 0
-    n_total = 0
-    n_correct = 0
-    pred_label = []
-    result_pred = []
-
-    while i < len_dataloader:
-        data_input = next(data_iter)
-        img1, img2, img3, img4 = data_input
-
-        batch_size = len(img1)
-
-        input_img1 = torch.FloatTensor(batch_size, 1, 7, 128)
-        input_img2 = torch.FloatTensor(batch_size, 10, 1)
-        input_img3 = torch.FloatTensor(batch_size, 1, 7, 128)
-        input_img4 = torch.FloatTensor(batch_size, 512)
-
-        if cuda:
-            img1 = img1.cuda()
-            img2 = img2.cuda()
-            img3 = img3.cuda()
-            img4 = img4.cuda()
-            input_img1 = input_img1.cuda()
-            input_img2 = input_img2.cuda()
-            input_img3 = input_img3.cuda()
-            input_img4 = input_img4.cuda()
-
-        input_img1.resize_as_(input_img1).copy_(img1)
-        input_img2.resize_as_(input_img2).copy_(img2)
-        input_img3.resize_as_(input_img3).copy_(img3)
-        input_img4.resize_as_(input_img4).copy_(img4)
-        inputv_img1 = Variable(input_img1)
-        inputv_img2 = Variable(input_img2)
-        inputv_img3 = Variable(input_img3)
-        inputv_img4 = Variable(input_img4)
-
-        result = my_net(
-            inputv_img1,
-            inputv_img2,
-            inputv_img3,
-            inputv_img4,
-            mode="source",
-            signaling=signaling,
-        )
-        pred = result[3].data.max(1, keepdim=True)[1]
-
-        # f_1+=multiclass_f1_score(pred.squeeze(), classv_label, num_classes=3, average="macro")
-
-        n_total += batch_size
-        result_pred.append(result[3].data.cpu())
-
-        i += 1
-
-    return result_pred
+    predictions = np.array(predictions)
+    confidence = np.array(confidence)
+    return (predictions, confidence)
 
 
 ##################################################EDIT Labels#######################################
@@ -154,7 +117,7 @@ def edit_two(L):
     idx_ma = np.where(sws_t < 5)[0]
     mask = (sws_t >= 4) & (sws_t < 11)
     idx_wake = np.where(mask)[0]
-    print(idx_wake)
+    # print(idx_wake)
 
     for i in range(len(idx_ma)):
         temp = sws[idx_ma[i]]
@@ -203,7 +166,7 @@ def edit_three(L):
     idx_ma = np.where(sws_t < 4)[0]
     mask = (sws_t >= 4) & (sws_t < 11)
     idx_wake = np.where(mask)[0]
-    print(idx_wake)
+    # print(idx_wake)
 
     for i in range(len(idx_ma)):
         temp = sws[idx_ma[i]]
@@ -261,94 +224,6 @@ def find_ma(L):
             # else:
             label[temp[0] : temp[1] + 1] = 3
     return label
-
-
-#######################################################End EDIT###############################################
-
-
-def test2(model, dataloader, signaling):
-    ###################
-    # params          #
-    ###################
-
-    cuda = False
-    cudnn.benchmark = False
-
-    if signaling == 100:
-        my_net = DSN2(code_size=128)
-    elif signaling == 200:
-        my_net = DSN2(code_size=96)
-    elif signaling == 400:
-        my_net = DSN2(code_size=64)
-    elif signaling == 300:
-        my_net = DSN2(code_size=96)
-    elif signaling == 600:
-        my_net = DSN2(code_size=32)
-    elif signaling == 500:
-        my_net = DSN2(code_size=32)
-
-    # my_net=DSN()
-    model_root = model
-    my_net.load_state_dict(torch.load(model_root, map_location=torch.device("cpu")))
-    my_net.eval()
-    # my_net.cuda()
-    len_dataloader = len(dataloader)
-    data_iter = iter(dataloader)
-
-    i = 0
-    n_total = 0
-    n_correct = 0
-    pred_label = []
-    result_pred = []
-
-    while i < len_dataloader:
-        data_input = next(data_iter)
-        img1, img2, img3, img4 = data_input
-
-        batch_size = len(img1)
-
-        input_img1 = torch.FloatTensor(batch_size, 1, 7, 128)
-        input_img2 = torch.FloatTensor(batch_size, 10, 1)
-        input_img3 = torch.FloatTensor(batch_size, 1, 7, 128)
-        input_img4 = torch.FloatTensor(batch_size, 512)
-
-        if cuda:
-            img1 = img1.cuda()
-            img2 = img2.cuda()
-            img3 = img3.cuda()
-            img4 = img4.cuda()
-            input_img1 = input_img1.cuda()
-            input_img2 = input_img2.cuda()
-            input_img3 = input_img3.cuda()
-            input_img4 = input_img4.cuda()
-
-        input_img1.resize_as_(input_img1).copy_(img1)
-        input_img2.resize_as_(input_img2).copy_(img2)
-        input_img3.resize_as_(input_img3).copy_(img3)
-        input_img4.resize_as_(input_img4).copy_(img4)
-        inputv_img1 = Variable(input_img1)
-        inputv_img2 = Variable(input_img2)
-        inputv_img3 = Variable(input_img3)
-        inputv_img4 = Variable(input_img4)
-
-        result = my_net(
-            inputv_img1,
-            inputv_img2,
-            inputv_img3,
-            inputv_img4,
-            mode="source",
-            signaling=signaling,
-        )
-        pred = result[3].data.max(1, keepdim=True)[1]
-
-        # f_1+=multiclass_f1_score(pred.squeeze(), classv_label, num_classes=3, average="macro")
-
-        n_total += batch_size
-        result_pred.append(result[3].data.cpu())
-
-        i += 1
-
-    return result_pred
 
 
 def rolling_window(data, window, step):

@@ -179,7 +179,7 @@ def generate_prediction(ready):
     filename = cache.get("filename")
     mat = cache.get("mat")
     temp_mat_path = os.path.join(TEMP_PATH, filename)
-    output_path = os.path.splitext(temp_mat_path)[0] + "_prediction.mat"
+    output_path = os.path.splitext(temp_mat_path)[0] + "_prediction"
     run_inference(mat, model_path=None, output_path=output_path)
     return (
         html.Div(["The prediction has been generated successfully."]),

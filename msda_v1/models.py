@@ -363,7 +363,7 @@ class DSN(nn.Module):
 ########################IF we want Four class preds
 class DSN2(nn.Module):
     def __init__(self, code_size=None, n_class=3):
-        super(DSN, self).__init__()
+        super(DSN2, self).__init__()
         self.code_size = code_size
 
         ##########################################
