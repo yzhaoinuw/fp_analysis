@@ -1,5 +1,5 @@
 # Modify the following paths
-checkpoint_path = "./ckpt/BaseLine_Seq_ftALL_pl16_ns64_dm128_el2_dff512_eb0_bs8_f1_bs8/model_best.pth.tar"
+checkpoint_path = "./sdreamer/ckpt/BaseLine_Seq_ftALL_pl16_ns64_dm128_el2_dff512_eb0_bs8_f1_bs8/model_best.pth.tar"
 output_path = "./output/"
 
 # Do not change the following lines

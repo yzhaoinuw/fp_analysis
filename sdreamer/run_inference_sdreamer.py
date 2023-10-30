@@ -42,29 +42,6 @@ def infer(data, output_path=None):
     args = build_args()
     num_class = args.c_out
     batch_size = args.batch_size
-
-    if output_path is None:
-        output_path = "./data_prediction"
-    output_path += f"_sdreamer_{num_class}class.mat"
-
-    model = n2nBaseLineNE.Model(args)
-    eeg_data = data["trial_eeg"]  # (16946, 512)
-    emg_data = data["trial_emg"]  # (16946, 512)
-    ne_data = data["trial_ne"]  # (16946, 1017)
-
-    test_dataset = LongSequenceLoader(
-        eeg_data, emg_data, ne_data, n_sequcnes=args.n_sequences, useNorm=args.useNorm
-    )
-
-    data_loader = DataLoader(
-        test_dataset,
-        batch_size=batch_size,
-        shuffle=False,
-        num_workers=num_workers,
-        drop_last=False,
-        pin_memory=True,
-    )
-
     if args.use_gpu:
         if args.use_multi_gpu:
             device = torch.device("cuda")
@@ -72,6 +49,31 @@ def infer(data, output_path=None):
             device = torch.device("cuda:{}".format(args.gpu))
     else:
         device = torch.device("cpu")
+
+    if output_path is None:
+        output_path = "./data_prediction"
+    output_path += f"_sdreamer_{num_class}class.mat"
+
+    model = n2nBaseLineNE.Model(args)
+    ckpt_path = args.reload_ckpt
+    ckpt = torch.load(ckpt_path, map_location=device)
+    model.load_state_dict(ckpt["state_dict"])
+    eeg_data = data["trial_eeg"]  # (16946, 512)
+    emg_data = data["trial_emg"]  # (16946, 512)
+    ne_data = data["trial_ne"]  # (16946, 1017)
+
+    test_dataset = LongSequenceLoader(
+        eeg_data, emg_data, ne_data, n_sequences=args.n_sequences, useNorm=args.useNorm
+    )
+
+    data_loader = DataLoader(
+        test_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=0,
+        drop_last=False,
+        pin_memory=True,
+    )
 
     model.eval()
     with tqdm(total=len(test_dataset), unit=" seconds of signal") as pbar:

@@ -4,7 +4,7 @@ from torch.utils.data import Dataset
 
 
 class LongSequenceLoader(Dataset):
-    def __init__(self, eeg_data, emg_data, ne_data, n_sequcnes=16, useNorm=False):
+    def __init__(self, eeg_data, emg_data, ne_data, n_sequences=16, useNorm=False):
         eeg_data = eeg_data.reshape(
             (eeg_data.shape[0], 1, eeg_data.shape[1])
         )  # (16946, 1, 512)
@@ -27,7 +27,7 @@ class LongSequenceLoader(Dataset):
         ne_data_norm = (ne_data - ne_mean) / ne_std
 
         train_data = slice_trace_wNE(
-            trace_data, ne_data, trace_data_norm, ne_data_norm, n_sequcnes
+            trace_data, ne_data, trace_data_norm, ne_data_norm, n_sequences
         )
 
         self.traces = torch.cat([train_data[0], train_data[2]], dim=3)
