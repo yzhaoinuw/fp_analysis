@@ -10,11 +10,20 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from plotly_resampler import FigureResampler
 
-from config import annotation_color_map, sleep_score_opacity
 
-# load custom colorscale
-stage_colors = list(annotation_color_map.keys())
-
+# set up color config
+sleep_score_opacity = 0.5
+stage_colors = [
+    "rgb(102, 178, 255)", # Wake,
+    "rgb(255, 102, 255)", # SWS,
+    "rgb(102, 255, 102)", # REM,
+    "rgb(255, 128, 0)", # MA,
+]
+stage_names = ["Wake: 0", "SWS: 1", "REM: 2", "MA: 3"]
+colorscale = {
+    3: [[0, stage_colors[0]], [0.5, stage_colors[1]], [1, stage_colors[2]]],
+    4: [[0, stage_colors[0]], [1/3, stage_colors[1]], [2/3, stage_colors[2]], [1, stage_colors[3]]]
+}
 
 def make_figure(pred):
     # Time span and frequencies
@@ -41,6 +50,7 @@ def make_figure(pred):
     ne_min, ne_max = min(y_x3), max(y_x3)
     predictions = pred["pred_labels"].flatten()
     confidence = pred["confidence"].flatten()
+    num_class = len(np.unique(predictions))
 
     fig = FigureResampler(
         make_subplots(
@@ -60,8 +70,6 @@ def make_figure(pred):
         default_n_shown_samples=2000,
     )
 
-    colorscale = [[0, stage_colors[0]], [0.5, stage_colors[1]], [1, stage_colors[2]]]
-
     # Create a heatmap for stages
     hovertext = [
         f"time: {time[i]}\nconfidence: {confidence[i]:.2f}"
@@ -74,7 +82,7 @@ def make_figure(pred):
         z=[predictions],
         text=[hovertext],
         hoverinfo="text",
-        colorscale=colorscale,
+        colorscale=colorscale[num_class],
         showscale=False,
         opacity=sleep_score_opacity,
     )
@@ -144,8 +152,7 @@ def make_figure(pred):
     fig.add_trace(sleep_scores, row=3, col=1)
     fig.add_trace(conf, row=4, col=1)
 
-    stage_names = ["Wake: 0", "SWS: 1", "REM: 2"]  # Adjust this to match your stages
-    for i, color in enumerate(stage_colors):
+    for i, color in enumerate(stage_colors[:num_class]):
         fig.add_trace(
             go.Scatter(
                 x=[-100],
@@ -169,8 +176,8 @@ def make_figure(pred):
         title_text="Predicted Sleep Scores on EEG, EMG, and NE.",
         yaxis4=dict(tickvals=[]),  # suppress y ticks on the heatmap
         legend=dict(
-            x=0.6,  # adjust these values to position the sleep score legend
-            y=1.05,  # stage_names
+            x=0.6,  # adjust these values to position the sleep score legend stage_names
+            y=1.05,
             orientation="h",  # makes legend items horizontal
             bgcolor="rgba(0,0,0,0)",  # transparent legend background
             font=dict(size=10),  # adjust legend text size
@@ -229,6 +236,6 @@ if __name__ == "__main__":
 
     io.renderers.default = "browser"
     path = ".\\"
-    pred = loadmat(path + "data_prediction_msda_3class.mat")
+    pred = loadmat(path + "data_prediction_sdreamer_4class.mat")
     fig = make_figure(pred)
     fig.show_dash(config={"scrollZoom": True})

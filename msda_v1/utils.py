@@ -6,6 +6,7 @@ Created on Thu Oct 26 16:41:54 2023
 adpated from Shadi Sartipi's msda_version1_utils_byShadi.py
 """
 
+import os
 import warnings
 
 warnings.filterwarnings("ignore")
@@ -20,11 +21,13 @@ from tqdm import tqdm
 from msda_v1.models import DSN, DSN2
 
 
+num_workers = os.cpu_count()
+
+
 def run_test(num_class, batch_size, test_dataset, signaling):
     ###################
     # params          #
     ###################
-    # mcf1s = MulticlassF1Score(num_classes=3, average='macro')
     code_size_map = {100: 128, 200: 96, 400: 64, 300: 96, 600: 32, 500: 32}
     model_path = f"./msda_{num_class}class_v1.pth"
     code_size = code_size_map[signaling]
