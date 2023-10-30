@@ -76,11 +76,11 @@ def infer(data, output_path=None):
     )
 
     model.eval()
-    with tqdm(total=len(test_dataset), unit=" seconds of signal") as pbar:
+    with tqdm(total=eeg_data.shape[0], unit=" seconds of signal") as pbar:
         with torch.no_grad():
             all_pred = []
             all_prob = []
-            for batch, (traces, nes) in enumerate(data_loader):
+            for batch, (traces, nes) in enumerate(data_loader, 1):
                 traces = traces.to(device)  # [1, 64, 2, 1, 512]
                 nes = nes.to(device)  # # [1, 64, 1, 1, 1017]
 
@@ -92,8 +92,8 @@ def infer(data, output_path=None):
 
                 pred = np.argmax(out.detach().cpu(), axis=1)
                 all_pred.append(pred)
-                pbar.update(batch_size)
-            pbar.set_postfix({"Batch": batch})
+                pbar.update(batch_size*args.n_sequences)
+            pbar.set_postfix({"Number of batches": batch})
 
     all_pred = np.concatenate(all_pred)
     all_prob = np.concatenate(all_prob)

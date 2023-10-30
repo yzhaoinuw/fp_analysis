@@ -180,7 +180,7 @@ def generate_prediction(ready):
     mat = cache.get("mat")
     temp_mat_path = os.path.join(TEMP_PATH, filename)
     output_path = os.path.splitext(temp_mat_path)[0] + "_prediction"
-    run_inference(mat, model_path=None, output_path=output_path)
+    run_inference(mat, output_path=output_path)
     return (
         html.Div(["The prediction has been generated successfully."]),
         dcc.send_file(output_path),
@@ -236,6 +236,7 @@ def read_box_select(box_select, figure):
 @app.callback(
     Output("graph", "figure", allow_duplicate=True),
     Output("undo-button", "style"),
+    Output("debug-message", "children"),
     Input("box-select-store", "data"),
     Input("keyboard", "n_events"),
     State("keyboard", "event"),
@@ -255,29 +256,29 @@ def update_sleep_scores(box_select_range, keyboard_nevents, keyboard_event, figu
                 annotation_history.append(
                     (
                         start,
-                        end + 1,
+                        end,
                         figure["data"][3]["z"][0][
-                            start : end + 1
+                            start : end
                         ],  # previous prediction
                         figure["data"][6]["z"][0][
-                            start : end + 1
+                            start : end
                         ],  # previous confidence
                     )
                 )
                 cache.set("annotation_history", annotation_history)
-                figure["data"][3]["z"][0][start : end + 1] = [label] * (end - start + 1)
-                figure["data"][4]["z"][0][start : end + 1] = [label] * (end - start + 1)
-                figure["data"][5]["z"][0][start : end + 1] = [label] * (end - start + 1)
-                figure["data"][6]["z"][0][start : end + 1] = [1] * (
-                    end - start + 1
+                figure["data"][3]["z"][0][start : end] = [label] * (end - start)
+                figure["data"][4]["z"][0][start : end] = [label] * (end - start)
+                figure["data"][5]["z"][0][start : end] = [label] * (end - start)
+                figure["data"][6]["z"][0][start : end] = [1] * (
+                    end - start
                 )  # change conf to 1
 
                 mat = cache.get("mat")
                 mat["pred_labels"] = np.array(figure["data"][3]["z"][0])
                 mat["confidence"] = np.array(figure["data"][6]["z"][0])
                 cache.set("mat", mat)
-                return figure, {"display": "block"}
-    return dash.no_update, dash.no_update
+                return figure, {"display": "block"}, f"{start}, {end}"
+    return dash.no_update, dash.no_update, dash.no_update
 
 
 @app.callback(

@@ -46,6 +46,8 @@ def run_test(num_class, batch_size, test_dataset, signaling):
     confidence = []
     with tqdm(total=len(test_dataset), unit=" seconds of signal") as pbar:
         with torch.no_grad():
+            if num_class == 4:
+                pbar.set_description("Labeling MA stages")
             for batch, (eeg_signal, ne_signal, emg_signal, fft_signal) in enumerate(
                 test_loader, 1
             ):
@@ -63,7 +65,7 @@ def run_test(num_class, batch_size, test_dataset, signaling):
                 predictions.extend(preds.tolist())
                 confidence.extend(conf.tolist())
                 pbar.update(batch_size)
-            pbar.set_postfix({"Batch": batch})
+            pbar.set_postfix({"Number of batches": batch})
 
     predictions = np.array(predictions)
     confidence = np.array(confidence)

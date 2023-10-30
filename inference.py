@@ -8,11 +8,12 @@ Created on Sun Oct 29 22:09:21 2023
 from scipy.io import loadmat
 
 
-def run_inference(data, model_choice, output_path=None):
+def run_inference(data, model_choice, num_class=None, output_path=None):
     if model_choice == "msda":
         from msda_v1 import run_inference_msda
-        
-        run_inference_msda.infer(data, num_class=3, output_path=None)
+        if num_class is None:
+            num_class = 3
+        run_inference_msda.infer(data, num_class=num_class, output_path=None)
         
     else:
         import sys
@@ -25,6 +26,6 @@ def run_inference(data, model_choice, output_path=None):
         run_inference_sdreamer.infer(data, output_path)
 
 if __name__ == "__main__":
-    model_choice = "sdreamer"
+    model_choice = "msda"
     data = loadmat("C:\\Users\\yzhao\\python_projects\\sleep_scoring\\data.mat")
-    run_inference(data, model_choice)
+    run_inference(data, model_choice, num_class=4)

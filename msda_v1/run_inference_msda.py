@@ -65,7 +65,7 @@ def infer(data, num_class=3, output_path=None, batch_size=16, signaling=100):
         eeg.float(), ne.float(), emg.float(), fft.float()
     )
 
-    predictions, confidence = run_test(num_class, batch_size, test_dataset, signaling)
+    predictions, confidence = run_test(3, batch_size, test_dataset, signaling)
     final_predictions, final_confidence = edit_one(predictions, confidence)
     final_predictions[0] = 0
     final_predictions = edit_three(edit_two(final_predictions))
@@ -91,8 +91,8 @@ def infer(data, num_class=3, output_path=None, batch_size=16, signaling=100):
     }
 
     savemat(output_path, results)
-
+    return (final_predictions, final_confidence)
 
 if __name__ == "__main__":
     data = loadmat("C:\\Users\\yzhao\\python_projects\\sleep_scoring\\data.mat")
-    infer(data, num_class=3)
+    final_predictions, final_confidence = infer(data, num_class=4)
