@@ -14,16 +14,22 @@ from plotly_resampler import FigureResampler
 # set up color config
 sleep_score_opacity = 0.5
 stage_colors = [
-    "rgb(102, 178, 255)", # Wake,
-    "rgb(255, 102, 255)", # SWS,
-    "rgb(102, 255, 102)", # REM,
-    "rgb(255, 128, 0)", # MA,
+    "rgb(102, 178, 255)",  # Wake,
+    "rgb(255, 102, 255)",  # SWS,
+    "rgb(102, 255, 102)",  # REM,
+    "rgb(255, 128, 0)",  # MA,
 ]
 stage_names = ["Wake: 0", "SWS: 1", "REM: 2", "MA: 3"]
 colorscale = {
     3: [[0, stage_colors[0]], [0.5, stage_colors[1]], [1, stage_colors[2]]],
-    4: [[0, stage_colors[0]], [1/3, stage_colors[1]], [2/3, stage_colors[2]], [1, stage_colors[3]]]
+    4: [
+        [0, stage_colors[0]],
+        [1 / 3, stage_colors[1]],
+        [2 / 3, stage_colors[2]],
+        [1, stage_colors[3]],
+    ],
 }
+
 
 def make_figure(pred):
     # Time span and frequencies

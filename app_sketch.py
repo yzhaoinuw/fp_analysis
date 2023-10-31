@@ -26,11 +26,12 @@ from plotly_resampler import FigureResampler
 
 from inference import run_inference
 from make_figure import make_figure
-from components import mat_upload_box, graph, visualization_div
+from components import Components
 
 
 app = Dash(__name__)
 port = 8050
+components = Components()
 
 TEMP_PATH = os.path.join(tempfile.gettempdir(), "sleep_scoring_app_data")
 if not os.path.exists(TEMP_PATH):
@@ -64,23 +65,7 @@ def initiate_cache(cache, filename, mat):
 
 
 def run_app():
-    app.layout = html.Div(
-        [
-            dcc.RadioItems(
-                id="task-selection",
-                options=[
-                    {"label": "Generate prediction", "value": "gen"},
-                    {"label": "Visualize existing prediction", "value": "vis"},
-                ],
-            ),
-            html.Div(id="upload-container"),
-            html.Div(id="data-upload-message"),
-            dcc.Store(id="extension-validation"),
-            dcc.Store(id="generation-ready"),
-            dcc.Store(id="visualization-ready"),
-            dcc.Download(id="prediction-download"),
-        ]
-    )
+    app.layout = components.home_div
 
 
 @app.callback(Output("upload-container", "children"), Input("task-selection", "value"))
@@ -88,14 +73,14 @@ def show_upload(task):
     if task is None:
         raise PreventUpdate
     else:
-        return mat_upload_box
+        return components.mat_upload_box
 
 
 @app.callback(
     Output("data-upload-message", "children", allow_duplicate=True),
     Output("extension-validation", "data"),
-    Input(mat_upload_box, "contents"),
-    State(mat_upload_box, "filename"),
+    Input(components.mat_upload_box, "contents"),
+    State(components.mat_upload_box, "filename"),
     prevent_initial_call=True,
 )
 def validate_extension(contents, filename):
@@ -116,8 +101,8 @@ def validate_extension(contents, filename):
     Output("generation-ready", "data"),
     Output("visualization-ready", "data"),
     Input("extension-validation", "data"),
-    State(mat_upload_box, "contents"),
-    State(mat_upload_box, "filename"),
+    State(components.mat_upload_box, "contents"),
+    State(components.mat_upload_box, "filename"),
     State("task-selection", "value"),
     prevent_initial_call=True,
 )
@@ -151,7 +136,7 @@ def read_mat(extension_validated, contents, filename, task):
         return (
             html.Div(
                 [
-                    "File validated. Generating predictions... This may take up to 60 seconds."
+                    "File validated. Generating predictions... This may take up to 2 minutes."
                 ]
             ),
             True,
@@ -195,8 +180,8 @@ def generate_prediction(ready):
 def create_visualization(ready):
     mat = cache.get("mat")
     fig = create_fig(mat, default_n_shown_samples=2000)
-    graph.figure = fig
-    return visualization_div
+    components.graph.figure = fig
+    return components.visualization_div
 
 
 @app.callback(
@@ -236,7 +221,6 @@ def read_box_select(box_select, figure):
 @app.callback(
     Output("graph", "figure", allow_duplicate=True),
     Output("undo-button", "style"),
-    Output("debug-message", "children"),
     Input("box-select-store", "data"),
     Input("keyboard", "n_events"),
     State("keyboard", "event"),
@@ -257,19 +241,15 @@ def update_sleep_scores(box_select_range, keyboard_nevents, keyboard_event, figu
                     (
                         start,
                         end,
-                        figure["data"][3]["z"][0][
-                            start : end
-                        ],  # previous prediction
-                        figure["data"][6]["z"][0][
-                            start : end
-                        ],  # previous confidence
+                        figure["data"][3]["z"][0][start:end],  # previous prediction
+                        figure["data"][6]["z"][0][start:end],  # previous confidence
                     )
                 )
                 cache.set("annotation_history", annotation_history)
-                figure["data"][3]["z"][0][start : end] = [label] * (end - start)
-                figure["data"][4]["z"][0][start : end] = [label] * (end - start)
-                figure["data"][5]["z"][0][start : end] = [label] * (end - start)
-                figure["data"][6]["z"][0][start : end] = [1] * (
+                figure["data"][3]["z"][0][start:end] = [label] * (end - start)
+                figure["data"][4]["z"][0][start:end] = [label] * (end - start)
+                figure["data"][5]["z"][0][start:end] = [label] * (end - start)
+                figure["data"][6]["z"][0][start:end] = [1] * (
                     end - start
                 )  # change conf to 1
 
@@ -277,8 +257,8 @@ def update_sleep_scores(box_select_range, keyboard_nevents, keyboard_event, figu
                 mat["pred_labels"] = np.array(figure["data"][3]["z"][0])
                 mat["confidence"] = np.array(figure["data"][6]["z"][0])
                 cache.set("mat", mat)
-                return figure, {"display": "block"}, f"{start}, {end}"
-    return dash.no_update, dash.no_update, dash.no_update
+                return figure, {"display": "block"}
+    return dash.no_update, dash.no_update
 
 
 @app.callback(

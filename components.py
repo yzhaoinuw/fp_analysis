@@ -8,7 +8,47 @@ Created on Fri Oct 20 16:27:03 2023
 from dash import dcc, html
 from trace_updater import TraceUpdater
 from dash_extensions import EventListener
-from plotly_resampler import FigureResampler
+
+# from plotly_resampler import FigureResampler
+
+
+home_div = html.Div(
+    [
+        html.Div(
+            style={"display": "flex"},
+            children=[
+                html.Div(
+                    dcc.RadioItems(
+                        id="task-selection",
+                        options=[
+                            {"label": "Generate prediction", "value": "gen"},
+                            {"label": "Visualize existing prediction", "value": "vis"},
+                        ],
+                    )
+                ),
+                html.Div(
+                    id="model-choice-container",
+                    children=[
+                        dcc.RadioItems(
+                            id="model-choice",
+                            options=[
+                                {"label": "MSDA by Shadi", "value": "msda"},
+                                {"label": "sDREAMER by Yuan", "value": "sdreamer"},
+                            ],
+                        )
+                    ],
+                    style={"display": "none"},
+                ),
+            ],
+        ),
+        html.Div(id="upload-container"),
+        html.Div(id="data-upload-message"),
+        dcc.Store(id="extension-validation"),
+        dcc.Store(id="generation-ready"),
+        dcc.Store(id="visualization-ready"),
+        dcc.Download(id="prediction-download"),
+    ]
+)
 
 mat_upload_box = dcc.Upload(
     # id="data-upload",
@@ -82,3 +122,12 @@ visualization_div = html.Div(
         ),
     ],
 )
+
+
+# %%
+class Components:
+    def __init__(self):
+        self.home_div = home_div
+        self.mat_upload_box = mat_upload_box
+        self.graph = graph
+        self.visualization_div = visualization_div
