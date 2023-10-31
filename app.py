@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon Jun 26 15:53:49 2023
+Created on Fri Oct 20 15:45:29 2023
 
-@author: Yue
+@author: yzhao
 """
 
 import os
@@ -12,29 +12,27 @@ import tempfile
 import webbrowser
 from io import BytesIO
 from threading import Timer
+from collections import deque
 
 import dash
 from dash import Dash, dcc, html
 from dash.exceptions import PreventUpdate
 from dash.dependencies import Input, Output, State
-from dash_extensions import EventListener
 
+import numpy as np
 from flask_caching import Cache
-from trace_updater import TraceUpdater
-from plotly_resampler import FigureResampler
-
 from scipy.io import loadmat, savemat
+from plotly_resampler import FigureResampler
 
 from inference import run_inference
 from make_figure import make_figure
+from components import Components
 
 
-app = Dash(__name__)
+app = Dash(__name__, suppress_callback_exceptions=True)
 port = 8050
-fig = FigureResampler(default_n_shown_samples=2000)
-fig.register_update_graph_callback(
-    app=app, graph_id="graph-1", trace_updater_id="trace-updater-1"
-)
+components = Components()
+
 TEMP_PATH = os.path.join(tempfile.gettempdir(), "sleep_scoring_app_data")
 if not os.path.exists(TEMP_PATH):
     os.makedirs(TEMP_PATH)
@@ -45,192 +43,219 @@ cache = Cache(
         "CACHE_TYPE": "filesystem",
         "CACHE_DIR": TEMP_PATH,
         "CACHE_THRESHOLD": 10,
-        "CACHE_DEFAULT_TIMEOUT": 86400,  # to save cache for 1 day
+        "CACHE_DEFAULT_TIMEOUT": 86400,  # to save cache for 1 day, otherwise it is default to 300 seconds
     },
 )
 
 
-def run_app():
-    app.layout = html.Div(
-        [
-            dcc.RadioItems(
-                id="task-selection",
-                options=[
-                    {"label": "Generate prediction", "value": "gen"},
-                    {"label": "Visualize existing prediction", "value": "vis"},
-                ],
-            ),
-            html.Div(id="upload-container"),
-            html.Div(id="output-data-upload"),
-            dcc.Store(id="validate-file-extension"),
-            # dcc.Store(id="mat-filename"),
-            dcc.Download(id="download-prediction"),
-        ]
+def create_fig(mat, default_n_shown_samples=2000):
+    fig = FigureResampler(default_n_shown_samples=default_n_shown_samples)
+    fig.register_update_graph_callback(
+        app=app, graph_id="graph", trace_updater_id="trace-updater"
     )
+    figure = make_figure(mat)
+    fig.replace(figure)
+    return fig
 
 
-@app.callback(Output("upload-container", "children"), Input("task-selection", "value"))
-def show_upload(task):
-    if task is None:
-        raise PreventUpdate
-    else:
-        return dcc.Upload(
-            id="upload-data",
-            children=html.Div(["Select File"], className="upload-button"),
-            style={
-                "width": "100%",
-                "height": "60px",
-                "lineHeight": "60px",
-                "borderWidth": "1px",
-                "borderStyle": "dashed",
-                "borderRadius": "5px",
-                "textAlign": "center",
-                "margin": "10px",
-            },
-            multiple=False,
-        )
+def initiate_cache(cache, filename, mat):
+    cache.set("filename", filename)
+    cache.set("mat", mat)
+    cache.set("annotation_history", deque(maxlen=3))
+
+
+def run_app():
+    app.layout = components.home_div
 
 
 @app.callback(
-    Output("output-data-upload", "children", allow_duplicate=True),
-    Output("validate-file-extension", "data"),
-    Input("upload-data", "contents"),
-    State("upload-data", "filename"),
-    State("task-selection", "value"),
+    Output("upload-container", "children"),
+    Output("model-choice-container", "style"),
+    Input("task-selection", "value"),
+)
+def show_upload_box(task):
+    if task is None:
+        raise PreventUpdate
+    if task == "gen":
+        return components.mat_upload_box, {"display": "block"}
+    else:
+        return components.mat_upload_box, {"display": "none"}
+
+
+@app.callback(
+    Output("num-class-container", "style"),
+    Output("model-choice-store", "data"),
+    Input("model-choice", "value"),
+    Input("model-choice-container", "style"),
+)
+def choose_model(model_choice, model_choice_style):
+    if model_choice_style["display"] == "none":
+        return {"display": "none"}, model_choice
+
+    return {"display": "block"}, model_choice
+
+
+@app.callback(
+    Output("num-class-store", "data"),
+    Input("num-class", "value"),
+)
+def choose_num_class(num_class):
+    return num_class
+
+
+@app.callback(
+    Output("data-upload-message", "children", allow_duplicate=True),
+    Output("extension-validation-store", "data"),
+    Input(components.mat_upload_box, "contents"),
+    State(components.mat_upload_box, "filename"),
     prevent_initial_call=True,
 )
-def show_mat_read_status(contents, filename, task):
+def validate_extension(contents, filename):
     if contents is None:
         return html.Div(["Please select a .mat file."]), dash.no_update
 
     if not filename.endswith(".mat"):
         return html.Div(["Please select a .mat file only."]), dash.no_update
 
-    if task == "gen":
-        return (
-            html.Div(
-                ["Generating sleep score predictions. This may take up to 60 seconds."]
-            ),
-            True,
-        )
     return (
-        html.Div(
-            ["Preparing visualizations of the results. This may take up to 20 seconds."]
-        ),
+        html.Div(["Loading and validating file... This may take up to 10 seconds."]),
         True,
     )
 
 
 @app.callback(
-    [
-        Output("output-data-upload", "children"),
-        # Output("mat-filename", "data"),
-        Output("download-prediction", "data"),
-    ],
-    Input(
-        "validate-file-extension", "data"
-    ),  # must pass file extension check to trigger this callback
-    State("upload-data", "contents"),
-    State("upload-data", "filename"),
+    Output("data-upload-message", "children", allow_duplicate=True),
+    Output("generation-ready-store", "data"),
+    Output("visualization-ready-store", "data"),
+    Input("extension-validation-store", "data"),
+    State(components.mat_upload_box, "contents"),
+    State(components.mat_upload_box, "filename"),
     State("task-selection", "value"),
     prevent_initial_call=True,
 )
-def update_output(file_validated, contents, filename, task):
+def read_mat(extension_validated, contents, filename, task):
     content_type, content_string = contents.split(",")
     decoded = base64.b64decode(content_string)
     mat = loadmat(BytesIO(decoded))
-    if not os.path.exists(TEMP_PATH):
-        os.makedirs(TEMP_PATH)
-
-    # clear TEMP_PATH regularly
-    for temp_file in os.listdir(TEMP_PATH):
-        if temp_file.endswith(".mat"):
-            os.remove(os.path.join(TEMP_PATH, temp_file))
-    temp_mat_path = os.path.join(TEMP_PATH, filename)
-
-    if task == "gen":
-        output_path = os.path.splitext(temp_mat_path)[0] + "_predictions.mat"
-        run_inference(mat, model_path=None, output_path=output_path)
+    if mat.get("trial_eeg") is None:
         return (
-            html.Div(["The predictions have been generated successfully."]),
-            dcc.send_file(output_path),
+            html.Div(["EEG data is missing. Please double check the file selected."]),
+            dash.no_update,
+            dash.no_update,
         )
-    else:  # task == 'vis'
-        try:
-            # savemat(temp_mat_path, mat)
-            fig.replace(make_figure(mat))
-            div = html.Div(
-                children=[
-                    dcc.Graph(
-                        id="graph-1",
-                        config={
-                            "scrollZoom": True,
-                            "editable": True,
-                            "edits": {
-                                "axisTitleText": False,
-                                "titleText": False,
-                                "colorbarTitleText": False,
-                                "annotationText": False,
-                            },
-                        },
-                        figure=fig,
-                    ),
-                    TraceUpdater(id="trace-updater-1", gdID="graph-1"),
-                    html.Div(
-                        style={"display": "flex"},
-                        children=[
-                            dcc.Store(id="box-select-store"),
-                            EventListener(
-                                id="keyboard",
-                                events=[{"event": "keydown", "props": ["key"]}],
-                            ),
-                            html.Div(
-                                style={"display": "flex", "margin-right": "5px"},
-                                children=[
-                                    html.Button("Save Annotations", id="save-button"),
-                                    dcc.Download(id="download-annotations"),
-                                ],
-                            ),
-                            dcc.Interval(
-                                id="interval-component",
-                                interval=1 * 1000,  # in milliseconds
-                                max_intervals=0,  # stop after the first interval
-                            ),
-                            html.Div(id="annotation-message"),
-                        ],
-                    ),
-                ],
-            )
-            cache.set("filename", filename)
-            cache.set("mat", mat)
-            return div, None
-        except Exception as e:
-            print(e)
-            return html.Div(["There was an error processing this file."]), None
+
+    if mat.get("trial_emg") is None:
+        return (
+            html.Div(["EMG data is missing. Please double check the file selected."]),
+            dash.no_update,
+            dash.no_update,
+        )
+
+    if mat.get("trial_ne") is None:
+        return (
+            html.Div(["NE data is missing. Please double check the file selected."]),
+            dash.no_update,
+            dash.no_update,
+        )
+
+    initiate_cache(cache, filename, mat)
+    if task == "gen":
+        return (
+            html.Div(
+                [
+                    "File validated. Generating predictions... This may take up to 2 minutes."
+                ]
+            ),
+            True,
+            dash.no_update,
+        )
+
+    return (
+        html.Div(
+            [
+                "File validated. Creating visualizations... This may take up to 20 seconds."
+            ]
+        ),
+        dash.no_update,
+        True,
+    )
+
+
+@app.callback(
+    Output("data-upload-message", "children", allow_duplicate=True),
+    Output("prediction-download-store", "data"),
+    Input("generation-ready-store", "data"),
+    State("model-choice-store", "data"),
+    State("num-class-store", "data"),
+    prevent_initial_call=True,
+)
+def generate_prediction(ready, model_choice, num_class):
+    filename = cache.get("filename")
+    mat = cache.get("mat")
+    temp_mat_path = os.path.join(TEMP_PATH, filename)
+    output_path = os.path.splitext(temp_mat_path)[0] + "_prediction"
+    _, _, output_path = run_inference(
+        mat, model_choice, num_class, output_path=output_path
+    )
+    return (
+        html.Div(["The prediction has been generated successfully."]),
+        dcc.send_file(output_path),
+    )
+
+
+@app.callback(
+    Output("data-upload-message", "children", allow_duplicate=True),
+    Input("visualization-ready-store", "data"),
+    prevent_initial_call=True,
+)
+def create_visualization(ready):
+    mat = cache.get("mat")
+    fig = create_fig(mat, default_n_shown_samples=2000)
+    components.graph.figure = fig
+    return components.visualization_div
+
+
+@app.callback(
+    Output("graph", "figure"),
+    Input("n-sample-dropdown", "value"),
+    prevent_initial_call=True,
+)
+def change_sampling_level(sampling_level):
+    if sampling_level is None:
+        return dash.no_update
+    sampling_level_map = {"x1": 2000, "x2": 4000, "x4": 8000}
+    n_samples = sampling_level_map[sampling_level]
+    mat = cache.get("mat")
+    fig = create_fig(mat, default_n_shown_samples=n_samples)
+    return fig
 
 
 @app.callback(
     Output("box-select-store", "data"),
+    Output("graph", "figure", allow_duplicate=True),
     Output("annotation-message", "children", allow_duplicate=True),
-    Input("graph-1", "selectedData"),
+    Input("graph", "selectedData"),
+    State("graph", "figure"),
     prevent_initial_call=True,
 )
-def read_box_select(box_select):
-    try:
-        start, end = box_select["range"]["x4"]
-    except KeyError:
-        return None, ""
-    start = round(start)
-    end = round(end)
-    return json.dumps([start, end]), "Press 0 for Wake, 1 for SWS, and 2 for REM."
+def read_box_select(box_select, figure):
+    selections = figure["layout"].get("selections")
+    if not selections:
+        return [], dash.no_update, dash.no_update
+    if len(selections) > 1:
+        selections.pop(0)
+    start, end = selections[0]["x0"], selections[0]["x1"]
+    start, end = round(start), round(end)
+    return [start, end], figure, "Press 0 for Wake, 1 for SWS, and 2 for REM."
 
 
 @app.callback(
-    Output("graph-1", "figure"),
+    Output("graph", "figure", allow_duplicate=True),
+    Output("undo-button", "style"),
     Input("box-select-store", "data"),
     Input("keyboard", "n_events"),
     State("keyboard", "event"),
-    State("graph-1", "figure"),
+    State("graph", "figure"),
     prevent_initial_call=True,
 )
 def update_sleep_scores(box_select_range, keyboard_nevents, keyboard_event, figure):
@@ -241,22 +266,80 @@ def update_sleep_scores(box_select_range, keyboard_nevents, keyboard_event, figu
             label = keyboard_event.get("key")
             if label in ["0", "1", "2"] and box_select_range:
                 label = int(label)
-                start, end = json.loads(box_select_range)
-                figure["data"][3]["z"][0][start : end + 1] = [label] * (end - start + 1)
-                figure["data"][4]["z"][0][start : end + 1] = [label] * (end - start + 1)
-                figure["data"][5]["z"][0][start : end + 1] = [label] * (end - start + 1)
-                figure["data"][6]["z"][0][start : end + 1] = [1] * (
-                    end - start + 1
+                start, end = box_select_range
+                annotation_history = cache.get("annotation_history")
+                annotation_history.append(
+                    (
+                        start,
+                        end,
+                        figure["data"][3]["z"][0][start:end],  # previous prediction
+                        figure["data"][6]["z"][0][start:end],  # previous confidence
+                    )
+                )
+                cache.set("annotation_history", annotation_history)
+                figure["data"][3]["z"][0][start:end] = [label] * (end - start)
+                figure["data"][4]["z"][0][start:end] = [label] * (end - start)
+                figure["data"][5]["z"][0][start:end] = [label] * (end - start)
+                figure["data"][6]["z"][0][start:end] = [1] * (
+                    end - start
                 )  # change conf to 1
-            return figure
-    return dash.no_update
+
+                mat = cache.get("mat")
+                mat["pred_labels"] = np.array(figure["data"][3]["z"][0])
+                mat["confidence"] = np.array(figure["data"][6]["z"][0])
+                cache.set("mat", mat)
+                return figure, {"display": "block"}
+    raise PreventUpdate
+
+
+@app.callback(
+    Output("graph", "figure", allow_duplicate=True),
+    Output("undo-button", "style", allow_duplicate=True),
+    Input("undo-button", "n_clicks"),
+    State("graph", "figure"),
+    prevent_initial_call=True,
+)
+def undo_annotation(n_clicks, figure):
+    annotation_history = cache.get("annotation_history")
+    prev_annotation = annotation_history.pop()
+    (start, end, prev_pred, prev_conf) = prev_annotation
+
+    # undo figure
+    figure["data"][3]["z"][0][start:end] = prev_pred
+    figure["data"][4]["z"][0][start:end] = prev_pred
+    figure["data"][5]["z"][0][start:end] = prev_pred
+    figure["data"][6]["z"][0][start:end] = prev_conf
+
+    # undo cache
+    mat = cache.get("mat")
+    mat["pred_labels"] = np.array(figure["data"][3]["z"][0])
+    mat["confidence"] = np.array(figure["data"][6]["z"][0])
+    cache.set("mat", mat)
+
+    # update annotation_history
+    cache.set("annotation_history", annotation_history)
+    if not annotation_history:
+        return figure, {"display": "none"}
+    return figure, {"display": "block"}
+
+
+@app.callback(
+    Output("download-annotations", "data"),
+    Input("save-button", "n_clicks"),
+    prevent_initial_call=True,
+)
+def save_annotations(n_clicks):
+    mat_filename = cache.get("filename")
+    temp_mat_path = os.path.join(TEMP_PATH, mat_filename)
+    mat = cache.get("mat")
+    savemat(temp_mat_path, mat)
+    return dcc.send_file(temp_mat_path)
 
 
 @app.callback(
     Output("interval-component", "max_intervals"),
     Output("annotation-message", "children", allow_duplicate=True),
     Input("save-button", "n_clicks"),
-    State("graph-1", "figure"),
     prevent_initial_call=True,
 )
 def show_save_annotation_status(n_clicks, figure):
@@ -273,24 +356,6 @@ def clear_display(n):
     return dash.no_update
 
 
-@app.callback(
-    Output("download-annotations", "data"),
-    Input("save-button", "n_clicks"),
-    State("graph-1", "figure"),
-    # State("mat-filename", "data"),
-    prevent_initial_call=True,
-)
-def save_annotations(n_clicks, figure):
-    mat_filename = cache.get("filename")
-    temp_mat_path = os.path.join(TEMP_PATH, mat_filename)
-    # mat = loadmat(temp_mat_path)
-    mat = cache.get("mat")
-    mat["pred_labels"] = figure["data"][3]["z"][0]
-    mat["confidence"] = figure["data"][6]["z"][0]
-    savemat(temp_mat_path, mat)
-    return dcc.send_file(temp_mat_path)
-
-
 def open_browser():
     webbrowser.open_new(f"http://127.0.0.1:{port}/")
 
@@ -298,4 +363,4 @@ def open_browser():
 if __name__ == "__main__":
     run_app()
     Timer(1, open_browser).start()
-    app.run_server(debug=False, port=8050)
+    app.run_server(debug=True, port=8050)

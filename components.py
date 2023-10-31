@@ -24,6 +24,7 @@ home_div = html.Div(
                             {"label": "Generate prediction", "value": "gen"},
                             {"label": "Visualize existing prediction", "value": "vis"},
                         ],
+                        style={"marginRight": "50px"},
                     )
                 ),
                 html.Div(
@@ -35,6 +36,22 @@ home_div = html.Div(
                                 {"label": "MSDA by Shadi", "value": "msda"},
                                 {"label": "sDREAMER by Yuan", "value": "sdreamer"},
                             ],
+                            value="msda",
+                        )
+                    ],
+                    style={"display": "none"},
+                ),
+                html.Div([" "], id="invisible-gap", style={"marginRight": "50px"}),
+                html.Div(
+                    id="num-class-container",
+                    children=[
+                        dcc.RadioItems(
+                            id="num-class",
+                            options=[
+                                {"label": "3 Classes", "value": 3},
+                                {"label": "4 Classes", "value": 4},
+                            ],
+                            value=3,
                         )
                     ],
                     style={"display": "none"},
@@ -43,25 +60,27 @@ home_div = html.Div(
         ),
         html.Div(id="upload-container"),
         html.Div(id="data-upload-message"),
-        dcc.Store(id="extension-validation"),
-        dcc.Store(id="generation-ready"),
-        dcc.Store(id="visualization-ready"),
-        dcc.Download(id="prediction-download"),
+        dcc.Store(id="model-choice-store"),
+        dcc.Store(id="num-class-store"),
+        dcc.Store(id="extension-validation-store"),
+        dcc.Store(id="generation-ready-store"),
+        dcc.Store(id="visualization-ready-store"),
+        dcc.Download(id="prediction-download-store"),
     ]
 )
 
 mat_upload_box = dcc.Upload(
     # id="data-upload",
-    children=html.Div(["Select File"], className="upload-button"),
+    children=html.Button(["Click here to select File"], className="upload-button"),
     style={
-        "width": "100%",
-        "height": "60px",
-        "lineHeight": "60px",
-        "borderWidth": "1px",
+        "width": "12%",
+        "height": "auto",
+        # "lineHeight": "40px",
+        "borderWidth": "0px",
         "borderStyle": "dashed",
-        "borderRadius": "5px",
-        "textAlign": "center",
-        "margin": "10px",
+        # "borderRadius": "5px",
+        "textAlign": "left",
+        "margin": "5px",
     },
     multiple=False,
 )

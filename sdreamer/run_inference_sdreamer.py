@@ -107,9 +107,9 @@ def infer(data, output_path=None):
     }
 
     savemat(output_path, results)
-    return (all_pred, all_prob)
+    return all_pred, all_prob, output_path
 
 
 if __name__ == "__main__":
     data = loadmat("C:\\Users\\yzhao\\python_projects\\sleep_scoring\\data.mat")
-    all_pred, all_prob = infer(data)
+    all_pred, all_prob, output_path = infer(data)

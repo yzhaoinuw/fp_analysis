@@ -8,13 +8,15 @@ Created on Sun Oct 29 22:09:21 2023
 from scipy.io import loadmat
 
 
-def run_inference(data, model_choice, num_class=None, output_path=None):
+def run_inference(data, model_choice="msda", num_class=None, output_path=None):
     if model_choice == "msda":
         from msda_v1 import run_inference_msda
 
         if num_class is None:
             num_class = 3
-        run_inference_msda.infer(data, num_class=num_class, output_path=None)
+        predictions, confidence, output_path = run_inference_msda.infer(
+            data, num_class=num_class, output_path=output_path
+        )
 
     else:
         import sys
@@ -24,7 +26,10 @@ def run_inference(data, model_choice, num_class=None, output_path=None):
 
         from sdreamer import run_inference_sdreamer
 
-        run_inference_sdreamer.infer(data, output_path)
+        predictions, confidence, output_path = run_inference_sdreamer.infer(
+            data, output_path
+        )
+    return predictions, confidence, output_path
 
 
 if __name__ == "__main__":

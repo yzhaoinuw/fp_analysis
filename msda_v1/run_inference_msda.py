@@ -91,8 +91,8 @@ def infer(data, num_class=3, output_path=None, batch_size=16, signaling=100):
     }
 
     savemat(output_path, results)
-    return (final_predictions, final_confidence)
+    return final_predictions, final_confidence, output_path
 
 if __name__ == "__main__":
     data = loadmat("C:\\Users\\yzhao\\python_projects\\sleep_scoring\\data.mat")
-    final_predictions, final_confidence = infer(data, num_class=4)
+    final_predictions, final_confidence, output_path = infer(data, num_class=4)
