@@ -68,15 +68,16 @@ home_div = html.Div(
 )
 
 mat_upload_box = dcc.Upload(
-    # id="data-upload",
-    children=html.Button(["Click here to select File"], className="upload-button"),
+    id="data-upload",
+    children=html.Button(
+        ["Click here to select File"],
+        # className="upload-button"
+    ),
     style={
         "width": "12%",
         "height": "auto",
-        # "lineHeight": "40px",
         "borderWidth": "0px",
         "borderStyle": "dashed",
-        # "borderRadius": "5px",
         "textAlign": "left",
         "margin": "5px",
     },

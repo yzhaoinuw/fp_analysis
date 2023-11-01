@@ -22,14 +22,15 @@ import numpy as np
 from flask_caching import Cache
 from scipy.io import loadmat, savemat
 
-# from plotly_resampler import FigureResampler
 
 from inference import run_inference
 from make_figure import make_figure
 from components import Components
 
 
-app = Dash(__name__, suppress_callback_exceptions=True)
+app = Dash(__name__,
+           #suppress_callback_exceptions=True,
+)
 port = 8050
 components = Components()
 app.layout = components.home_div
@@ -65,8 +66,12 @@ def initiate_cache(cache, filename, mat):
     Output("upload-container", "children"),
     Output("model-choice-container", "style"),
     Input("task-selection", "value"),
+    Input("model-choice", "value"),
+    Input("num-class", "value"),
 )
-def show_upload_box(task):
+def show_upload_box(task, model_choice, num_class):
+    # if any of task, model choice, or num_class changes, gives a new upload box so that
+    # the upload of the same file (but running with different model) is allowed
     if task is None:
         raise PreventUpdate
     if task == "gen":
@@ -373,4 +378,4 @@ def open_browser():
 
 if __name__ == "__main__":
     Timer(1, open_browser).start()
-    app.run_server(debug=True, port=8050)
+    app.run_server(debug=False, port=8050)
