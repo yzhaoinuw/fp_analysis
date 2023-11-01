@@ -6,7 +6,6 @@ Created on Fri Oct 20 15:45:29 2023
 """
 
 import os
-import json
 import base64
 import tempfile
 import webbrowser
@@ -22,7 +21,8 @@ from dash.dependencies import Input, Output, State
 import numpy as np
 from flask_caching import Cache
 from scipy.io import loadmat, savemat
-from plotly_resampler import FigureResampler
+
+# from plotly_resampler import FigureResampler
 
 from inference import run_inference
 from make_figure import make_figure
@@ -32,6 +32,7 @@ from components import Components
 app = Dash(__name__, suppress_callback_exceptions=True)
 port = 8050
 components = Components()
+app.layout = components.home_div
 
 TEMP_PATH = os.path.join(tempfile.gettempdir(), "sleep_scoring_app_data")
 if not os.path.exists(TEMP_PATH):
@@ -48,13 +49,8 @@ cache = Cache(
 )
 
 
-def create_fig(mat, default_n_shown_samples=2000):
-    fig = FigureResampler(default_n_shown_samples=default_n_shown_samples)
-    fig.register_update_graph_callback(
-        app=app, graph_id="graph", trace_updater_id="trace-updater"
-    )
-    figure = make_figure(mat)
-    fig.replace(figure)
+def create_fig(mat, default_n_shown_samples=1000):
+    fig = make_figure(mat, default_n_shown_samples)
     return fig
 
 
@@ -62,10 +58,7 @@ def initiate_cache(cache, filename, mat):
     cache.set("filename", filename)
     cache.set("mat", mat)
     cache.set("annotation_history", deque(maxlen=3))
-
-
-def run_app():
-    app.layout = components.home_div
+    cache.set("fig_resampler", None)
 
 
 @app.callback(
@@ -137,6 +130,12 @@ def read_mat(extension_validated, contents, filename, task):
     content_type, content_string = contents.split(",")
     decoded = base64.b64decode(content_string)
     mat = loadmat(BytesIO(decoded))
+
+    # clear TEMP_PATH regularly
+    for temp_file in os.listdir(TEMP_PATH):
+        if temp_file.endswith(".mat"):
+            os.remove(os.path.join(TEMP_PATH, temp_file))
+
     if mat.get("trial_eeg") is None:
         return (
             html.Div(["EEG data is missing. Please double check the file selected."]),
@@ -210,7 +209,8 @@ def generate_prediction(ready, model_choice, num_class):
 )
 def create_visualization(ready):
     mat = cache.get("mat")
-    fig = create_fig(mat, default_n_shown_samples=2000)
+    fig = create_fig(mat)
+    cache.set("fig_resampler", fig)
     components.graph.figure = fig
     return components.visualization_div
 
@@ -223,7 +223,7 @@ def create_visualization(ready):
 def change_sampling_level(sampling_level):
     if sampling_level is None:
         return dash.no_update
-    sampling_level_map = {"x1": 2000, "x2": 4000, "x4": 8000}
+    sampling_level_map = {"x1": 1000, "x2": 2000, "x4": 4000}
     n_samples = sampling_level_map[sampling_level]
     mat = cache.get("mat")
     fig = create_fig(mat, default_n_shown_samples=n_samples)
@@ -250,6 +250,16 @@ def read_box_select(box_select, figure):
 
 
 @app.callback(
+    Output("trace-updater", "updateData"),
+    Input("graph", "relayoutData"),
+    prevent_initial_call=True,
+)
+def update_fig(relayoutdata):
+    fig = cache.get("fig_resampler")
+    return fig.construct_update_data(relayoutdata)
+
+
+@app.callback(
     Output("graph", "figure", allow_duplicate=True),
     Output("undo-button", "style"),
     Input("box-select-store", "data"),
@@ -264,9 +274,10 @@ def update_sleep_scores(box_select_range, keyboard_nevents, keyboard_event, figu
         input_id = ctx.triggered[0]["prop_id"].split(".")[0]
         if input_id == "keyboard":
             label = keyboard_event.get("key")
-            if label in ["0", "1", "2"] and box_select_range:
+            if label in ["0", "1", "2"] and box_select_range:  # TODO: what about "3"?
                 label = int(label)
                 start, end = box_select_range
+                start = max(start, 0)  # TODO: what about end capping?
                 annotation_history = cache.get("annotation_history")
                 annotation_history.append(
                     (
@@ -342,7 +353,7 @@ def save_annotations(n_clicks):
     Input("save-button", "n_clicks"),
     prevent_initial_call=True,
 )
-def show_save_annotation_status(n_clicks, figure):
+def show_save_annotation_status(n_clicks):
     return 5, "Saving annotations. This may take up to 10 seconds."
 
 
@@ -361,6 +372,5 @@ def open_browser():
 
 
 if __name__ == "__main__":
-    run_app()
     Timer(1, open_browser).start()
     app.run_server(debug=True, port=8050)

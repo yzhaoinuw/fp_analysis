@@ -9,8 +9,6 @@ from dash import dcc, html
 from trace_updater import TraceUpdater
 from dash_extensions import EventListener
 
-# from plotly_resampler import FigureResampler
-
 
 home_div = html.Div(
     [
@@ -102,11 +100,33 @@ graph = dcc.Graph(
 
 visualization_div = html.Div(
     children=[
-        dcc.Dropdown(
-            ["x1", "x2", "x4"],
-            "x1",
-            id="n-sample-dropdown",
-            placeholder="Select a sampling level",
+        html.Div(
+            style={"display": "flex"},
+            children=[
+                html.Div(
+                    ["Sampling Level"],
+                    style={
+                        "marginRight": "10px",
+                        "lineHeight": "40px",
+                    },
+                ),
+                html.Div(
+                    children=[
+                        dcc.Dropdown(
+                            ["x1", "x2", "x4"],
+                            "x1",
+                            id="n-sample-dropdown",
+                            # placeholder="Select a sampling level",
+                        )
+                    ],
+                    style={
+                        "width": "50px",
+                        "height": "auto",
+                        "textAlign": "left",
+                        "margin": "2px",
+                    },
+                ),
+            ],
         ),
         graph,
         TraceUpdater(id="trace-updater", gdID="graph"),

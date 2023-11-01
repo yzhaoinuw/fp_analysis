@@ -31,7 +31,7 @@ colorscale = {
 }
 
 
-def make_figure(pred):
+def make_figure(pred, default_n_shown_samples):
     # Time span and frequencies
     start_time, end_time = 0, pred["trial_eeg"].shape[0]
     eeg, emg, ne = pred["trial_eeg"], pred["trial_emg"], pred["trial_ne"]
@@ -56,7 +56,8 @@ def make_figure(pred):
     ne_min, ne_max = min(y_x3), max(y_x3)
     predictions = pred["pred_labels"].flatten()
     confidence = pred["confidence"].flatten()
-    num_class = len(np.unique(predictions))
+    # num_class = pred["num_class"].item()
+    num_class = len(np.unique(predictions))  # TODO: to be further worked on
 
     fig = FigureResampler(
         make_subplots(
@@ -73,7 +74,7 @@ def make_figure(pred):
             ),
             row_heights=[0.3, 0.3, 0.3, 0.1],
         ),
-        default_n_shown_samples=2000,
+        default_n_shown_samples=default_n_shown_samples,
     )
 
     # Create a heatmap for stages
@@ -81,7 +82,7 @@ def make_figure(pred):
         f"time: {time[i]}\nconfidence: {confidence[i]:.2f}"
         for i in range(len(confidence))
     ]
-    sleep_scores = go.Heatmap(
+    sleep_scores = go.Heatmap(  # TODO: investigate heatmap xticks alignment
         x=time,
         y0=0,
         dy=20,  # assuming that the max abs value of eeg, emg, or ne is no more than 10
@@ -117,7 +118,7 @@ def make_figure(pred):
     fig.add_trace(
         go.Scattergl(
             line=dict(width=1),
-            marker=dict(size=2, color="black"),
+            marker=dict(size=3, color="black"),
             showlegend=False,
             mode="lines+markers",
             hoverinfo="x+y",
@@ -242,6 +243,6 @@ if __name__ == "__main__":
 
     io.renderers.default = "browser"
     path = ".\\"
-    pred = loadmat(path + "data_prediction_msda_4class.mat")
+    pred = loadmat(path + "data_prediction_sdreamer_4class.mat")
     fig = make_figure(pred)
     fig.show_dash(config={"scrollZoom": True})

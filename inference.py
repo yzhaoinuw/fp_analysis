@@ -33,6 +33,8 @@ def run_inference(data, model_choice="msda", num_class=None, output_path=None):
 
 
 if __name__ == "__main__":
-    model_choice = "msda"
+    model_choice = "sdreamer"
     data = loadmat("C:\\Users\\yzhao\\python_projects\\sleep_scoring\\data.mat")
-    run_inference(data, model_choice, num_class=4)
+    predictions, confidence, output_path = run_inference(
+        data, model_choice, num_class=4
+    )

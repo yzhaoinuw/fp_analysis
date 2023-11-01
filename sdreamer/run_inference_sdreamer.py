@@ -92,7 +92,7 @@ def infer(data, output_path=None):
 
                 pred = np.argmax(out.detach().cpu(), axis=1)
                 all_pred.append(pred)
-                pbar.update(batch_size*args.n_sequences)
+                pbar.update(batch_size * args.n_sequences)
             pbar.set_postfix({"Number of batches": batch})
 
     all_pred = np.concatenate(all_pred)
@@ -101,6 +101,7 @@ def infer(data, output_path=None):
     results = {
         "pred_labels": all_pred,
         "confidence": all_prob,
+        "num_class": num_class,
         "trial_eeg": eeg_data,
         "trial_emg": emg_data,
         "trial_ne": ne_data,

@@ -85,6 +85,7 @@ def infer(data, num_class=3, output_path=None, batch_size=16, signaling=100):
     results = {
         "pred_labels": final_predictions,
         "confidence": final_confidence,
+        "num_class": num_class,
         "trial_eeg": trial_eeg,
         "trial_emg": trial_emg,
         "trial_ne": trial_ne,
@@ -92,6 +93,7 @@ def infer(data, num_class=3, output_path=None, batch_size=16, signaling=100):
 
     savemat(output_path, results)
     return final_predictions, final_confidence, output_path
+
 
 if __name__ == "__main__":
     data = loadmat("C:\\Users\\yzhao\\python_projects\\sleep_scoring\\data.mat")
