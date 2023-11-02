@@ -34,6 +34,7 @@ def run_test(model_path, num_class, batch_size, test_dataset, signaling):
     else:
         model = DSN2(code_size=code_size)
 
+    model_path += f"msda_{num_class}class_v1.pth"
     model.load_state_dict(torch.load(model_path, map_location=torch.device("cpu")))
     model.eval()
 

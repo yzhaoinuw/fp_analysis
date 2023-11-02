@@ -68,7 +68,7 @@ def infer(
     )
 
     predictions, confidence = run_test(
-        model_path, num_class, batch_size, test_dataset, signaling
+        model_path, 3, batch_size, test_dataset, signaling
     )
     final_predictions, final_confidence = edit_one(predictions, confidence)
     final_predictions[0] = 0
@@ -76,7 +76,7 @@ def infer(
 
     if num_class == 4:
         predictions_4class, confidence_4class = run_test(
-            model_path, num_class, batch_size, test_dataset, signaling
+            model_path, 4, batch_size, test_dataset, signaling
         )
         p = np.zeros((len(final_predictions)))
         for i in range(len(final_predictions)):

@@ -25,9 +25,8 @@ def run_inference(data, model_choice="msda", num_class=None, output_path=None):
         if num_class is None:
             num_class = 3
 
-        model_path = model_path_map[f"{model_choice}_{num_class}class"]
         predictions, confidence, output_path = run_inference_msda.infer(
-            data, model_path, num_class=num_class, output_path=output_path
+            data, MODEL_PATH, num_class=num_class, output_path=output_path
         )
 
     else:
