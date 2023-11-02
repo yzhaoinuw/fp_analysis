@@ -5,7 +5,6 @@ Created on Sat Oct 28 15:50:11 2023
 @author: yzhao
 """
 
-import os
 import argparse
 
 from tqdm import tqdm
@@ -15,12 +14,9 @@ from scipy.io import loadmat, savemat
 import torch
 from torch.utils.data import DataLoader
 
-from models.seq import n2nBaseLineNE
-from configs.model_config_dict import model_config_dict
-from data_provider.data_loader_test import LongSequenceLoader
-
-
-num_workers = os.cpu_count()
+from sdreamer.models.seq import n2nBaseLineNE
+from sdreamer.configs.model_config_dict import model_config_dict
+from sdreamer.data_provider.data_loader_test import LongSequenceLoader
 
 
 def build_args(model_name="model_A", **kwargs):
@@ -38,7 +34,7 @@ def build_args(model_name="model_A", **kwargs):
     return args
 
 
-def infer(data, output_path=None):
+def infer(data, checkpoint_path, output_path=None):
     args = build_args()
     num_class = args.c_out
     batch_size = args.batch_size
@@ -55,8 +51,7 @@ def infer(data, output_path=None):
     output_path += f"_sdreamer_{num_class}class.mat"
 
     model = n2nBaseLineNE.Model(args)
-    ckpt_path = args.reload_ckpt
-    ckpt = torch.load(ckpt_path, map_location=device)
+    ckpt = torch.load(checkpoint_path, map_location=device)
     model.load_state_dict(ckpt["state_dict"])
     eeg_data = data["trial_eeg"]  # (16946, 512)
     emg_data = data["trial_emg"]  # (16946, 512)

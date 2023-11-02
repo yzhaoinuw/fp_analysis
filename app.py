@@ -28,9 +28,7 @@ from make_figure import make_figure
 from components import Components
 
 
-app = Dash(__name__,
-           #suppress_callback_exceptions=True,
-)
+app = Dash(__name__, suppress_callback_exceptions=True)
 port = 8050
 components = Components()
 app.layout = components.home_div

@@ -3,7 +3,7 @@ from torch import nn
 from einops import rearrange
 from timm.models.layers import trunc_normal_
 
-from layers.transformer import Transformer, SWTransformer
+from sdreamer.layers.transformer import Transformer, SWTransformer
 
 
 class Model(nn.Module):

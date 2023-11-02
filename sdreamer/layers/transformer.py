@@ -3,9 +3,9 @@ from torch import nn
 from einops import repeat
 from timm.models.layers import trunc_normal_
 
-from layers.head import Pooler, SeqPooler, SeqPooler2
-from layers.patchEncoder import PatchEncoder, SWPatchEncoder
-from layers.attention import (
+from sdreamer.layers.head import Pooler, SeqPooler, SeqPooler2
+from sdreamer.layers.patchEncoder import PatchEncoder, SWPatchEncoder
+from sdreamer.layers.attention import (
     MultiHeadAttention,
     MultiHeadCrossAttention,
     MoEBlock,

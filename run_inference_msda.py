@@ -30,7 +30,9 @@ from msda_v1.utils import (
 code_size_map = {100: 128, 200: 96, 400: 64, 300: 96, 600: 32, 500: 32}
 
 
-def infer(data, num_class=3, output_path=None, batch_size=16, signaling=100):
+def infer(
+    data, model_path, num_class=3, output_path=None, batch_size=16, signaling=100
+):
     Fs = 512
     fs = 10
     if output_path is None:
@@ -65,14 +67,16 @@ def infer(data, num_class=3, output_path=None, batch_size=16, signaling=100):
         eeg.float(), ne.float(), emg.float(), fft.float()
     )
 
-    predictions, confidence = run_test(3, batch_size, test_dataset, signaling)
+    predictions, confidence = run_test(
+        model_path, num_class, batch_size, test_dataset, signaling
+    )
     final_predictions, final_confidence = edit_one(predictions, confidence)
     final_predictions[0] = 0
     final_predictions = edit_three(edit_two(final_predictions))
 
     if num_class == 4:
         predictions_4class, confidence_4class = run_test(
-            4, batch_size, test_dataset, signaling
+            model_path, num_class, batch_size, test_dataset, signaling
         )
         p = np.zeros((len(final_predictions)))
         for i in range(len(final_predictions)):
