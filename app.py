@@ -94,8 +94,11 @@ def choose_model(model_choice, model_choice_style):
 @app.callback(
     Output("num-class-store", "data"),
     Input("num-class", "value"),
+    State("model-choice-store", "data"),
 )
-def choose_num_class(num_class):
+def choose_num_class(num_class, model_choice):
+    if model_choice == "sdreamer":
+        num_class = 4
     return num_class
 
 
@@ -376,4 +379,4 @@ def open_browser():
 
 if __name__ == "__main__":
     Timer(1, open_browser).start()
-    app.run_server(debug=False, port=8050)
+    app.run_server(debug=True, port=8050)

@@ -31,7 +31,7 @@ colorscale = {
 }
 
 
-def make_figure(pred, default_n_shown_samples):
+def make_figure(pred, default_n_shown_samples=1000):
     # Time span and frequencies
     start_time, end_time = 0, pred["trial_eeg"].shape[0]
     eeg, emg, ne = pred["trial_eeg"], pred["trial_emg"], pred["trial_ne"]
@@ -47,7 +47,6 @@ def make_figure(pred, default_n_shown_samples):
     time_x3 = np.linspace(start_time, end_time, freq_x3)
     time = np.arange(start_time, end_time)
 
-    # Create some example y-values
     y_x1 = eeg.flatten()
     y_x2 = emg.flatten()
     y_x3 = ne.flatten()
@@ -56,8 +55,24 @@ def make_figure(pred, default_n_shown_samples):
     ne_min, ne_max = min(y_x3), max(y_x3)
     predictions = pred["pred_labels"].flatten()
     confidence = pred["confidence"].flatten()
-    # num_class = pred["num_class"].item()
-    num_class = len(np.unique(predictions))  # TODO: to be further worked on
+    num_class = pred["num_class"].item()
+    # num_class = len(np.unique(predictions))  # TODO: to be further worked on
+    time_filler_array = np.arange(-num_class, 0)
+    class_filler_array = np.arange(num_class)
+    time = time[: len(confidence)]
+    time = time + 0.5
+    # hovertext = [""]
+    hovertext = []
+    hovertext.extend(
+        [
+            f"time: {round(time[i]+0.5)}\nconfidence: {confidence[i]:.2f}"
+            for i in range(len(confidence))
+        ]
+    )
+    # time = np.concatenate([[0], time])
+    # confidence = np.concatenate([[confidence[0]], confidence])
+    # predictions = np.concatenate([[predictions[0]], predictions])
+    # predictions = np.concatenate([class_filler_array, predictions])
 
     fig = FigureResampler(
         make_subplots(
@@ -70,7 +85,6 @@ def make_figure(pred, default_n_shown_samples):
                 "EMG",
                 "NE",
                 "Prediction Confidence",
-                # "User Annotation",
             ),
             row_heights=[0.3, 0.3, 0.3, 0.1],
         ),
@@ -78,10 +92,6 @@ def make_figure(pred, default_n_shown_samples):
     )
 
     # Create a heatmap for stages
-    hovertext = [
-        f"time: {time[i]}\nconfidence: {confidence[i]:.2f}"
-        for i in range(len(confidence))
-    ]
     sleep_scores = go.Heatmap(  # TODO: investigate heatmap xticks alignment
         x=time,
         y0=0,
@@ -154,6 +164,7 @@ def make_figure(pred, default_n_shown_samples):
         row=3,
         col=1,
     )
+
     fig.add_trace(sleep_scores, row=1, col=1)
     fig.add_trace(sleep_scores, row=2, col=1)
     fig.add_trace(sleep_scores, row=3, col=1)
@@ -182,6 +193,7 @@ def make_figure(pred, default_n_shown_samples):
         hovermode="x unified",  # gives crosshair in one subplot
         title_text="Predicted Sleep Scores on EEG, EMG, and NE.",
         yaxis4=dict(tickvals=[]),  # suppress y ticks on the heatmap
+        xaxis4=dict(tickformat="digits"),
         legend=dict(
             x=0.6,  # adjust these values to position the sleep score legend stage_names
             y=1.05,
@@ -202,7 +214,6 @@ def make_figure(pred, default_n_shown_samples):
     fig.update_xaxes(range=[start_time, end_time], row=1, col=1)
     fig.update_xaxes(range=[start_time, end_time], row=2, col=1)
     fig.update_xaxes(range=[start_time, end_time], row=3, col=1)
-    fig.update_xaxes(range=[start_time, end_time], row=4, col=1)
     fig.update_xaxes(
         range=[start_time, end_time], row=4, col=1, title_text="<b>Time (s)</b>"
     )
@@ -243,6 +254,6 @@ if __name__ == "__main__":
 
     io.renderers.default = "browser"
     path = ".\\"
-    pred = loadmat(path + "data_prediction_sdreamer_4class.mat")
+    pred = loadmat(path + "data_prediction_msda_3class.mat")
     fig = make_figure(pred)
     fig.show_dash(config={"scrollZoom": True})
