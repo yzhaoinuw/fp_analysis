@@ -272,15 +272,20 @@ def update_fig(relayoutdata):
     Input("keyboard", "n_events"),
     State("keyboard", "event"),
     State("graph", "figure"),
+    State("num-class-store", "data"),
     prevent_initial_call=True,
 )
-def update_sleep_scores(box_select_range, keyboard_nevents, keyboard_event, figure):
+def update_sleep_scores(
+    box_select_range, keyboard_nevents, keyboard_event, figure, num_class
+):
     ctx = dash.callback_context
     if ctx.triggered:
         input_id = ctx.triggered[0]["prop_id"].split(".")[0]
         if input_id == "keyboard":
             label = keyboard_event.get("key")
-            if label in ["0", "1", "2"] and box_select_range:  # TODO: what about "3"?
+            if (
+                label in ["0", "1", "2", "3"][:num_class] and box_select_range
+            ):  # TODO: what about "3"?
                 label = int(label)
                 start, end = box_select_range
                 start = max(start, 0)  # TODO: what about end capping?

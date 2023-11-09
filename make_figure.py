@@ -34,6 +34,7 @@ colorscale = {
 def make_figure(pred, default_n_shown_samples=1000):
     # Time span and frequencies
     start_time, end_time = 0, pred["trial_eeg"].shape[0]
+
     eeg, emg, ne = pred["trial_eeg"], pred["trial_emg"], pred["trial_ne"]
     freq_x1, freq_x2, freq_x3 = (
         eeg.shape[1] * eeg.shape[0],
@@ -56,12 +57,16 @@ def make_figure(pred, default_n_shown_samples=1000):
     predictions = pred["pred_labels"].flatten()
     confidence = pred["confidence"].flatten()
     num_class = pred["num_class"].item()
+    end_time_clipped = len(confidence)
     # num_class = len(np.unique(predictions))  # TODO: to be further worked on
-    time_filler_array = np.arange(-num_class, 0)
-    class_filler_array = np.arange(num_class)
-    time = time[: len(confidence)]
+
+    # time_filler_array = np.arange(-num_class, 0)
+    time = time[
+        :end_time_clipped
+    ]  # clip time if last last couple of seconds don't preds
+
+    # align heatmap and xticks and hoverinfo over x axis
     time = time + 0.5
-    # hovertext = [""]
     hovertext = []
     hovertext.extend(
         [
@@ -69,10 +74,6 @@ def make_figure(pred, default_n_shown_samples=1000):
             for i in range(len(confidence))
         ]
     )
-    # time = np.concatenate([[0], time])
-    # confidence = np.concatenate([[confidence[0]], confidence])
-    # predictions = np.concatenate([[predictions[0]], predictions])
-    # predictions = np.concatenate([class_filler_array, predictions])
 
     fig = FigureResampler(
         make_subplots(
@@ -102,6 +103,8 @@ def make_figure(pred, default_n_shown_samples=1000):
         colorscale=colorscale[num_class],
         showscale=False,
         opacity=sleep_score_opacity,
+        zmax=num_class - 1,
+        zmin=0,
     )
 
     conf = go.Heatmap(
@@ -254,6 +257,6 @@ if __name__ == "__main__":
 
     io.renderers.default = "browser"
     path = ".\\"
-    pred = loadmat(path + "data_prediction_msda_3class.mat")
+    pred = loadmat(path + "data_prediction_sdreamer_4class.mat")
     fig = make_figure(pred)
     fig.show_dash(config={"scrollZoom": True})
