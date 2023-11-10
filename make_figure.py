@@ -257,6 +257,6 @@ if __name__ == "__main__":
 
     io.renderers.default = "browser"
     path = ".\\"
-    pred = loadmat(path + "data_prediction_sdreamer_4class.mat")
+    pred = loadmat(path + "data_prediction_msda_4class.mat")
     fig = make_figure(pred)
     fig.show_dash(config={"scrollZoom": True})

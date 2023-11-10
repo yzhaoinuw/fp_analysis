@@ -65,7 +65,7 @@ def initiate_cache(cache, filename, mat):
     Output("model-choice-container", "style"),
     Input("task-selection", "value"),
     Input("model-choice", "value"),
-    Input("num-class", "value"),
+    Input("num-class-choice", "value"),
 )
 def show_upload_box(task, model_choice, num_class):
     # if any of task, model choice, or num_class changes, gives a new upload box so that
@@ -93,7 +93,7 @@ def choose_model(model_choice, model_choice_style):
 
 @app.callback(
     Output("num-class-store", "data"),
-    Input("num-class", "value"),
+    Input("num-class-choice", "value"),
     State("model-choice-store", "data"),
 )
 def choose_num_class(num_class, model_choice):
@@ -222,6 +222,18 @@ def create_visualization(ready):
 
 
 @app.callback(
+    Output("filename-container", "children"),
+    Input("graph", "clickData"),
+    Input("graph", "selectedData"),
+    Input("graph", "relayoutData"),
+)
+def show_visualization_name(click, select, pan):
+    filename = cache.get("filename")
+    message = f"You are viewing {filename}"
+    return html.Div([message])
+
+
+@app.callback(
     Output("graph", "figure"),
     Input("n-sample-dropdown", "value"),
     prevent_initial_call=True,
@@ -252,7 +264,11 @@ def read_box_select(box_select, figure):
         selections.pop(0)
     start, end = selections[0]["x0"], selections[0]["x1"]
     start, end = round(start), round(end)
-    return [start, end], figure, "Press 0 for Wake, 1 for SWS, and 2 for REM."
+    return (
+        [start, end],
+        figure,
+        "Press 0 for Wake, 1 for SWS, 2 for REM, and 3 for MA, if applicable.",
+    )
 
 
 @app.callback(
@@ -272,24 +288,28 @@ def update_fig(relayoutdata):
     Input("keyboard", "n_events"),
     State("keyboard", "event"),
     State("graph", "figure"),
-    State("num-class-store", "data"),
     prevent_initial_call=True,
 )
-def update_sleep_scores(
-    box_select_range, keyboard_nevents, keyboard_event, figure, num_class
-):
+def update_sleep_scores(box_select_range, keyboard_nevents, keyboard_event, figure):
     ctx = dash.callback_context
     if ctx.triggered:
         input_id = ctx.triggered[0]["prop_id"].split(".")[0]
         if input_id == "keyboard":
+            mat = cache.get("mat")
+            num_class = mat["num_class"].item()
             label = keyboard_event.get("key")
-            if (
-                label in ["0", "1", "2", "3"][:num_class] and box_select_range
-            ):  # TODO: what about "3"?
+            if label in ["0", "1", "2", "3"][:num_class] and box_select_range:
                 label = int(label)
                 start, end = box_select_range
                 start = max(start, 0)  # TODO: what about end capping?
                 if start == end:
+                    raise PreventUpdate
+
+                # If the annotation does not change anything, don't add to history
+                if (
+                    figure["data"][3]["z"][0][start:end]
+                    == np.array([label] * (end - start))
+                ).all():
                     raise PreventUpdate
 
                 annotation_history = cache.get("annotation_history")
@@ -309,7 +329,6 @@ def update_sleep_scores(
                     end - start
                 )  # change conf to 1
 
-                mat = cache.get("mat")
                 mat["pred_labels"] = np.array(figure["data"][3]["z"][0])
                 mat["confidence"] = np.array(figure["data"][6]["z"][0])
                 cache.set("mat", mat)
@@ -387,4 +406,4 @@ def open_browser():
 
 if __name__ == "__main__":
     Timer(1, open_browser).start()
-    app.run_server(debug=True, port=8050)
+    app.run_server(debug=False, port=8050)

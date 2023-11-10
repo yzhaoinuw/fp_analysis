@@ -44,7 +44,7 @@ home_div = html.Div(
                     id="num-class-container",
                     children=[
                         dcc.RadioItems(
-                            id="num-class",
+                            id="num-class-choice",
                             options=[
                                 {"label": "3 Classes", "value": 3},
                                 {"label": "4 Classes", "value": 4},
@@ -125,7 +125,12 @@ visualization_div = html.Div(
                         "height": "auto",
                         "textAlign": "left",
                         "margin": "2px",
+                        "marginRight": "20px",
                     },
+                ),
+                html.Div(
+                    id="filename-container",
+                    style={"lineHeight": "40px", "marginLeft": "20px"},
                 ),
             ],
         ),
