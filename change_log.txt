@@ -1,0 +1,5 @@
+#### v0.5.4
+1. Added support for annotation for Micro-Arousal (MA).
+2. Make the time axis always show the raw time in seconds, instead of using K for larger number. For example, always show 16455, instead of showing 16.455K.
+3. Added a message telling the user what prediction file is being visualized now, in case the user lost track during annotation. The message will always above the graph when visualizing a prediction file.
+4. Fixed an incorrect Undo Annotation behavior where, when an annotation does not change the current prediction, it would still be considered an annotation, and thus consuming the undo history. Now is an annotation does not change the prediction, it will not be counted in the undo history.
