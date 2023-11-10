@@ -289,6 +289,9 @@ def update_sleep_scores(
                 label = int(label)
                 start, end = box_select_range
                 start = max(start, 0)  # TODO: what about end capping?
+                if start == end:
+                    raise PreventUpdate
+
                 annotation_history = cache.get("annotation_history")
                 annotation_history.append(
                     (
