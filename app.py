@@ -156,21 +156,18 @@ def read_mat(extension_validated, contents, filename, task):
             dash.no_update,
         )
 
-    if mat.get("trial_ne") is None:
-        return (
-            html.Div(["NE data is missing. Please double check the file selected."]),
-            dash.no_update,
-            dash.no_update,
-        )
-
     initiate_cache(cache, filename, mat)
     if task == "gen":
+        message = (
+            "File validated. Generating predictions... This may take up to 2 minutes."
+        )
+        if mat.get("trial_ne") is None:
+            message = (
+                "File validated but NE data not detected. "
+                "Generating predictions using msda... This may take up to 2 minutes."
+            )
         return (
-            html.Div(
-                [
-                    "File validated. Generating predictions... This may take up to 2 minutes."
-                ]
-            ),
+            html.Div([message]),
             True,
             dash.no_update,
         )
