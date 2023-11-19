@@ -38,8 +38,8 @@ def run_inference(data, model_choice="msda", num_class=None, output_path=None):
 
 
 if __name__ == "__main__":
-    model_choice = "sdreamer"
+    model_choice = "msda"
     data = loadmat("data.mat")
     predictions, confidence, output_path = run_inference(
-        data, model_choice, num_class=4
+        data, model_choice, num_class=3
     )

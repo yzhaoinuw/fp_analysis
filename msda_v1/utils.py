@@ -17,10 +17,10 @@ import torch.utils.data
 
 from tqdm import tqdm
 
-from msda_v1.models import DSN, DSN2
+from msda_v1.models import DSN, DSN2, DSN3
 
 
-def run_test(model_path, num_class, batch_size, test_dataset, signaling):
+def run_test(model_path, num_class, has_ne, batch_size, test_dataset, signaling):
     ###################
     # params          #
     ###################
@@ -29,12 +29,15 @@ def run_test(model_path, num_class, batch_size, test_dataset, signaling):
     test_loader = torch.utils.data.DataLoader(
         dataset=test_dataset, batch_size=batch_size, shuffle=False
     )
-    if num_class == 3:
-        model = DSN(code_size=code_size)
+    if not has_ne:
+        model = DSN3(code_size=code_size)
+        model_path += "msda_3class_no_ne_v1.pth"
     else:
-        model = DSN2(code_size=code_size)
-
-    model_path += f"msda_{num_class}class_v1.pth"
+        if num_class == 3:
+            model = DSN(code_size=code_size)
+        else:
+            model = DSN2(code_size=code_size)
+        model_path += f"msda_{num_class}class_v1.pth"
     model.load_state_dict(torch.load(model_path, map_location=torch.device("cpu")))
     model.eval()
 
@@ -44,14 +47,15 @@ def run_test(model_path, num_class, batch_size, test_dataset, signaling):
         with torch.no_grad():
             if num_class == 4:
                 pbar.set_description("Labeling MA stages")
-            for batch, (eeg_signal, ne_signal, emg_signal, fft_signal) in enumerate(
-                test_loader, 1
-            ):
+            # signals = (
+            #   eeg_signal,
+            #   ne_signal, # may be missing
+            #   emg_signal,
+            #   fft_signal
+            # )
+            for batch, signals in enumerate(test_loader, 1):
                 output = model(
-                    eeg_signal,
-                    ne_signal,
-                    emg_signal,
-                    fft_signal,
+                    *signals,
                     mode="source",
                     signaling=signaling,
                 )

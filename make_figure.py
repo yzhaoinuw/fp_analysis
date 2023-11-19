@@ -35,32 +35,23 @@ def make_figure(pred, default_n_shown_samples=1000):
     # Time span and frequencies
     start_time, end_time = 0, pred["trial_eeg"].shape[0]
 
-    eeg, emg, ne = pred["trial_eeg"], pred["trial_emg"], pred["trial_ne"]
-    freq_x1, freq_x2, freq_x3 = (
-        eeg.shape[1] * eeg.shape[0],
-        emg.shape[1] * emg.shape[0],
-        ne.shape[1] * ne.shape[0],  # example frequencies
-    )
+    eeg, emg, ne = pred.get("trial_eeg"), pred.get("trial_emg"), pred.get("trial_ne")
+    freq_x1, freq_x2 = (eeg.shape[1] * eeg.shape[0], emg.shape[1] * emg.shape[0])
 
     # Create the time sequences
     time_x1 = np.linspace(start_time, end_time, freq_x1)
     time_x2 = np.linspace(start_time, end_time, freq_x2)
-    time_x3 = np.linspace(start_time, end_time, freq_x3)
     time = np.arange(start_time, end_time)
-
     y_x1 = eeg.flatten()
     y_x2 = emg.flatten()
-    y_x3 = ne.flatten()
     eeg_min, eeg_max = min(y_x1), max(y_x2)
     emg_min, emg_max = min(y_x2), max(y_x2)
-    ne_min, ne_max = min(y_x3), max(y_x3)
+
     predictions = pred["pred_labels"].flatten()
     confidence = pred["confidence"].flatten()
     num_class = pred["num_class"].item()
     end_time_clipped = len(confidence)
-    # num_class = len(np.unique(predictions))  # TODO: to be further worked on
 
-    # time_filler_array = np.arange(-num_class, 0)
     time = time[
         :end_time_clipped
     ]  # clip time if last last couple of seconds don't preds
@@ -93,7 +84,7 @@ def make_figure(pred, default_n_shown_samples=1000):
     )
 
     # Create a heatmap for stages
-    sleep_scores = go.Heatmap(  # TODO: investigate heatmap xticks alignment
+    sleep_scores = go.Heatmap(
         x=time,
         y0=0,
         dy=20,  # assuming that the max abs value of eeg, emg, or ne is no more than 10
@@ -154,19 +145,27 @@ def make_figure(pred, default_n_shown_samples=1000):
         row=2,
         col=1,
     )
-    fig.add_trace(
-        go.Scattergl(
-            line=dict(width=1),
-            marker=dict(size=2, color="black"),
-            showlegend=False,
-            mode="lines+markers",
-            hoverinfo="x+y",
-        ),
-        hf_x=time_x3,
-        hf_y=y_x3,
-        row=3,
-        col=1,
-    )
+
+    if ne.size > 1:
+        freq_x3 = ne.shape[1] * ne.shape[0]
+        time_x3 = np.linspace(start_time, end_time, freq_x3)
+        y_x3 = ne.flatten()
+        ne_min, ne_max = min(y_x3), max(y_x3)
+        fig.add_trace(
+            go.Scattergl(
+                line=dict(width=1),
+                marker=dict(size=2, color="black"),
+                showlegend=False,
+                mode="lines+markers",
+                hoverinfo="x+y",
+            ),
+            hf_x=time_x3,
+            hf_y=y_x3,
+            row=3,
+            col=1,
+        )
+    else:
+        ne_min, ne_max = 0, 0
 
     fig.add_trace(sleep_scores, row=1, col=1)
     fig.add_trace(sleep_scores, row=2, col=1)
@@ -194,7 +193,7 @@ def make_figure(pred, default_n_shown_samples=1000):
         margin=dict(t=50, l=20, r=20, b=40),
         height=800,
         hovermode="x unified",  # gives crosshair in one subplot
-        title_text="Predicted Sleep Scores on EEG, EMG, and NE.",
+        title_text="Predicted Sleep Scores",
         yaxis4=dict(tickvals=[]),  # suppress y ticks on the heatmap
         xaxis4=dict(tickformat="digits"),
         legend=dict(
@@ -257,6 +256,6 @@ if __name__ == "__main__":
 
     io.renderers.default = "browser"
     path = ".\\"
-    pred = loadmat(path + "data_prediction_msda_4class.mat")
+    pred = loadmat(path + "data_prediction_msda_3class.mat")
     fig = make_figure(pred)
     fig.show_dash(config={"scrollZoom": True})
