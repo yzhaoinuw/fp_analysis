@@ -19,7 +19,7 @@ stage_colors = [
     "rgb(102, 255, 102)",  # REM,
     "rgb(255, 128, 0)",  # MA,
 ]
-stage_names = ["Wake: 0", "SWS: 1", "REM: 2", "MA: 3"]
+stage_names = ["Wake: 1", "SWS: 2", "REM: 3", "MA: 4"]
 colorscale = {
     3: [[0, stage_colors[0]], [0.5, stage_colors[1]], [1, stage_colors[2]]],
     4: [
@@ -167,11 +167,6 @@ def make_figure(pred, default_n_shown_samples=1000):
     else:
         ne_min, ne_max = 0, 0
 
-    fig.add_trace(sleep_scores, row=1, col=1)
-    fig.add_trace(sleep_scores, row=2, col=1)
-    fig.add_trace(sleep_scores, row=3, col=1)
-    fig.add_trace(conf, row=4, col=1)
-
     for i, color in enumerate(stage_colors[:num_class]):
         fig.add_trace(
             go.Scatter(
@@ -187,6 +182,12 @@ def make_figure(pred, default_n_shown_samples=1000):
             row=1,
             col=1,
         )
+
+    # add the heatmap last so that their indices can be accessed using last indices
+    fig.add_trace(sleep_scores, row=1, col=1)
+    fig.add_trace(sleep_scores, row=2, col=1)
+    fig.add_trace(sleep_scores, row=3, col=1)
+    fig.add_trace(conf, row=4, col=1)
 
     fig.update_layout(
         autosize=True,
@@ -256,6 +257,6 @@ if __name__ == "__main__":
 
     io.renderers.default = "browser"
     path = ".\\"
-    pred = loadmat(path + "data_prediction_msda_3class.mat")
+    pred = loadmat(path + "data_no_ne_prediction_msda_3class.mat")
     fig = make_figure(pred)
     fig.show_dash(config={"scrollZoom": True})

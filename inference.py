@@ -11,13 +11,8 @@ from scipy.io import loadmat
 import run_inference_msda
 import run_inference_sdreamer
 
+
 MODEL_PATH = "./model_save_states/"
-model_path_map = {
-    "msda_3class": f"{MODEL_PATH}msda_3class_v1.pth",
-    "msda_4class": f"{MODEL_PATH}msda_4class_v1.pth",
-    "sdreamer_3class": f"{MODEL_PATH}sdreamer_4class.pth.tar",
-    "sdreamer_4class": f"{MODEL_PATH}sdreamer_4class.pth.tar",
-}
 
 
 def run_inference(data, model_choice="msda", num_class=None, output_path=None):
@@ -30,9 +25,8 @@ def run_inference(data, model_choice="msda", num_class=None, output_path=None):
         )
 
     else:
-        model_path = model_path_map[f"{model_choice}_{num_class}class"]
         predictions, confidence, output_path = run_inference_sdreamer.infer(
-            data, model_path, output_path
+            data, MODEL_PATH, output_path
         )
     return predictions, confidence, output_path
 

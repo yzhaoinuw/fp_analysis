@@ -264,7 +264,7 @@ def read_box_select(box_select, figure):
     return (
         [start, end],
         figure,
-        "Press 0 for Wake, 1 for SWS, 2 for REM, and 3 for MA, if applicable.",
+        "Press 1 for Wake, 2 for SWS, 3 for REM, and 4 for MA, if applicable.",
     )
 
 
@@ -295,8 +295,8 @@ def update_sleep_scores(box_select_range, keyboard_nevents, keyboard_event, figu
             mat = cache.get("mat")
             num_class = mat["num_class"].item()
             label = keyboard_event.get("key")
-            if label in ["0", "1", "2", "3"][:num_class] and box_select_range:
-                label = int(label)
+            if label in ["1", "2", "3", "4"][:num_class] and box_select_range:
+                label = int(label) - 1
                 start, end = box_select_range
                 start = max(start, 0)  # TODO: what about end capping?
                 if start == end:
@@ -304,7 +304,7 @@ def update_sleep_scores(box_select_range, keyboard_nevents, keyboard_event, figu
 
                 # If the annotation does not change anything, don't add to history
                 if (
-                    figure["data"][3]["z"][0][start:end]
+                    figure["data"][-2]["z"][0][start:end]
                     == np.array([label] * (end - start))
                 ).all():
                     raise PreventUpdate
@@ -314,20 +314,20 @@ def update_sleep_scores(box_select_range, keyboard_nevents, keyboard_event, figu
                     (
                         start,
                         end,
-                        figure["data"][3]["z"][0][start:end],  # previous prediction
-                        figure["data"][6]["z"][0][start:end],  # previous confidence
+                        figure["data"][-2]["z"][0][start:end],  # previous prediction
+                        figure["data"][-1]["z"][0][start:end],  # previous confidence
                     )
                 )
                 cache.set("annotation_history", annotation_history)
-                figure["data"][3]["z"][0][start:end] = [label] * (end - start)
-                figure["data"][4]["z"][0][start:end] = [label] * (end - start)
-                figure["data"][5]["z"][0][start:end] = [label] * (end - start)
-                figure["data"][6]["z"][0][start:end] = [1] * (
+                figure["data"][-4]["z"][0][start:end] = [label] * (end - start)
+                figure["data"][-3]["z"][0][start:end] = [label] * (end - start)
+                figure["data"][-2]["z"][0][start:end] = [label] * (end - start)
+                figure["data"][-1]["z"][0][start:end] = [1] * (
                     end - start
                 )  # change conf to 1
 
-                mat["pred_labels"] = np.array(figure["data"][3]["z"][0])
-                mat["confidence"] = np.array(figure["data"][6]["z"][0])
+                mat["pred_labels"] = np.array(figure["data"][-2]["z"][0])
+                mat["confidence"] = np.array(figure["data"][-1]["z"][0])
                 cache.set("mat", mat)
                 return figure, {"display": "block"}
     raise PreventUpdate
@@ -346,15 +346,15 @@ def undo_annotation(n_clicks, figure):
     (start, end, prev_pred, prev_conf) = prev_annotation
 
     # undo figure
-    figure["data"][3]["z"][0][start:end] = prev_pred
-    figure["data"][4]["z"][0][start:end] = prev_pred
-    figure["data"][5]["z"][0][start:end] = prev_pred
-    figure["data"][6]["z"][0][start:end] = prev_conf
+    figure["data"][-4]["z"][0][start:end] = prev_pred
+    figure["data"][-3]["z"][0][start:end] = prev_pred
+    figure["data"][-2]["z"][0][start:end] = prev_pred
+    figure["data"][-1]["z"][0][start:end] = prev_conf
 
     # undo cache
     mat = cache.get("mat")
-    mat["pred_labels"] = np.array(figure["data"][3]["z"][0])
-    mat["confidence"] = np.array(figure["data"][6]["z"][0])
+    mat["pred_labels"] = np.array(figure["data"][-2]["z"][0])
+    mat["confidence"] = np.array(figure["data"][-1]["z"][0])
     cache.set("mat", mat)
 
     # update annotation_history

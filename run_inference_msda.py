@@ -30,14 +30,9 @@ from msda_v1.utils import (
 code_size_map = {100: 128, 200: 96, 400: 64, 300: 96, 600: 32, 500: 32}
 
 
-def infer(
-    data: dict, model_path, num_class=3, output_path=None, batch_size=16, signaling=100
-):
+def infer(data: dict, model_path, num_class=3, output_path=None, batch_size=16):
     Fs = 512
     fs = 10
-    if output_path is None:
-        output_path = "./data_prediction"
-    output_path += f"_msda_{num_class}class.mat"
 
     trial_eeg = data.get("trial_eeg")
     trial_emg = data.get("trial_emg")
@@ -59,7 +54,7 @@ def infer(
 
     if trial_ne is not None:
         has_ne = True
-        num_class = 3  # only supports three-class prediction without NE
+        signaling = 100
         trial_ne = signal.resample(trial_ne, fs, axis=1)
         ne = trial_ne.reshape([-1, fs, 1])
         ne = torch.from_numpy(ne)
@@ -68,6 +63,7 @@ def infer(
         )
 
     else:
+        num_class = 3  # only supports three-class prediction without NE
         trial_ne = np.nan
         has_ne = False
         signaling = 200
@@ -84,7 +80,7 @@ def infer(
 
     if num_class == 4:
         predictions_4class, confidence_4class = run_test(
-            model_path, 4, batch_size, test_dataset, signaling
+            model_path, 4, has_ne, batch_size, test_dataset, signaling
         )
         p = np.zeros((len(final_predictions)))
         for i in range(len(final_predictions)):
@@ -103,10 +99,16 @@ def infer(
         "trial_ne": trial_ne,
     }
 
+    if output_path is None:
+        output_path = "./data_prediction"
+    output_path += f"_msda_{num_class}class.mat"
     savemat(output_path, results)
     return final_predictions, final_confidence, output_path
 
 
 if __name__ == "__main__":
     data = loadmat("C:\\Users\\yzhao\\python_projects\\sleep_scoring\\data.mat")
-    final_predictions, final_confidence, output_path = infer(data, num_class=4)
+    model_path = "./model_save_states/"
+    final_predictions, final_confidence, output_path = infer(
+        data, model_path, num_class=4
+    )

@@ -34,7 +34,7 @@ def build_args(model_name="model_A", **kwargs):
     return args
 
 
-def infer(data, checkpoint_path, output_path=None):
+def infer(data, model_path, output_path=None):
     args = build_args()
     num_class = args.c_out
     batch_size = args.batch_size
@@ -46,6 +46,7 @@ def infer(data, checkpoint_path, output_path=None):
     else:
         device = torch.device("cpu")
 
+    checkpoint_path = model_path + "sdreamer_4class.pth.tar"
     if output_path is None:
         output_path = "./data_prediction"
     output_path += f"_sdreamer_{num_class}class.mat"
@@ -108,4 +109,5 @@ def infer(data, checkpoint_path, output_path=None):
 
 if __name__ == "__main__":
     data = loadmat("C:\\Users\\yzhao\\python_projects\\sleep_scoring\\data.mat")
-    all_pred, all_prob, output_path = infer(data)
+    model_path = "./model_save_states/"
+    all_pred, all_prob, output_path = infer(data, model_path)
