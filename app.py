@@ -6,6 +6,7 @@ Created on Fri Oct 20 15:45:29 2023
 """
 
 import os
+import math
 import base64
 import tempfile
 import webbrowser
@@ -48,7 +49,7 @@ cache = Cache(
 )
 
 
-def create_fig(mat, default_n_shown_samples=1000):
+def create_fig(mat, default_n_shown_samples=4000):
     fig = make_figure(mat, default_n_shown_samples)
     return fig
 
@@ -238,7 +239,7 @@ def show_visualization_name(click, select, pan):
 def change_sampling_level(sampling_level):
     if sampling_level is None:
         return dash.no_update
-    sampling_level_map = {"x1": 1000, "x2": 2000, "x4": 4000}
+    sampling_level_map = {"x1": 4000, "x2": 8000, "x4": 16000}
     n_samples = sampling_level_map[sampling_level]
     mat = cache.get("mat")
     fig = create_fig(mat, default_n_shown_samples=n_samples)
@@ -260,7 +261,6 @@ def read_box_select(box_select, figure):
     if len(selections) > 1:
         selections.pop(0)
     start, end = selections[0]["x0"], selections[0]["x1"]
-    start, end = round(start), round(end)
     return (
         [start, end],
         figure,
@@ -298,10 +298,13 @@ def update_sleep_scores(box_select_range, keyboard_nevents, keyboard_event, figu
             if label in ["1", "2", "3", "4"][:num_class] and box_select_range:
                 label = int(label) - 1
                 start, end = box_select_range
-                start = max(start, 0)  # TODO: what about end capping?
-                if start == end:
-                    raise PreventUpdate
-
+                start_round, end_round = round(start), round(end)
+                start_round = max(start_round, 0)  # TODO: what about end capping?
+                if start_round == end_round:
+                    start_round = int(start)
+                    end_round = math.ceil(end)
+                    # raise PreventUpdate
+                start, end = start_round, end_round
                 # If the annotation does not change anything, don't add to history
                 if (
                     figure["data"][-2]["z"][0][start:end]

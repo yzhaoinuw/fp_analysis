@@ -17,7 +17,7 @@ stage_colors = [
     "rgb(102, 178, 255)",  # Wake,
     "rgb(255, 102, 255)",  # SWS,
     "rgb(102, 255, 102)",  # REM,
-    "rgb(255, 128, 0)",  # MA,
+    "rgb(255, 255, 0)",  # MA yellow
 ]
 stage_names = ["Wake: 1", "SWS: 2", "REM: 3", "MA: 4"]
 colorscale = {
