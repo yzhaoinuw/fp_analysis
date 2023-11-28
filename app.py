@@ -269,13 +269,45 @@ def read_box_select(box_select, figure):
 
 
 @app.callback(
-    Output("trace-updater", "updateData"),
+    Output("trace-updater", "updateData", allow_duplicate=True),
+    Output("debug-message", "children"),
     Input("graph", "relayoutData"),
     prevent_initial_call=True,
 )
 def update_fig(relayoutdata):
     fig = cache.get("fig_resampler")
-    return fig.construct_update_data(relayoutdata)
+    return fig.construct_update_data(relayoutdata), str(relayoutdata)
+
+
+# %% test moving window
+@app.callback(
+    # Output("debug-message", "children"),
+    Output("graph", "figure", allow_duplicate=True),
+    Output("graph", "relayoutData"),
+    Input("keyboard", "n_events"),
+    State("keyboard", "event"),
+    State("graph", "relayoutData"),
+    State("graph", "figure"),
+    prevent_initial_call=True,
+)
+def show_key_pressed(keyboard_nevents, keyboard_event, relayoutdata, figure):
+    new_range = None
+    if keyboard_event:
+        key = keyboard_event.get("key")
+        x0, x1 = figure["layout"]["xaxis4"]["range"]
+        if key == "ArrowRight":
+            new_range = (x0 + (x1 - x0) * 0.3, x1 + (x1 - x0) * 0.3)
+        elif key == "ArrowLeft":
+            new_range = (x0 - (x1 - x0) * 0.3, x1 - (x1 - x0) * 0.3)
+    if new_range is not None:
+        relayoutdata["xaxis4.range[0]"] = new_range[0]
+        relayoutdata["xaxis4.range[1]"] = new_range[1]
+        figure["layout"]["xaxis4"]["range"] = new_range
+        return figure, relayoutdata
+    return dash.no_update, dash.no_update
+
+
+# %%
 
 
 @app.callback(
@@ -298,12 +330,21 @@ def update_sleep_scores(box_select_range, keyboard_nevents, keyboard_event, figu
             if label in ["1", "2", "3", "4"][:num_class] and box_select_range:
                 label = int(label) - 1
                 start, end = box_select_range
+                if end < 0:
+                    raise PreventUpdate
                 start_round, end_round = round(start), round(end)
+
                 start_round = max(start_round, 0)  # TODO: what about end capping?
                 if start_round == end_round:
-                    start_round = int(start)
-                    end_round = math.ceil(end)
-                    # raise PreventUpdate
+                    if (
+                        start_round - start > end - end_round
+                    ):  # spanning over two consecutive seconds
+                        end_round = math.ceil(start)
+                        start_round = math.floor(start)
+                    else:
+                        end_round = math.ceil(end)
+                        start_round = math.floor(end)
+
                 start, end = start_round, end_round
                 # If the annotation does not change anything, don't add to history
                 if (
