@@ -270,13 +270,12 @@ def read_box_select(box_select, figure):
 
 @app.callback(
     Output("trace-updater", "updateData", allow_duplicate=True),
-    Output("debug-message", "children"),
     Input("graph", "relayoutData"),
     prevent_initial_call=True,
 )
 def update_fig(relayoutdata):
     fig = cache.get("fig_resampler")
-    return fig.construct_update_data(relayoutdata), str(relayoutdata)
+    return fig.construct_update_data(relayoutdata)
 
 
 # %% test moving window
@@ -290,7 +289,7 @@ def update_fig(relayoutdata):
     State("graph", "figure"),
     prevent_initial_call=True,
 )
-def show_key_pressed(keyboard_nevents, keyboard_event, relayoutdata, figure):
+def pan_figures(keyboard_nevents, keyboard_event, relayoutdata, figure):
     new_range = None
     if keyboard_event:
         key = keyboard_event.get("key")
