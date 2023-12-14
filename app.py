@@ -369,6 +369,10 @@ def update_sleep_scores(box_select_range, keyboard_nevents, keyboard_event, figu
                     end - start
                 )  # change conf to 1
 
+                # remove box select after an update is made
+                selections = figure["layout"].get("selections")
+                selections.pop()
+
                 mat["pred_labels"] = np.array(figure["data"][-2]["z"][0])
                 mat["confidence"] = np.array(figure["data"][-1]["z"][0])
                 cache.set("mat", mat)
@@ -446,4 +450,4 @@ def open_browser():
 
 if __name__ == "__main__":
     Timer(1, open_browser).start()
-    app.run_server(debug=False, port=8050)
+    app.run_server(debug=True, port=8050)

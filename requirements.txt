@@ -9,4 +9,3 @@ flask-caching==2.0.2
 torch==2.1.0
 timm==0.9.8
 einops==0.7.0
-tensorflow==2.12.0

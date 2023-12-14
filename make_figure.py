@@ -207,7 +207,7 @@ def make_figure(pred, default_n_shown_samples=1000):
         font=dict(
             size=12,  # title font size
         ),
-        modebar_remove=["lasso2d", "zoom"],
+        modebar_remove=["lasso2d", "zoom", "autoScale"],
         dragmode="pan",
         clickmode="event",
     )
