@@ -71,7 +71,7 @@ mat_upload_box = dcc.Upload(
     id="data-upload",
     children=html.Button(
         ["Click here to select File"],
-        # className="upload-button"
+        id="select-file-button",
     ),
     style={
         "width": "12%",

@@ -15,7 +15,7 @@ from threading import Timer
 from collections import deque
 
 import dash
-from dash import Dash, dcc, html, ctx
+from dash import Dash, dcc, html, ctx, clientside_callback
 from dash.exceptions import PreventUpdate
 from dash.dependencies import Input, Output, State
 
@@ -49,6 +49,10 @@ cache = Cache(
 )
 
 
+def open_browser():
+    webbrowser.open_new(f"http://127.0.0.1:{PORT}/")
+
+
 def create_fig(mat, default_n_shown_samples=4000):
     fig = make_figure(mat, default_n_shown_samples)
     return fig
@@ -59,6 +63,9 @@ def initiate_cache(cache, filename, mat):
     cache.set("mat", mat)
     cache.set("annotation_history", deque(maxlen=3))
     cache.set("fig_resampler", None)
+
+
+# %% client side callbacks below
 
 
 @app.callback(
@@ -103,24 +110,136 @@ def choose_num_class(num_class, model_choice):
     return num_class
 
 
-@app.callback(
+# validate_extension
+clientside_callback(
+    """
+    function(contents, filename) {
+        if (!contents) {
+            return ["Please select a .mat file.", dash_clientside.no_update];
+        }
+
+        if (!filename.endsWith(".mat")) {
+            return ["Please select a .mat file only.", dash_clientside.no_update];
+        }
+
+        return ["Loading and validating file... This may take up to 10 seconds.", true];
+    }
+    """,
     Output("data-upload-message", "children", allow_duplicate=True),
     Output("extension-validation-store", "data"),
     Input(components.mat_upload_box, "contents"),
     State(components.mat_upload_box, "filename"),
     prevent_initial_call=True,
 )
-def validate_extension(contents, filename):
-    if contents is None:
-        return html.Div(["Please select a .mat file."]), dash.no_update
 
-    if not filename.endswith(".mat"):
-        return html.Div(["Please select a .mat file only."]), dash.no_update
 
-    return (
-        html.Div(["Loading and validating file... This may take up to 10 seconds."]),
-        True,
-    )
+# read_box_select
+clientside_callback(
+    """
+    function(box_select, figure) {
+        if (!figure.layout.selections || figure.layout.selections.length === 0) {
+            return [[], window.dash_clientside.no_update, ""];
+        }
+    
+        var selections = figure.layout.selections;
+        if (selections.length > 1) {
+            selections.shift();  // Remove the first element, equivalent to pop(0)
+        }
+    
+        var selection = selections[0];
+        if (!selection || selection.x0 === undefined || selection.x1 === undefined) {
+            return [[], window.dash_clientside.no_update, ""];
+        }
+    
+        var x0 = selection.x0;
+        var x1 = selection.x1;
+        var start = Math.min(x0, x1);
+        var end = Math.max(x0, x1);
+    
+        return [
+            [start, end],
+            figure,
+            "Press 1 for Wake, 2 for SWS, 3 for REM, and 4 for MA, if applicable."
+        ];
+    }
+    """,
+    Output("box-select-store", "data"),
+    Output("graph", "figure", allow_duplicate=True),
+    Output("annotation-message", "children", allow_duplicate=True),
+    Input("graph", "selectedData"),
+    State("graph", "figure"),
+    prevent_initial_call=True,
+)
+
+
+# pan_figures
+app.clientside_callback(
+    """
+    function(keyboard_nevents, keyboard_event, relayoutdata, figure) {
+        if (!keyboard_event || !figure) {
+            return [dash_clientside.no_update, dash_clientside.no_update];
+        }
+
+        var key = keyboard_event.key;
+        var xaxisRange = figure.layout.xaxis4.range;
+        var x0 = xaxisRange[0];
+        var x1 = xaxisRange[1];
+        var newRange;
+
+        if (key === "ArrowRight") {
+            newRange = [x0 + (x1 - x0) * 0.3, x1 + (x1 - x0) * 0.3];
+        } else if (key === "ArrowLeft") {
+            newRange = [x0 - (x1 - x0) * 0.3, x1 - (x1 - x0) * 0.3];
+        }
+
+        if (newRange) {
+            relayoutdata['xaxis4.range[0]'] = newRange[0];
+            relayoutdata['xaxis4.range[1]'] = newRange[1];
+            figure.layout.xaxis4.range = newRange;
+            return [figure, relayoutdata];
+        }
+
+        return [dash_clientside.no_update, dash_clientside.no_update];
+    }
+    """,
+    Output("graph", "figure", allow_duplicate=True),
+    Output("graph", "relayoutData"),
+    Input("keyboard", "n_events"),
+    State("keyboard", "event"),
+    State("graph", "relayoutData"),
+    State("graph", "figure"),
+    prevent_initial_call=True,
+)
+
+# show_save_annotation_status
+clientside_callback(
+    """
+    function(n_clicks) {
+        if (n_clicks > 0) {
+            return [5, "Saving annotations. This may take up to 10 seconds."];
+        }
+        return [dash_clientside.no_update, dash_clientside.no_update];
+    }
+    """,
+    Output("interval-component", "max_intervals"),
+    Output("annotation-message", "children", allow_duplicate=True),
+    Input("save-button", "n_clicks"),
+    prevent_initial_call=True,
+)
+
+
+# clear_display
+clientside_callback(
+    """
+    function(n_intervals) {
+        return n_intervals === 5 ? "" : dash_clientside.no_update;
+    }
+    """,
+    Output("annotation-message", "children"),
+    Input("interval-component", "n_intervals"),
+)
+
+# %% server side callbacks below
 
 
 @app.callback(
@@ -303,68 +422,14 @@ def debug_annotate(box_select_range, keyboard_press, keyboard_event):
 
 
 @app.callback(
-    Output("box-select-store", "data"),
-    Output("graph", "figure", allow_duplicate=True),
-    Output("annotation-message", "children", allow_duplicate=True),
-    Input("graph", "selectedData"),
-    State("graph", "figure"),
-    prevent_initial_call=True,
-)
-def read_box_select(box_select, figure):
-    selections = figure["layout"].get("selections")
-    if not selections:
-        return [], dash.no_update, ""
-    if len(selections) > 1:
-        selections.pop(0)
-    start, end = min(selections[0]["x0"], selections[0]["x1"]), max(
-        selections[0]["x0"], selections[0]["x1"]
-    )
-    return (
-        [start, end],
-        figure,
-        "Press 1 for Wake, 2 for SWS, 3 for REM, and 4 for MA, if applicable.",
-    )
-
-
-@app.callback(
     Output("trace-updater", "updateData", allow_duplicate=True),
     Input("graph", "relayoutData"),
     prevent_initial_call=True,
+    memoize=True,
 )
 def update_fig(relayoutdata):
     fig = cache.get("fig_resampler")
     return fig.construct_update_data(relayoutdata)
-
-
-# %% test moving window
-@app.callback(
-    # Output("debug-message", "children"),
-    Output("graph", "figure", allow_duplicate=True),
-    Output("graph", "relayoutData"),
-    Input("keyboard", "n_events"),
-    State("keyboard", "event"),
-    State("graph", "relayoutData"),
-    State("graph", "figure"),
-    prevent_initial_call=True,
-)
-def pan_figures(keyboard_nevents, keyboard_event, relayoutdata, figure):
-    new_range = None
-    if keyboard_event:
-        key = keyboard_event.get("key")
-        x0, x1 = figure["layout"]["xaxis4"]["range"]
-        if key == "ArrowRight":
-            new_range = (x0 + (x1 - x0) * 0.3, x1 + (x1 - x0) * 0.3)
-        elif key == "ArrowLeft":
-            new_range = (x0 - (x1 - x0) * 0.3, x1 - (x1 - x0) * 0.3)
-    if new_range is not None:
-        relayoutdata["xaxis4.range[0]"] = new_range[0]
-        relayoutdata["xaxis4.range[1]"] = new_range[1]
-        figure["layout"]["xaxis4"]["range"] = new_range
-        return figure, relayoutdata
-    return dash.no_update, dash.no_update
-
-
-# %%
 
 
 @app.callback(
@@ -384,7 +449,6 @@ def update_sleep_scores(
         raise PreventUpdate
 
     label = keyboard_event.get("key")
-    # num_class = mat["num_class"].item()
     if label not in ["1", "2", "3", "4"][:num_class]:
         raise PreventUpdate
 
@@ -453,7 +517,7 @@ def make_annotation(annotation, figure):
 
 
 @app.callback(
-    Output("debug-message", "children"),
+    # Output("debug-message", "children"),
     Output("graph", "figure", allow_duplicate=True),
     Output("undo-button", "style", allow_duplicate=True),
     Input("undo-button", "n_clicks"),
@@ -480,8 +544,8 @@ def undo_annotation(n_clicks, figure):
     # update annotation_history
     cache.set("annotation_history", annotation_history)
     if not annotation_history:
-        return str(start) + ", " + str(end), figure, {"display": "none"}
-    return str(start) + ", " + str(end), figure, {"display": "block"}
+        return figure, {"display": "none"}
+    return figure, {"display": "block"}
 
 
 @app.callback(
@@ -495,30 +559,6 @@ def save_annotations(n_clicks):
     mat = cache.get("mat")
     savemat(temp_mat_path, mat)
     return dcc.send_file(temp_mat_path)
-
-
-@app.callback(
-    Output("interval-component", "max_intervals"),
-    Output("annotation-message", "children", allow_duplicate=True),
-    Input("save-button", "n_clicks"),
-    prevent_initial_call=True,
-)
-def show_save_annotation_status(n_clicks):
-    return 5, "Saving annotations. This may take up to 10 seconds."
-
-
-@app.callback(
-    Output("annotation-message", "children"),
-    Input("interval-component", "n_intervals"),
-)
-def clear_display(n):
-    if n == 5:
-        return ""
-    return dash.no_update
-
-
-def open_browser():
-    webbrowser.open_new(f"http://127.0.0.1:{PORT}/")
 
 
 if __name__ == "__main__":
