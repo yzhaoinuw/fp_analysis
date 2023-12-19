@@ -15,7 +15,7 @@ from threading import Timer
 from collections import deque
 
 import dash
-from dash import Dash, dcc, html
+from dash import Dash, dcc, html, ctx
 from dash.exceptions import PreventUpdate
 from dash.dependencies import Input, Output, State
 
@@ -246,6 +246,44 @@ def change_sampling_level(sampling_level):
     return fig
 
 
+"""
+@app.callback(
+    Output("debug-message", "children"),
+    Input("graph", "selectedData"),
+    State("graph", "figure"),
+    prevent_initial_call=True,
+)
+def debug_selected_data(box_select, figure):
+    if box_select is None:
+        return dash.no_update
+    #return str(box_select)
+    return str(figure["layout"].get("selections"))
+
+@app.callback(
+    Output("debug-message", "children"),
+    #Input("keyboard", "n_events"),
+    Input("keyboard", "event"),
+    #State("keyboard", "event"),
+    prevent_initial_call=True,
+)
+def debug_keypress(keyboard_event):
+    return str(keyboard_event.get("key"))
+"""
+
+
+@app.callback(
+    Output("debug-message", "children", allow_duplicate=True),
+    Input("box-select-store", "data"),
+    Input("keyboard", "n_events"),
+    State("keyboard", "event"),
+    prevent_initial_call=True,
+)
+def debug_annotate(box_select_range, keyboard_press, keyboard_event):
+    if not (ctx.triggered_id == "keyboard" and box_select_range):
+        raise PreventUpdate
+    return str(ctx.triggered_id) + str(box_select_range)
+
+
 @app.callback(
     Output("box-select-store", "data"),
     Output("graph", "figure", allow_duplicate=True),
@@ -257,10 +295,12 @@ def change_sampling_level(sampling_level):
 def read_box_select(box_select, figure):
     selections = figure["layout"].get("selections")
     if not selections:
-        return [], dash.no_update, dash.no_update
+        return [], dash.no_update, ""
     if len(selections) > 1:
         selections.pop(0)
-    start, end = selections[0]["x0"], selections[0]["x1"]
+    start, end = min(selections[0]["x0"], selections[0]["x1"]), max(
+        selections[0]["x0"], selections[0]["x1"]
+    )
     return (
         [start, end],
         figure,
@@ -313,71 +353,68 @@ def pan_figures(keyboard_nevents, keyboard_event, relayoutdata, figure):
     Output("graph", "figure", allow_duplicate=True),
     Output("undo-button", "style"),
     Input("box-select-store", "data"),
-    Input("keyboard", "n_events"),
+    Input("keyboard", "n_events"),  # a keyboard press
     State("keyboard", "event"),
     State("graph", "figure"),
     prevent_initial_call=True,
 )
-def update_sleep_scores(box_select_range, keyboard_nevents, keyboard_event, figure):
-    ctx = dash.callback_context
-    if ctx.triggered:
-        input_id = ctx.triggered[0]["prop_id"].split(".")[0]
-        if input_id == "keyboard":
-            mat = cache.get("mat")
-            num_class = mat["num_class"].item()
-            label = keyboard_event.get("key")
-            if label in ["1", "2", "3", "4"][:num_class] and box_select_range:
-                label = int(label) - 1
-                start, end = box_select_range
-                if end < 0:
-                    raise PreventUpdate
-                start_round, end_round = round(start), round(end)
+def update_sleep_scores(box_select_range, keyboard_press, keyboard_event, figure):
+    if not (ctx.triggered_id == "keyboard" and box_select_range):
+        raise PreventUpdate
 
-                start_round = max(start_round, 0)  # TODO: what about end capping?
-                if start_round == end_round:
-                    if (
-                        start_round - start > end - end_round
-                    ):  # spanning over two consecutive seconds
-                        end_round = math.ceil(start)
-                        start_round = math.floor(start)
-                    else:
-                        end_round = math.ceil(end)
-                        start_round = math.floor(end)
+    mat = cache.get("mat")
+    label = keyboard_event.get("key")
+    num_class = mat["num_class"].item()
+    if label not in ["1", "2", "3", "4"][:num_class]:
+        raise PreventUpdate
 
-                start, end = start_round, end_round
-                # If the annotation does not change anything, don't add to history
-                if (
-                    figure["data"][-2]["z"][0][start:end]
-                    == np.array([label] * (end - start))
-                ).all():
-                    raise PreventUpdate
+    label = int(label) - 1
+    start, end = box_select_range
+    if end < 0:
+        raise PreventUpdate
+    start_round, end_round = round(start), round(end)
 
-                annotation_history = cache.get("annotation_history")
-                annotation_history.append(
-                    (
-                        start,
-                        end,
-                        figure["data"][-2]["z"][0][start:end],  # previous prediction
-                        figure["data"][-1]["z"][0][start:end],  # previous confidence
-                    )
-                )
-                cache.set("annotation_history", annotation_history)
-                figure["data"][-4]["z"][0][start:end] = [label] * (end - start)
-                figure["data"][-3]["z"][0][start:end] = [label] * (end - start)
-                figure["data"][-2]["z"][0][start:end] = [label] * (end - start)
-                figure["data"][-1]["z"][0][start:end] = [1] * (
-                    end - start
-                )  # change conf to 1
+    start_round = max(start_round, 0)  # TODO: what about end capping?
+    if start_round == end_round:
+        if (
+            start_round - start > end - end_round
+        ):  # spanning over two consecutive seconds
+            end_round = math.ceil(start)
+            start_round = math.floor(start)
+        else:
+            end_round = math.ceil(end)
+            start_round = math.floor(end)
 
-                # remove box select after an update is made
-                selections = figure["layout"].get("selections")
-                selections.pop()
+    start, end = start_round, end_round
+    # If the annotation does not change anything, don't add to history
+    if (
+        figure["data"][-2]["z"][0][start:end] == np.array([label] * (end - start))
+    ).all():
+        raise PreventUpdate
 
-                mat["pred_labels"] = np.array(figure["data"][-2]["z"][0])
-                mat["confidence"] = np.array(figure["data"][-1]["z"][0])
-                cache.set("mat", mat)
-                return figure, {"display": "block"}
-    raise PreventUpdate
+    annotation_history = cache.get("annotation_history")
+    annotation_history.append(
+        (
+            start,
+            end,
+            figure["data"][-2]["z"][0][start:end],  # previous prediction
+            figure["data"][-1]["z"][0][start:end],  # previous confidence
+        )
+    )
+    cache.set("annotation_history", annotation_history)
+    figure["data"][-4]["z"][0][start:end] = [label] * (end - start)
+    figure["data"][-3]["z"][0][start:end] = [label] * (end - start)
+    figure["data"][-2]["z"][0][start:end] = [label] * (end - start)
+    figure["data"][-1]["z"][0][start:end] = [1] * (end - start)  # change conf to 1
+
+    # remove box select after an update is made
+    selections = figure["layout"].get("selections")
+    selections.pop()
+
+    mat["pred_labels"] = np.array(figure["data"][-2]["z"][0])
+    mat["confidence"] = np.array(figure["data"][-1]["z"][0])
+    cache.set("mat", mat)
+    return figure, {"display": "block"}
 
 
 @app.callback(

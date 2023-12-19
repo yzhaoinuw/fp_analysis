@@ -9,6 +9,7 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from plotly_resampler import FigureResampler
+from plotly_resampler.aggregation import MinMaxLTTB
 
 
 # set up color config
@@ -81,6 +82,7 @@ def make_figure(pred, default_n_shown_samples=1000):
             row_heights=[0.3, 0.3, 0.3, 0.1],
         ),
         default_n_shown_samples=default_n_shown_samples,
+        default_downsampler=MinMaxLTTB(parallel=True),
     )
 
     # Create a heatmap for stages
