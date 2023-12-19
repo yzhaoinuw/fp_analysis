@@ -140,6 +140,7 @@ visualization_div = html.Div(
             style={"display": "flex"},
             children=[
                 dcc.Store(id="box-select-store"),
+                dcc.Store(id="annotation-store"),
                 EventListener(
                     id="keyboard",
                     events=[{"event": "keydown", "props": ["key"]}],

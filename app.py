@@ -30,10 +30,10 @@ from components import Components
 
 
 app = Dash(__name__, suppress_callback_exceptions=True)
-port = 8050
 components = Components()
 app.layout = components.home_div
 
+PORT = 8050
 TEMP_PATH = os.path.join(tempfile.gettempdir(), "sleep_scoring_app_data")
 if not os.path.exists(TEMP_PATH):
     os.makedirs(TEMP_PATH)
@@ -127,6 +127,7 @@ def validate_extension(contents, filename):
     Output("data-upload-message", "children", allow_duplicate=True),
     Output("generation-ready-store", "data"),
     Output("visualization-ready-store", "data"),
+    Output("num-class-store", "data", allow_duplicate=True),
     Input("extension-validation-store", "data"),
     State(components.mat_upload_box, "contents"),
     State(components.mat_upload_box, "filename"),
@@ -148,11 +149,13 @@ def read_mat(extension_validated, contents, filename, task):
             html.Div(["EEG data is missing. Please double check the file selected."]),
             dash.no_update,
             dash.no_update,
+            dash.no_update,
         )
 
     if mat.get("trial_emg") is None:
         return (
             html.Div(["EMG data is missing. Please double check the file selected."]),
+            dash.no_update,
             dash.no_update,
             dash.no_update,
         )
@@ -171,8 +174,23 @@ def read_mat(extension_validated, contents, filename, task):
             html.Div([message]),
             True,
             dash.no_update,
+            dash.no_update,
         )
 
+    # else visualizing predictions
+    num_class = mat.get("num_class")
+    if mat.get("num_class") is None:
+        return (
+            html.Div(
+                [
+                    "Missing the number of unique sleep scores. Please double check the file selected."
+                ]
+            ),
+            dash.no_update,
+            dash.no_update,
+            dash.no_update,
+        )
+    num_class = num_class.item()
     return (
         html.Div(
             [
@@ -181,6 +199,7 @@ def read_mat(extension_validated, contents, filename, task):
         ),
         dash.no_update,
         True,
+        num_class,
     )
 
 
@@ -268,11 +287,9 @@ def debug_selected_data(box_select, figure):
 )
 def debug_keypress(keyboard_event):
     return str(keyboard_event.get("key"))
-"""
-
 
 @app.callback(
-    Output("debug-message", "children", allow_duplicate=True),
+    Output("debug-message", "children"),
     Input("box-select-store", "data"),
     Input("keyboard", "n_events"),
     State("keyboard", "event"),
@@ -282,6 +299,7 @@ def debug_annotate(box_select_range, keyboard_press, keyboard_event):
     if not (ctx.triggered_id == "keyboard" and box_select_range):
         raise PreventUpdate
     return str(ctx.triggered_id) + str(box_select_range)
+"""
 
 
 @app.callback(
@@ -351,20 +369,22 @@ def pan_figures(keyboard_nevents, keyboard_event, relayoutdata, figure):
 
 @app.callback(
     Output("graph", "figure", allow_duplicate=True),
-    Output("undo-button", "style"),
+    Output("annotation-store", "data"),
     Input("box-select-store", "data"),
     Input("keyboard", "n_events"),  # a keyboard press
     State("keyboard", "event"),
+    State("num-class-store", "data"),
     State("graph", "figure"),
     prevent_initial_call=True,
 )
-def update_sleep_scores(box_select_range, keyboard_press, keyboard_event, figure):
+def update_sleep_scores(
+    box_select_range, keyboard_press, keyboard_event, num_class, figure
+):
     if not (ctx.triggered_id == "keyboard" and box_select_range):
         raise PreventUpdate
 
-    mat = cache.get("mat")
     label = keyboard_event.get("key")
-    num_class = mat["num_class"].item()
+    # num_class = mat["num_class"].item()
     if label not in ["1", "2", "3", "4"][:num_class]:
         raise PreventUpdate
 
@@ -392,16 +412,8 @@ def update_sleep_scores(box_select_range, keyboard_press, keyboard_event, figure
     ).all():
         raise PreventUpdate
 
-    annotation_history = cache.get("annotation_history")
-    annotation_history.append(
-        (
-            start,
-            end,
-            figure["data"][-2]["z"][0][start:end],  # previous prediction
-            figure["data"][-1]["z"][0][start:end],  # previous confidence
-        )
-    )
-    cache.set("annotation_history", annotation_history)
+    prev_labels = figure["data"][-4]["z"][0][start:end]
+    prev_conf = figure["data"][-1]["z"][0][start:end]
     figure["data"][-4]["z"][0][start:end] = [label] * (end - start)
     figure["data"][-3]["z"][0][start:end] = [label] * (end - start)
     figure["data"][-2]["z"][0][start:end] = [label] * (end - start)
@@ -411,13 +423,37 @@ def update_sleep_scores(box_select_range, keyboard_press, keyboard_event, figure
     selections = figure["layout"].get("selections")
     selections.pop()
 
-    mat["pred_labels"] = np.array(figure["data"][-2]["z"][0])
-    mat["confidence"] = np.array(figure["data"][-1]["z"][0])
-    cache.set("mat", mat)
-    return figure, {"display": "block"}
+    return figure, (start, end, prev_labels, prev_conf)
 
 
 @app.callback(
+    Output("undo-button", "style"),
+    Input("annotation-store", "data"),
+    State("graph", "figure"),
+    prevent_initial_call=True,
+)
+def make_annotation(annotation, figure):
+    """write to annotation history, update mat in cache, and make undo button availabe"""
+    start, end, prev_labels, prev_conf = annotation
+    mat = cache.get("mat")
+    annotation_history = cache.get("annotation_history")
+    annotation_history.append(
+        (
+            start,
+            end,
+            prev_labels,  # previous prediction
+            prev_conf,  # previous confidence
+        )
+    )
+    cache.set("annotation_history", annotation_history)
+    mat["pred_labels"] = np.array(figure["data"][-2]["z"][0])
+    mat["confidence"] = np.array(figure["data"][-1]["z"][0])
+    cache.set("mat", mat)
+    return {"display": "block"}
+
+
+@app.callback(
+    Output("debug-message", "children"),
     Output("graph", "figure", allow_duplicate=True),
     Output("undo-button", "style", allow_duplicate=True),
     Input("undo-button", "n_clicks"),
@@ -444,8 +480,8 @@ def undo_annotation(n_clicks, figure):
     # update annotation_history
     cache.set("annotation_history", annotation_history)
     if not annotation_history:
-        return figure, {"display": "none"}
-    return figure, {"display": "block"}
+        return str(start) + ", " + str(end), figure, {"display": "none"}
+    return str(start) + ", " + str(end), figure, {"display": "block"}
 
 
 @app.callback(
@@ -482,9 +518,9 @@ def clear_display(n):
 
 
 def open_browser():
-    webbrowser.open_new(f"http://127.0.0.1:{port}/")
+    webbrowser.open_new(f"http://127.0.0.1:{PORT}/")
 
 
 if __name__ == "__main__":
     Timer(1, open_browser).start()
-    app.run_server(debug=True, port=8050)
+    app.run_server(debug=True, port=PORT)
