@@ -15,18 +15,17 @@ from threading import Timer
 from collections import deque
 
 import dash
-from dash import Dash, dcc, html, ctx, clientside_callback
 from dash.exceptions import PreventUpdate
 from dash.dependencies import Input, Output, State
+from dash import Dash, dcc, html, ctx, clientside_callback
 
 import numpy as np
 from flask_caching import Cache
 from scipy.io import loadmat, savemat
 
-
+from components import Components
 from inference import run_inference
 from make_figure import make_figure
-from components import Components
 
 
 app = Dash(__name__, suppress_callback_exceptions=True)
@@ -407,18 +406,34 @@ def debug_selected_data(box_select, figure):
 def debug_keypress(keyboard_event):
     return str(keyboard_event.get("key"))
 
+
+"""
+
+
 @app.callback(
     Output("debug-message", "children"),
     Input("box-select-store", "data"),
     Input("keyboard", "n_events"),
     State("keyboard", "event"),
+    State("num-class-store", "data"),
     prevent_initial_call=True,
 )
-def debug_annotate(box_select_range, keyboard_press, keyboard_event):
+def debug_annotate(box_select_range, keyboard_press, keyboard_event, num_class):
     if not (ctx.triggered_id == "keyboard" and box_select_range):
         raise PreventUpdate
-    return str(ctx.triggered_id) + str(box_select_range)
-"""
+
+    label = keyboard_event.get("key")
+    if label not in ["1", "2", "3", "4"][:num_class]:
+        raise PreventUpdate
+
+    return (
+        " callback triggered from: "
+        + str(ctx.triggered_id)
+        + ", box select range: "
+        + str(box_select_range)
+        + ", key pressed: "
+        + str(label)
+    )
 
 
 @app.callback(
