@@ -17,7 +17,7 @@ from collections import deque
 import dash
 from dash.exceptions import PreventUpdate
 from dash.dependencies import Input, Output, State
-from dash import Dash, dcc, html, ctx, clientside_callback
+from dash import Dash, dcc, html, ctx, clientside_callback, Patch
 
 import numpy as np
 from flask_caching import Cache
@@ -28,7 +28,7 @@ from inference import run_inference
 from make_figure import make_figure
 
 
-app = Dash(__name__, suppress_callback_exceptions=True)
+app = Dash(__name__, title="Sleep Scoring App", suppress_callback_exceptions=True)
 components = Components()
 app.layout = components.home_div
 
@@ -128,45 +128,6 @@ clientside_callback(
     Output("extension-validation-store", "data"),
     Input(components.mat_upload_box, "contents"),
     State(components.mat_upload_box, "filename"),
-    prevent_initial_call=True,
-)
-
-
-# read_box_select
-clientside_callback(
-    """
-    function(box_select, figure) {
-        if (!figure.layout.selections || figure.layout.selections.length === 0) {
-            return [[], window.dash_clientside.no_update, ""];
-        }
-    
-        var selections = figure.layout.selections;
-        if (selections.length > 1) {
-            selections.shift();  // Remove the first element, equivalent to pop(0)
-        }
-    
-        var selection = selections[0];
-        if (!selection || selection.x0 === undefined || selection.x1 === undefined) {
-            return [[], window.dash_clientside.no_update, ""];
-        }
-    
-        var x0 = selection.x0;
-        var x1 = selection.x1;
-        var start = Math.min(x0, x1);
-        var end = Math.max(x0, x1);
-    
-        return [
-            [start, end],
-            figure,
-            "Press 1 for Wake, 2 for SWS, 3 for REM, and 4 for MA, if applicable."
-        ];
-    }
-    """,
-    Output("box-select-store", "data"),
-    Output("graph", "figure", allow_duplicate=True),
-    Output("annotation-message", "children", allow_duplicate=True),
-    Input("graph", "selectedData"),
-    State("graph", "figure"),
     prevent_initial_call=True,
 )
 
@@ -407,9 +368,6 @@ def debug_keypress(keyboard_event):
     return str(keyboard_event.get("key"))
 
 
-"""
-
-
 @app.callback(
     Output("debug-message", "children"),
     Input("box-select-store", "data"),
@@ -434,6 +392,7 @@ def debug_annotate(box_select_range, keyboard_press, keyboard_event, num_class):
         + ", key pressed: "
         + str(label)
     )
+"""
 
 
 @app.callback(
@@ -445,6 +404,35 @@ def debug_annotate(box_select_range, keyboard_press, keyboard_event, num_class):
 def update_fig(relayoutdata):
     fig = cache.get("fig_resampler")
     return fig.construct_update_data(relayoutdata)
+
+
+@app.callback(
+    Output("box-select-store", "data"),
+    Output("graph", "figure", allow_duplicate=True),
+    Output("annotation-message", "children", allow_duplicate=True),
+    Input("graph", "selectedData"),
+    State("graph", "figure"),
+    prevent_initial_call=True,
+)
+def read_box_select(box_select, figure):
+    selections = figure["layout"].get("selections")
+    if not selections:
+        return [], dash.no_update, ""
+
+    patched_figure = Patch()
+    if len(selections) > 1:
+        selections.pop(0)
+    start, end = min(selections[0]["x0"], selections[0]["x1"]), max(
+        selections[0]["x0"], selections[0]["x1"]
+    )
+    patched_figure["layout"][
+        "selections"
+    ] = selections  # patial property update: https://dash.plotly.com/partial-properties#update
+    return (
+        [start, end],
+        patched_figure,
+        "Press 1 for Wake, 2 for SWS, 3 for REM, and 4 for MA, if applicable.",
+    )
 
 
 @app.callback(
