@@ -479,18 +479,24 @@ def update_sleep_scores(
     ).all():
         raise PreventUpdate
 
+    patched_figure = Patch()
     prev_labels = figure["data"][-4]["z"][0][start:end]
     prev_conf = figure["data"][-1]["z"][0][start:end]
     figure["data"][-4]["z"][0][start:end] = [label] * (end - start)
-    figure["data"][-3]["z"][0][start:end] = [label] * (end - start)
-    figure["data"][-2]["z"][0][start:end] = [label] * (end - start)
+    # figure["data"][-3]["z"][0][start:end] = [label] * (end - start)
+    # figure["data"][-2]["z"][0][start:end] = [label] * (end - start)
     figure["data"][-1]["z"][0][start:end] = [1] * (end - start)  # change conf to 1
 
+    patched_figure["data"][-4]["z"][0] = figure["data"][-4]["z"][0]
+    patched_figure["data"][-3]["z"][0] = figure["data"][-4]["z"][0]
+    patched_figure["data"][-2]["z"][0] = figure["data"][-4]["z"][0]
+    patched_figure["data"][-1]["z"][0] = figure["data"][-1]["z"][0]
     # remove box select after an update is made
-    selections = figure["layout"].get("selections")
-    selections.pop()
+    # selections = figure["layout"].get("selections")
+    # selections.pop()
+    patched_figure["layout"]["selections"].clear()
 
-    return figure, (start, end, prev_labels, prev_conf)
+    return patched_figure, (start, end, prev_labels, prev_conf)
 
 
 @app.callback(
@@ -532,23 +538,29 @@ def undo_annotation(n_clicks, figure):
     prev_annotation = annotation_history.pop()
     (start, end, prev_pred, prev_conf) = prev_annotation
 
+    patched_figure = Patch()
     # undo figure
     figure["data"][-4]["z"][0][start:end] = prev_pred
-    figure["data"][-3]["z"][0][start:end] = prev_pred
-    figure["data"][-2]["z"][0][start:end] = prev_pred
+    # figure["data"][-3]["z"][0][start:end] = prev_pred
+    # figure["data"][-2]["z"][0][start:end] = prev_pred
     figure["data"][-1]["z"][0][start:end] = prev_conf
+
+    patched_figure["data"][-4]["z"][0] = figure["data"][-4]["z"][0]
+    patched_figure["data"][-3]["z"][0] = figure["data"][-4]["z"][0]
+    patched_figure["data"][-2]["z"][0] = figure["data"][-4]["z"][0]
+    patched_figure["data"][-1]["z"][0] = figure["data"][-1]["z"][0]
 
     # undo cache
     mat = cache.get("mat")
-    mat["pred_labels"] = np.array(figure["data"][-2]["z"][0])
-    mat["confidence"] = np.array(figure["data"][-1]["z"][0])
+    mat["pred_labels"][start:end] = np.array(prev_pred)
+    mat["confidence"][start:end] = np.array(prev_conf)
     cache.set("mat", mat)
 
     # update annotation_history
     cache.set("annotation_history", annotation_history)
     if not annotation_history:
-        return figure, {"display": "none"}
-    return figure, {"display": "block"}
+        return patched_figure, {"display": "none"}
+    return patched_figure, {"display": "block"}
 
 
 @app.callback(
