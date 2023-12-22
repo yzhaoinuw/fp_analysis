@@ -366,7 +366,7 @@ def debug_selected_data(box_select, figure):
 )
 def debug_keypress(keyboard_event):
     return str(keyboard_event.get("key"))
-
+"""
 
 @app.callback(
     Output("debug-message", "children"),
@@ -392,7 +392,6 @@ def debug_annotate(box_select_range, keyboard_press, keyboard_event, num_class):
         + ", key pressed: "
         + str(label)
     )
-"""
 
 
 @app.callback(
@@ -578,4 +577,4 @@ def save_annotations(n_clicks):
 
 if __name__ == "__main__":
     Timer(1, open_browser).start()
-    app.run_server(debug=True, port=PORT)
+    app.run_server(debug=False, port=PORT)
