@@ -85,29 +85,37 @@ def show_upload_box(task, model_choice, num_class):
         return components.mat_upload_box, {"display": "none"}
 
 
-@app.callback(
+# choose_model
+clientside_callback(
+    """
+    function(model_choice, model_choice_style) {
+        if (model_choice_style.display === "none") {
+            return [{"display": "none"}, model_choice];
+        }
+        return [{"display": "block"}, model_choice];
+    }
+    """,
     Output("num-class-container", "style"),
     Output("model-choice-store", "data"),
     Input("model-choice", "value"),
     Input("model-choice-container", "style"),
 )
-def choose_model(model_choice, model_choice_style):
-    if model_choice_style["display"] == "none":
-        return {"display": "none"}, model_choice
-
-    return {"display": "block"}, model_choice
 
 
-@app.callback(
+# choose_num_class
+clientside_callback(
+    """
+    function(num_class, model_choice) {
+        if (model_choice === "sdreamer") {
+            num_class = 4;
+        }
+        return num_class;
+    }
+    """,
     Output("num-class-store", "data"),
     Input("num-class-choice", "value"),
     State("model-choice-store", "data"),
 )
-def choose_num_class(num_class, model_choice):
-    if model_choice == "sdreamer":
-        num_class = 4
-    return num_class
-
 
 # validate_extension
 clientside_callback(
@@ -367,6 +375,7 @@ def debug_selected_data(box_select, figure):
 def debug_keypress(keyboard_event):
     return str(keyboard_event.get("key"))
 """
+
 
 @app.callback(
     Output("debug-message", "children"),

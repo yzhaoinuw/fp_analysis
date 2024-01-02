@@ -62,7 +62,8 @@ def make_figure(pred, default_n_shown_samples=1000):
     hovertext = []
     hovertext.extend(
         [
-            f"time: {round(time[i]+0.5)}\nconfidence: {confidence[i]:.2f}"
+            # f"time: {round(time[i]+0.5)}\nconfidence: {confidence[i]:.2f}"
+            f"time: {round(time[i]+0.5)}"
             for i in range(len(confidence))
         ]
     )
@@ -127,7 +128,7 @@ def make_figure(pred, default_n_shown_samples=1000):
             marker=dict(size=2, color="black"),
             showlegend=False,
             mode="lines+markers",
-            hoverinfo="x+y",
+            hoverinfo="y",
         ),
         hf_x=time_x1,
         hf_y=y_x1,
@@ -140,7 +141,7 @@ def make_figure(pred, default_n_shown_samples=1000):
             marker=dict(size=2, color="black"),
             showlegend=False,
             mode="lines+markers",
-            hoverinfo="x+y",
+            hoverinfo="y",
         ),
         hf_x=time_x2,
         hf_y=y_x2,
@@ -159,7 +160,7 @@ def make_figure(pred, default_n_shown_samples=1000):
                 marker=dict(size=2, color="black"),
                 showlegend=False,
                 mode="lines+markers",
-                hoverinfo="x+y",
+                hoverinfo="y",
             ),
             hf_x=time_x3,
             hf_y=y_x3,
@@ -196,6 +197,7 @@ def make_figure(pred, default_n_shown_samples=1000):
         margin=dict(t=50, l=20, r=20, b=40),
         height=800,
         hovermode="x unified",  # gives crosshair in one subplot
+        hoverlabel=dict(bgcolor="rgba(255, 255, 255, 0.6)"),
         title_text="Predicted Sleep Scores",
         yaxis4=dict(tickvals=[]),  # suppress y ticks on the heatmap
         xaxis4=dict(tickformat="digits"),
@@ -220,7 +222,10 @@ def make_figure(pred, default_n_shown_samples=1000):
     fig.update_xaxes(range=[start_time, end_time], row=2, col=1)
     fig.update_xaxes(range=[start_time, end_time], row=3, col=1)
     fig.update_xaxes(
-        range=[start_time, end_time], row=4, col=1, title_text="<b>Time (s)</b>"
+        range=[start_time, end_time],
+        row=4,
+        col=1,
+        title_text="<b>Time (s)</b>",
     )
     fig.update_yaxes(
         range=[
