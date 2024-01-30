@@ -404,14 +404,16 @@ def debug_annotate(box_select_range, keyboard_press, keyboard_event, num_class):
 
 
 @app.callback(
-    Output("trace-updater", "updateData", allow_duplicate=True),
+    #Output("trace-updater", "updateData", allow_duplicate=True),
+    Output("graph", "figure", allow_duplicate=True),
     Input("graph", "relayoutData"),
     prevent_initial_call=True,
     memoize=True,
 )
 def update_fig(relayoutdata):
     fig = cache.get("fig_resampler")
-    return fig.construct_update_data(relayoutdata)
+    #return fig.construct_update_data(relayoutdata)
+    return fig.construct_update_data_patch(relayoutdata)
 
 
 @app.callback(
@@ -586,4 +588,4 @@ def save_annotations(n_clicks):
 
 if __name__ == "__main__":
     Timer(1, open_browser).start()
-    app.run_server(debug=False, port=PORT)
+    app.run_server(debug=True, port=PORT)
