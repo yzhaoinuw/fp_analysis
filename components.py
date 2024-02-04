@@ -6,7 +6,8 @@ Created on Fri Oct 20 16:27:03 2023
 """
 
 from dash import dcc, html
-#from trace_updater import TraceUpdater
+
+# from trace_updater import TraceUpdater
 from dash_extensions import EventListener
 
 
@@ -135,7 +136,7 @@ visualization_div = html.Div(
             ],
         ),
         graph,
-        #TraceUpdater(id="trace-updater", gdID="graph"),
+        # TraceUpdater(id="trace-updater", gdID="graph"),
         html.Div(
             style={"display": "flex"},
             children=[

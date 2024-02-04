@@ -38,6 +38,9 @@ def infer(data: dict, model_path, num_class=3, output_path=None, batch_size=16):
     trial_emg = data.get("trial_emg")
     trial_ne = data.get("trial_ne")
 
+    trial_eeg = signal.resample(trial_eeg, Fs, axis=1)
+    trial_emg = signal.resample(trial_emg, Fs, axis=1)
+
     eeg, emg = (trial_eeg.reshape([-1, Fs, 1]), trial_emg.reshape([-1, Fs, 1]))
     eeg_segment = rolling_window(
         eeg, 128, 64

@@ -225,38 +225,48 @@ def read_mat(extension_validated, contents, filename, task):
     content_type, content_string = contents.split(",")
     decoded = base64.b64decode(content_string)
     mat = loadmat(BytesIO(decoded))
-
+    message = ""
     # clear TEMP_PATH regularly
     for temp_file in os.listdir(TEMP_PATH):
         if temp_file.endswith(".mat"):
             os.remove(os.path.join(TEMP_PATH, temp_file))
 
-    if mat.get("trial_eeg") is None:
+    trial_eeg = mat.get("trial_eeg")
+    if trial_eeg is None:
         return (
             html.Div(["EEG data is missing. Please double check the file selected."]),
             dash.no_update,
             dash.no_update,
             dash.no_update,
         )
+    elif trial_eeg.shape[1] != 512:
+        message = (
+            "EEG data has a different sampling frequency than 512 Hz."
+            "Will resample to 512 Hz."
+        )
 
-    if mat.get("trial_emg") is None:
+    trial_emg = mat.get("trial_emg")
+    if trial_emg is None:
         return (
             html.Div(["EMG data is missing. Please double check the file selected."]),
             dash.no_update,
             dash.no_update,
             dash.no_update,
         )
+    elif trial_emg.shape[1] != 512:
+        message += " " + (
+            "EMG data has a different sampling frequency than 512 Hz."
+            "Will resample to 512 Hz."
+        )
 
     initiate_cache(cache, filename, mat)
     if task == "gen":
-        message = (
-            "File validated. Generating predictions... This may take up to 2 minutes."
-        )
-        if mat.get("trial_ne") is None:
-            message = (
-                "File validated but NE data not detected. "
-                "Generating predictions using msda... This may take up to 2 minutes."
-            )
+        message += " " + ("File validated.")
+        trial_ne = mat.get("trial_ne")
+        if trial_ne is None:
+            message += " " + "NE data not detected."
+
+        message += " " + "Generating predictions... This may take up to 2 minutes."
         return (
             html.Div([message]),
             True,
@@ -374,7 +384,7 @@ def debug_selected_data(box_select, figure):
 )
 def debug_keypress(keyboard_event):
     return str(keyboard_event.get("key"))
-"""
+
 
 
 @app.callback(
@@ -401,10 +411,11 @@ def debug_annotate(box_select_range, keyboard_press, keyboard_event, num_class):
         + ", key pressed: "
         + str(label)
     )
+"""
 
 
 @app.callback(
-    #Output("trace-updater", "updateData", allow_duplicate=True),
+    # Output("trace-updater", "updateData", allow_duplicate=True),
     Output("graph", "figure", allow_duplicate=True),
     Input("graph", "relayoutData"),
     prevent_initial_call=True,
@@ -412,7 +423,7 @@ def debug_annotate(box_select_range, keyboard_press, keyboard_event, num_class):
 )
 def update_fig(relayoutdata):
     fig = cache.get("fig_resampler")
-    #return fig.construct_update_data(relayoutdata)
+    # return fig.construct_update_data(relayoutdata)
     return fig.construct_update_data_patch(relayoutdata)
 
 

@@ -7,8 +7,9 @@ Created on Sat Oct 28 15:50:11 2023
 
 import argparse
 
-from tqdm import tqdm
 import numpy as np
+from tqdm import tqdm
+from scipy import signal
 from scipy.io import loadmat, savemat
 
 import torch
@@ -57,6 +58,10 @@ def infer(data, model_path, output_path=None):
     eeg_data = data["trial_eeg"]  # (16946, 512)
     emg_data = data["trial_emg"]  # (16946, 512)
     ne_data = data["trial_ne"]  # (16946, 1017)
+
+    # resample to 512 Hz
+    eeg_data = signal.resample(eeg_data, 512, axis=1)
+    emg_data = signal.resample(emg_data, 512, axis=1)
 
     test_dataset = LongSequenceLoader(
         eeg_data, emg_data, ne_data, n_sequences=args.n_sequences, useNorm=args.useNorm
@@ -108,6 +113,6 @@ def infer(data, model_path, output_path=None):
 
 
 if __name__ == "__main__":
-    data = loadmat("C:\\Users\\yzhao\\python_projects\\sleep_scoring\\data.mat")
+    data = loadmat("data.mat")
     model_path = "./model_save_states/"
     all_pred, all_prob, output_path = infer(data, model_path)
