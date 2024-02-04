@@ -6,6 +6,8 @@ Created on Mon Jun 26 15:36:14 2023
 """
 
 import numpy as np
+from scipy import signal
+
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from plotly_resampler import FigureResampler
@@ -32,7 +34,7 @@ colorscale = {
 }
 
 
-def make_figure(pred, default_n_shown_samples=1000):
+def make_figure(pred, default_n_shown_samples=1000, ne_fs=10):
     # Time span and frequencies
     start_time, end_time = 0, pred["trial_eeg"].shape[0]
 
@@ -150,9 +152,11 @@ def make_figure(pred, default_n_shown_samples=1000):
     )
 
     if ne.size > 1:
-        freq_x3 = ne.shape[1] * ne.shape[0]
+        # downsample ne because the user doesn't need its high frequency
+        ne_resampled = signal.resample(ne, ne_fs, axis=1)
+        freq_x3 = ne_resampled.shape[1] * ne_resampled.shape[0]
         time_x3 = np.linspace(start_time, end_time, freq_x3)
-        y_x3 = ne.flatten()
+        y_x3 = ne_resampled.flatten()
         ne_min, ne_max = min(y_x3), max(y_x3)
         fig.add_trace(
             go.Scattergl(
