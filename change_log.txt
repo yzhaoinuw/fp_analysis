@@ -1,3 +1,11 @@
+#### v0.7.0
+1. Got rid of the annotatiob box once an annotation is made. This allows the user to quickly draw smaller annotation boxes within the previous box and make annotations.
+2. Kept only time and confidence in hover info box and make it 50% see-through. This reduces view blocking.
+3. Removed the Autoscale button since it did the same thing as Reset Axes.
+4. Added a prompt in exiting the app, which serves as a reminder to the user to save results. 
+5. Added a resampling (to 512 Hz) step before feeding the EEG and EMG data to the model. The app can now handle data sampled at higher frequencies such as 610 Hz.
+6. Added several optimizations, such as converting serverside callbacks to clientside callbacks whenever possible, using partial property updates for callbacks on annotations. These make the app more responsive. 
+
 #### v0.6.0
 1. Added Shadi's 3-class model for sleep scoring data without NE signal.
 2. Bumped up initial smapling level to at most 4,000 points, which can be further increased to 16,000 points by selecting "x4" in Sampling Level.

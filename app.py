@@ -599,4 +599,4 @@ def save_annotations(n_clicks):
 
 if __name__ == "__main__":
     Timer(1, open_browser).start()
-    app.run_server(debug=True, port=PORT)
+    app.run_server(debug=False, port=PORT)
