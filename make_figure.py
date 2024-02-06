@@ -121,8 +121,8 @@ def make_figure(pred, default_n_shown_samples=4000, ne_fs=10):
         )
 
     ne_range = max(abs(ne_lower_range), abs(ne_upper_range))
-    heatmap_width = (
-        2 * (1 + range_padding_percent) * max([eeg_range, emg_range, ne_range])
+    heatmap_width = max(
+        20, 2 * (1 + range_padding_percent) * max([eeg_range, emg_range, ne_range])
     )
 
     # Create a heatmap for stages
@@ -208,8 +208,7 @@ def make_figure(pred, default_n_shown_samples=4000, ne_fs=10):
     # add the heatmap last so that their indices can be accessed using last indices
     fig.add_trace(sleep_scores, row=1, col=1)
     fig.add_trace(sleep_scores, row=2, col=1)
-    if ne.size > 1:
-        fig.add_trace(sleep_scores, row=3, col=1)
+    fig.add_trace(sleep_scores, row=3, col=1)
     fig.add_trace(conf, row=4, col=1)
 
     fig.update_layout(
@@ -287,10 +286,10 @@ if __name__ == "__main__":
 
     io.renderers.default = "browser"
     path = ".\\"
-    mat_file = "115_35_data_prediction_msda_3class.mat"
+    # mat_file = "115_35_data_prediction_msda_3class.mat"
     # mat_file = "Klaudia_datatest_prediction_msda_3class.mat"
     # mat_file = "data_prediction_msda_3class.mat"
-    # mat_file = "data_no_ne_prediction_msda_3class.mat"
+    mat_file = "data_no_ne_prediction_msda_3class.mat"
     pred = loadmat(path + mat_file)
     fig = make_figure(pred)
     fig.show_dash(config={"scrollZoom": True})
