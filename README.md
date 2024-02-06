@@ -1,6 +1,6 @@
 ### Installation
 1. Download "sleep_scoring_app_vx" (the suffix "vx" denotes the current version) and unzip it as needed. Note if you unzip it to the same location where the zip file is, you may end up with a layered folder, ie., a "sleep_scoring_app_vx" inside a "sleep_scoring_app_vx". If this is the case , you need to "unpeel" it and move the inner "sleep_scoring_app_vx" somewhere else and delete the outer "sleep_scoring_app_vx". Please make sure you check this.  
-2. Dowload "model_save_states" and unzip it as needed, to "sleep_scoring_app_vx", where you see "run_app.exe".
+2. Examine the content of the unzipped "sleep_scoring_app_vx". If it doesn't contain a folder called "model_save_states", download "model_save_states" and unzip it as needed, to "sleep_scoring_app_vx", where you see "run_app.exe".
 
 ### Usage 
 1. Double click "run_app.exe" to open the app, which will open a page in your web browser.
@@ -9,7 +9,7 @@
 4. You can add your annotations by selecting the Box Select tool. Once selected an area, you can update the sleep scores by pressing 1, 2, 3, or 4 (if applicable) on the keyboard. After you are done annotating the sleep scores, click the "Save Annotations" button located on the buttom left. Your annotations will be saved in the same prediction file.
 
 #### Notes:
-1. Please do not move the files or the folders around in the "sleep_scoring_app_v0.6.0" folder, it may break the app.
+1. Please do not move the files or the folders around in the "sleep_scoring_app_vx" folder, it may break the app.
 2. If you don't have a preprocessed sleep data file yet and you want to test run the app, you can use the sample preprocessed file called "data.mat" for a demo. You can download it in the same Onedrive folder where you download the app: https://uofr-my.sharepoint.com/:f:/r/personal/yzhao38_ur_rochester_edu/Documents/sleep_scoring_project?csf=1&web=1&e=r8NP3p
 
 #### FAQ

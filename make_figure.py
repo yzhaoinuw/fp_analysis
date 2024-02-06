@@ -32,9 +32,11 @@ colorscale = {
         [1, stage_colors[3]],
     ],
 }
+range_quantile = 0.9999
+range_padding_percent = 0.2
 
 
-def make_figure(pred, default_n_shown_samples=1000, ne_fs=10):
+def make_figure(pred, default_n_shown_samples=4000, ne_fs=10):
     # Time span and frequencies
     start_time, end_time = 0, pred["trial_eeg"].shape[0]
 
@@ -47,8 +49,14 @@ def make_figure(pred, default_n_shown_samples=1000, ne_fs=10):
     time = np.arange(start_time, end_time)
     y_x1 = eeg.flatten()
     y_x2 = emg.flatten()
-    eeg_min, eeg_max = min(y_x1), max(y_x2)
-    emg_min, emg_max = min(y_x2), max(y_x2)
+    eeg_lower_range, eeg_upper_range = np.quantile(
+        y_x1, 1 - range_quantile
+    ), np.quantile(y_x1, range_quantile)
+    emg_lower_range, emg_upper_range = np.quantile(
+        y_x2, 1 - range_quantile
+    ), np.quantile(y_x2, range_quantile)
+    eeg_range = max(abs(eeg_lower_range), abs(eeg_upper_range))
+    emg_range = max(abs(emg_lower_range), abs(emg_upper_range))
 
     predictions = pred["pred_labels"].flatten()
     confidence = pred["confidence"].flatten()
@@ -88,11 +96,40 @@ def make_figure(pred, default_n_shown_samples=1000, ne_fs=10):
         default_downsampler=MinMaxLTTB(parallel=True),
     )
 
+    ne_lower_range, ne_upper_range = 0, 0
+    if ne.size > 1:
+        # downsample ne because the user doesn't need its high frequency
+        ne_resampled = signal.resample(ne, ne_fs, axis=1)
+        freq_x3 = ne_resampled.shape[1] * ne_resampled.shape[0]
+        time_x3 = np.linspace(start_time, end_time, freq_x3)
+        y_x3 = ne_resampled.flatten()
+        ne_lower_range, ne_upper_range = np.quantile(
+            y_x3, 1 - range_quantile
+        ), np.quantile(y_x3, range_quantile)
+        fig.add_trace(
+            go.Scattergl(
+                line=dict(width=1),
+                marker=dict(size=2, color="black"),
+                showlegend=False,
+                mode="lines+markers",
+                hoverinfo="y",
+            ),
+            hf_x=time_x3,
+            hf_y=y_x3,
+            row=3,
+            col=1,
+        )
+
+    ne_range = max(abs(ne_lower_range), abs(ne_upper_range))
+    heatmap_width = (
+        2 * (1 + range_padding_percent) * max([eeg_range, emg_range, ne_range])
+    )
+
     # Create a heatmap for stages
     sleep_scores = go.Heatmap(
         x=time,
         y0=0,
-        dy=20,  # assuming that the max abs value of eeg, emg, or ne is no more than 10
+        dy=heatmap_width,  # assuming that the max abs value of eeg, emg, or ne is no more than 10
         z=[predictions],
         text=[hovertext],
         hoverinfo="text",
@@ -121,6 +158,7 @@ def make_figure(pred, default_n_shown_samples=1000, ne_fs=10):
             tickfont=dict(size=8),
         ),
         showscale=True,
+        xgap=0.05,  # add small gaps to serve as boundaries / ticks
     )
 
     # Add the time series to the figure
@@ -151,29 +189,6 @@ def make_figure(pred, default_n_shown_samples=1000, ne_fs=10):
         col=1,
     )
 
-    if ne.size > 1:
-        # downsample ne because the user doesn't need its high frequency
-        ne_resampled = signal.resample(ne, ne_fs, axis=1)
-        freq_x3 = ne_resampled.shape[1] * ne_resampled.shape[0]
-        time_x3 = np.linspace(start_time, end_time, freq_x3)
-        y_x3 = ne_resampled.flatten()
-        ne_min, ne_max = min(y_x3), max(y_x3)
-        fig.add_trace(
-            go.Scattergl(
-                line=dict(width=1),
-                marker=dict(size=2, color="black"),
-                showlegend=False,
-                mode="lines+markers",
-                hoverinfo="y",
-            ),
-            hf_x=time_x3,
-            hf_y=y_x3,
-            row=3,
-            col=1,
-        )
-    else:
-        ne_min, ne_max = 0, 0
-
     for i, color in enumerate(stage_colors[:num_class]):
         fig.add_trace(
             go.Scatter(
@@ -193,7 +208,8 @@ def make_figure(pred, default_n_shown_samples=1000, ne_fs=10):
     # add the heatmap last so that their indices can be accessed using last indices
     fig.add_trace(sleep_scores, row=1, col=1)
     fig.add_trace(sleep_scores, row=2, col=1)
-    fig.add_trace(sleep_scores, row=3, col=1)
+    if ne.size > 1:
+        fig.add_trace(sleep_scores, row=3, col=1)
     fig.add_trace(conf, row=4, col=1)
 
     fig.update_layout(
@@ -233,8 +249,8 @@ def make_figure(pred, default_n_shown_samples=1000, ne_fs=10):
     )
     fig.update_yaxes(
         range=[
-            eeg_min - 0.1 * (eeg_max - eeg_min),
-            eeg_max + 0.1 * (eeg_max - eeg_min),
+            eeg_range * -(1 + range_padding_percent),
+            eeg_range * (1 + range_padding_percent),
         ],
         # fixedrange=True,
         row=1,
@@ -242,15 +258,18 @@ def make_figure(pred, default_n_shown_samples=1000, ne_fs=10):
     )
     fig.update_yaxes(
         range=[
-            emg_min - 0.1 * (emg_max - emg_min),
-            emg_max + 0.1 * (emg_max - emg_min),
+            emg_range * -(1 + range_padding_percent),
+            emg_range * (1 + range_padding_percent),
         ],
         # fixedrange=True,
         row=2,
         col=1,
     )
     fig.update_yaxes(
-        range=[ne_min - 0.1 * (ne_max - ne_min), ne_max + 0.1 * (ne_max - ne_min)],
+        range=[
+            ne_range * -(1 + range_padding_percent),
+            ne_range * (1 + range_padding_percent),
+        ],
         # fixedrange=True,
         row=3,
         col=1,
@@ -268,6 +287,10 @@ if __name__ == "__main__":
 
     io.renderers.default = "browser"
     path = ".\\"
-    pred = loadmat(path + "data_no_ne_prediction_msda_3class.mat")
+    mat_file = "115_35_data_prediction_msda_3class.mat"
+    # mat_file = "Klaudia_datatest_prediction_msda_3class.mat"
+    # mat_file = "data_prediction_msda_3class.mat"
+    # mat_file = "data_no_ne_prediction_msda_3class.mat"
+    pred = loadmat(path + mat_file)
     fig = make_figure(pred)
     fig.show_dash(config={"scrollZoom": True})

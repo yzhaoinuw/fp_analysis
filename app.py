@@ -225,7 +225,7 @@ def read_mat(extension_validated, contents, filename, task):
     content_type, content_string = contents.split(",")
     decoded = base64.b64decode(content_string)
     mat = loadmat(BytesIO(decoded))
-    message = ""
+    message = "File validated."
     # clear TEMP_PATH regularly
     for temp_file in os.listdir(TEMP_PATH):
         if temp_file.endswith(".mat"):
@@ -240,8 +240,8 @@ def read_mat(extension_validated, contents, filename, task):
             dash.no_update,
         )
     elif trial_eeg.shape[1] != 512:
-        message = (
-            "EEG data has a different sampling frequency than 512 Hz."
+        message += " " + (
+            f"EEG data has a sampling frequency of {trial_eeg.shape[1]} Hz. "
             "Will resample to 512 Hz."
         )
 
@@ -255,13 +255,12 @@ def read_mat(extension_validated, contents, filename, task):
         )
     elif trial_emg.shape[1] != 512:
         message += " " + (
-            "EMG data has a different sampling frequency than 512 Hz."
+            f"EMG data has a sampling frequency of {trial_emg.shape[1]} Hz. "
             "Will resample to 512 Hz."
         )
 
     initiate_cache(cache, filename, mat)
     if task == "gen":
-        message += " " + ("File validated.")
         trial_ne = mat.get("trial_ne")
         if trial_ne is None:
             message += " " + "NE data not detected."
