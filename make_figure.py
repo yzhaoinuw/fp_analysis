@@ -46,7 +46,7 @@ def make_figure(pred, default_n_shown_samples=4000, ne_fs=10):
     # Create the time sequences
     time_x1 = np.linspace(start_time, end_time, freq_x1)
     time_x2 = np.linspace(start_time, end_time, freq_x2)
-    time = np.arange(start_time, end_time)
+    time = np.expand_dims(np.arange(1, end_time + 1), 0)
     y_x1 = eeg.flatten()
     y_x2 = emg.flatten()
     eeg_lower_range, eeg_upper_range = np.quantile(
@@ -58,25 +58,9 @@ def make_figure(pred, default_n_shown_samples=4000, ne_fs=10):
     eeg_range = max(abs(eeg_lower_range), abs(eeg_upper_range))
     emg_range = max(abs(emg_lower_range), abs(emg_upper_range))
 
-    predictions = pred["pred_labels"].flatten()
-    confidence = pred["confidence"].flatten()
+    predictions = pred["pred_labels"]
+    confidence = pred["confidence"]
     num_class = pred["num_class"].item()
-    end_time_clipped = len(confidence)
-
-    time = time[
-        :end_time_clipped
-    ]  # clip time if last last couple of seconds don't preds
-
-    # align heatmap and xticks and hoverinfo over x axis
-    time = time + 0.5
-    hovertext = []
-    hovertext.extend(
-        [
-            # f"time: {round(time[i]+0.5)}\nconfidence: {confidence[i]:.2f}"
-            f"time: {round(time[i]+0.5)}"
-            for i in range(len(confidence))
-        ]
-    )
 
     fig = FigureResampler(
         make_subplots(
@@ -112,7 +96,8 @@ def make_figure(pred, default_n_shown_samples=4000, ne_fs=10):
                 marker=dict(size=2, color="black"),
                 showlegend=False,
                 mode="lines+markers",
-                hoverinfo="y",
+                hovertemplate="<b>time</b>: %{x:.2f}"
+                + "<br><b>y</b>: %{y}<extra></extra>",
             ),
             hf_x=time_x3,
             hf_y=y_x3,
@@ -127,24 +112,26 @@ def make_figure(pred, default_n_shown_samples=4000, ne_fs=10):
 
     # Create a heatmap for stages
     sleep_scores = go.Heatmap(
-        x=time,
+        x0=0.5,
+        dx=1,
         y0=0,
         dy=heatmap_width,  # assuming that the max abs value of eeg, emg, or ne is no more than 10
-        z=[predictions],
-        text=[hovertext],
-        hoverinfo="text",
+        z=predictions,
+        hoverinfo="none",
         colorscale=colorscale[num_class],
         showscale=False,
         opacity=sleep_score_opacity,
         zmax=num_class - 1,
         zmin=0,
+        showlegend=False,
     )
 
     conf = go.Heatmap(
-        x=time,
-        z=[confidence],
-        text=[hovertext],
-        hoverinfo="text",
+        x0=0.5,
+        dx=1,
+        z=confidence,
+        customdata=time,
+        hovertemplate="<b>time</b>: %{customdata}<extra></extra>",
         colorscale="speed",
         colorbar=dict(
             thicknessmode="fraction",  # set the mode of thickness to fraction
@@ -168,7 +155,7 @@ def make_figure(pred, default_n_shown_samples=4000, ne_fs=10):
             marker=dict(size=2, color="black"),
             showlegend=False,
             mode="lines+markers",
-            hoverinfo="y",
+            hovertemplate="<b>time</b>: %{x:.2f}" + "<br><b>y</b>: %{y}<extra></extra>",
         ),
         hf_x=time_x1,
         hf_y=y_x1,
@@ -181,7 +168,7 @@ def make_figure(pred, default_n_shown_samples=4000, ne_fs=10):
             marker=dict(size=2, color="black"),
             showlegend=False,
             mode="lines+markers",
-            hoverinfo="y",
+            hovertemplate="<b>time</b>: %{x:.2f}" + "<br><b>y</b>: %{y}<extra></extra>",
         ),
         hf_x=time_x2,
         hf_y=y_x2,
@@ -290,6 +277,9 @@ if __name__ == "__main__":
     # mat_file = "Klaudia_datatest_prediction_msda_3class.mat"
     # mat_file = "data_prediction_msda_3class.mat"
     mat_file = "data_no_ne_prediction_msda_3class.mat"
+    # mat_file = "data_prediction_sdreamer_4class.mat"
     pred = loadmat(path + mat_file)
+    # mat_file = 'C:/Users/yzhao/matlab_projects/sleep_data_extraction/408_yfp.mat'
+    # pred = loadmat(mat_file)
     fig = make_figure(pred)
     fig.show_dash(config={"scrollZoom": True})
