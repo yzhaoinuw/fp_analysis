@@ -503,8 +503,6 @@ def update_sleep_scores(
     prev_labels = figure["data"][-4]["z"][0][start:end]
     prev_conf = figure["data"][-1]["z"][0][start:end]
     figure["data"][-4]["z"][0][start:end] = [label] * (end - start)
-    # figure["data"][-3]["z"][0][start:end] = [label] * (end - start)
-    # figure["data"][-2]["z"][0][start:end] = [label] * (end - start)
     figure["data"][-1]["z"][0][start:end] = [1] * (end - start)  # change conf to 1
 
     patched_figure["data"][-4]["z"][0] = figure["data"][-4]["z"][0]
@@ -598,4 +596,4 @@ def save_annotations(n_clicks):
 
 if __name__ == "__main__":
     Timer(1, open_browser).start()
-    app.run_server(debug=False, port=PORT)
+    app.run_server(debug=True, port=PORT)

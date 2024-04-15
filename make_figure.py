@@ -60,6 +60,11 @@ def make_figure(pred, default_n_shown_samples=4000, ne_fs=10):
 
     predictions = pred["pred_labels"]
     confidence = pred["confidence"]
+    if predictions.size == 0:
+        predictions = -np.ones((1, end_time), dtype=int)
+    if confidence.size == 0:
+        confidence = np.zeros((1, end_time))
+
     num_class = pred["num_class"].item()
 
     fig = FigureResampler(
@@ -133,6 +138,8 @@ def make_figure(pred, default_n_shown_samples=4000, ne_fs=10):
         customdata=time,
         hovertemplate="<b>time</b>: %{customdata}<extra></extra>",
         colorscale="speed",
+        zmax=1,
+        zmin=0,
         colorbar=dict(
             thicknessmode="fraction",  # set the mode of thickness to fraction
             thickness=0.005,  # the thickness of the colorbar
@@ -272,14 +279,16 @@ if __name__ == "__main__":
     from scipy.io import loadmat
 
     io.renderers.default = "browser"
-    path = ".\\"
+    path = ".\\user_test_files\\"
     # mat_file = "115_35_data_prediction_msda_3class.mat"
     # mat_file = "Klaudia_datatest_prediction_msda_3class.mat"
     # mat_file = "data_prediction_msda_3class.mat"
-    mat_file = "data_no_ne_prediction_msda_3class.mat"
+    # mat_file = "data_no_ne_prediction_msda_3class.mat"
+
     # mat_file = "data_prediction_sdreamer_4class.mat"
-    pred = loadmat(path + mat_file)
-    # mat_file = 'C:/Users/yzhao/matlab_projects/sleep_data_extraction/408_yfp.mat'
-    # pred = loadmat(mat_file)
+    # pred = loadmat(path + mat_file)
+    # mat_file = 'C:/Users/yzhao/matlab_projects/sleep_data_extraction/408_YFP_NOR.mat'
+    mat_file = "C:/Users/yzhao/matlab_projects/sleep_data_extraction/2023-10-17_Day1_no_stim_705/2023-10-17_Day1_no_stim_705.mat"
+    pred = loadmat(mat_file)
     fig = make_figure(pred)
     fig.show_dash(config={"scrollZoom": True})
