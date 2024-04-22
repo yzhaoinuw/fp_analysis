@@ -363,7 +363,7 @@ def change_sampling_level(sampling_level):
 
 """
 @app.callback(
-    Output("debug-message", "children"),
+    Output("debug-message", "children", allow_duplicate=True),
     Input("graph", "selectedData"),
     State("graph", "figure"),
     prevent_initial_call=True,
@@ -375,7 +375,7 @@ def debug_selected_data(box_select, figure):
     return str(figure["layout"].get("selections"))
 
 @app.callback(
-    Output("debug-message", "children"),
+    Output("debug-message", "children", allow_duplicate=True),
     #Input("keyboard", "n_events"),
     Input("keyboard", "event"),
     #State("keyboard", "event"),
@@ -387,7 +387,7 @@ def debug_keypress(keyboard_event):
 
 
 @app.callback(
-    Output("debug-message", "children"),
+    Output("debug-message", "children", allow_duplicate=True),
     Input("box-select-store", "data"),
     Input("keyboard", "n_events"),
     State("keyboard", "event"),
@@ -414,7 +414,6 @@ def debug_annotate(box_select_range, keyboard_press, keyboard_event, num_class):
 
 
 @app.callback(
-    # Output("trace-updater", "updateData", allow_duplicate=True),
     Output("graph", "figure", allow_duplicate=True),
     Input("graph", "relayoutData"),
     prevent_initial_call=True,

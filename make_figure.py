@@ -5,6 +5,7 @@ Created on Mon Jun 26 15:36:14 2023
 @author: Yue
 """
 
+import math
 import numpy as np
 from scipy import signal
 
@@ -15,11 +16,11 @@ from plotly_resampler.aggregation import MinMaxLTTB
 
 
 # set up color config
-sleep_score_opacity = 0.5
+sleep_score_opacity = 1
 stage_colors = [
-    "rgb(102, 178, 255)",  # Wake,
-    "rgb(255, 102, 255)",  # SWS,
-    "rgb(102, 255, 102)",  # REM,
+    "rgb(124, 124, 251)",  # Wake,
+    "rgb(251, 124, 124)",  # SWS,
+    "rgb(123, 251, 123)",  # REM,
     "rgb(255, 255, 0)",  # MA yellow
 ]
 stage_names = ["Wake: 1", "SWS: 2", "REM: 3", "MA: 4"]
@@ -36,36 +37,44 @@ range_quantile = 0.9999
 range_padding_percent = 0.2
 
 
-def make_figure(pred, default_n_shown_samples=4000, ne_fs=10):
+def make_figure(mat, default_n_shown_samples=4000, ne_fs=10):
     # Time span and frequencies
-    start_time, end_time = 0, pred["trial_eeg"].shape[0]
+    eeg, emg, ne = mat.get("trial_eeg"), mat.get("trial_emg"), mat.get("trial_ne")
+    eeg_freq, ne_freq = mat.get("eeg_frequency"), mat.get("ne_frequency")
+    if eeg_freq is None:
+        eeg_freq = eeg.shape[1]
+        if eeg_freq == 512:
+            eeg_freq = 511.9314
+        elif eeg_freq == 610:
+            eeg_freq = 610.3516
 
-    eeg, emg, ne = pred.get("trial_eeg"), pred.get("trial_emg"), pred.get("trial_ne")
-    freq_x1, freq_x2 = (eeg.shape[1] * eeg.shape[0], emg.shape[1] * emg.shape[0])
-
+    start_time = 0
+    eeg_end_time = mat["trial_eeg"].size / eeg_freq
     # Create the time sequences
-    time_x1 = np.linspace(start_time, end_time, freq_x1)
-    time_x2 = np.linspace(start_time, end_time, freq_x2)
-    time = np.expand_dims(np.arange(1, end_time + 1), 0)
-    y_x1 = eeg.flatten()
-    y_x2 = emg.flatten()
+    time_eeg = np.linspace(start_time, eeg_end_time, eeg.size)
+    eeg_end_time = math.ceil(eeg_end_time)
+    time = np.expand_dims(np.arange(1, eeg_end_time + 1), 0)
+    y_eeg = eeg.flatten()
+    y_emg = emg.flatten()
     eeg_lower_range, eeg_upper_range = np.quantile(
-        y_x1, 1 - range_quantile
-    ), np.quantile(y_x1, range_quantile)
+        y_eeg, 1 - range_quantile
+    ), np.quantile(y_eeg, range_quantile)
     emg_lower_range, emg_upper_range = np.quantile(
-        y_x2, 1 - range_quantile
-    ), np.quantile(y_x2, range_quantile)
+        y_emg, 1 - range_quantile
+    ), np.quantile(y_emg, range_quantile)
     eeg_range = max(abs(eeg_lower_range), abs(eeg_upper_range))
     emg_range = max(abs(emg_lower_range), abs(emg_upper_range))
 
-    predictions = pred["pred_labels"]
-    confidence = pred["confidence"]
-    if predictions.size == 0:
-        predictions = -np.ones((1, end_time), dtype=int)
-    if confidence.size == 0:
-        confidence = np.zeros((1, end_time))
+    labels = mat.get("pred_labels")
+    confidence = mat.get("confidence")
+    if labels is None or labels.size == 0:
+        labels = mat.get("pred_labels")
+    if labels is None or labels.size == 0:
+        labels = [[0] * eeg_end_time]
+    if confidence is None or confidence.size == 0:
+        confidence = [[False] * eeg_end_time]
 
-    num_class = pred["num_class"].item()
+    num_class = mat["num_class"].item()
 
     fig = FigureResampler(
         make_subplots(
@@ -87,14 +96,22 @@ def make_figure(pred, default_n_shown_samples=4000, ne_fs=10):
 
     ne_lower_range, ne_upper_range = 0, 0
     if ne.size > 1:
+        if ne_freq is None:
+            ne_freq = ne.shape[1]
+            if ne_freq == 1017:
+                ne_freq = 1017.2526
+        ne_end_time = ne.size / ne_freq
         # downsample ne because the user doesn't need its high frequency
-        ne_resampled = signal.resample(ne, ne_fs, axis=1)
-        freq_x3 = ne_resampled.shape[1] * ne_resampled.shape[0]
-        time_x3 = np.linspace(start_time, end_time, freq_x3)
-        y_x3 = ne_resampled.flatten()
+        ne = signal.resample(ne, ne_fs, axis=1)
+
+        # Create the time sequences
+        time_ne = np.linspace(start_time, ne_end_time, ne.size)
+        ne_end_time = math.ceil(ne_end_time)
+
+        y_ne = ne.flatten()
         ne_lower_range, ne_upper_range = np.quantile(
-            y_x3, 1 - range_quantile
-        ), np.quantile(y_x3, range_quantile)
+            y_ne, 1 - range_quantile
+        ), np.quantile(y_ne, range_quantile)
         fig.add_trace(
             go.Scattergl(
                 line=dict(width=1),
@@ -104,8 +121,8 @@ def make_figure(pred, default_n_shown_samples=4000, ne_fs=10):
                 hovertemplate="<b>time</b>: %{x:.2f}"
                 + "<br><b>y</b>: %{y}<extra></extra>",
             ),
-            hf_x=time_x3,
-            hf_y=y_x3,
+            hf_x=time_ne,
+            hf_y=y_ne,
             row=3,
             col=1,
         )
@@ -121,7 +138,7 @@ def make_figure(pred, default_n_shown_samples=4000, ne_fs=10):
         dx=1,
         y0=0,
         dy=heatmap_width,  # assuming that the max abs value of eeg, emg, or ne is no more than 10
-        z=predictions,
+        z=labels,
         hoverinfo="none",
         colorscale=colorscale[num_class],
         showscale=False,
@@ -164,8 +181,8 @@ def make_figure(pred, default_n_shown_samples=4000, ne_fs=10):
             mode="lines+markers",
             hovertemplate="<b>time</b>: %{x:.2f}" + "<br><b>y</b>: %{y}<extra></extra>",
         ),
-        hf_x=time_x1,
-        hf_y=y_x1,
+        hf_x=time_eeg,
+        hf_y=y_eeg,
         row=1,
         col=1,
     )
@@ -177,8 +194,8 @@ def make_figure(pred, default_n_shown_samples=4000, ne_fs=10):
             mode="lines+markers",
             hovertemplate="<b>time</b>: %{x:.2f}" + "<br><b>y</b>: %{y}<extra></extra>",
         ),
-        hf_x=time_x2,
-        hf_y=y_x2,
+        hf_x=time_eeg,
+        hf_y=y_emg,
         row=2,
         col=1,
     )
@@ -231,11 +248,11 @@ def make_figure(pred, default_n_shown_samples=4000, ne_fs=10):
 
     fig.update_traces(xaxis="x4")  # gives crosshair across all subplots
     fig.update_traces(colorbar_orientation="h", selector=dict(type="heatmap"))
-    fig.update_xaxes(range=[start_time, end_time], row=1, col=1)
-    fig.update_xaxes(range=[start_time, end_time], row=2, col=1)
-    fig.update_xaxes(range=[start_time, end_time], row=3, col=1)
+    fig.update_xaxes(range=[start_time, eeg_end_time], row=1, col=1)
+    fig.update_xaxes(range=[start_time, eeg_end_time], row=2, col=1)
+    fig.update_xaxes(range=[start_time, eeg_end_time], row=3, col=1)
     fig.update_xaxes(
-        range=[start_time, end_time],
+        range=[start_time, eeg_end_time],
         row=4,
         col=1,
         title_text="<b>Time (s)</b>",
@@ -284,11 +301,10 @@ if __name__ == "__main__":
     # mat_file = "Klaudia_datatest_prediction_msda_3class.mat"
     # mat_file = "data_prediction_msda_3class.mat"
     # mat_file = "data_no_ne_prediction_msda_3class.mat"
-
+    # mat_file = "20221221_adra_1_238_2_242.mat"
     # mat_file = "data_prediction_sdreamer_4class.mat"
-    # pred = loadmat(path + mat_file)
-    # mat_file = 'C:/Users/yzhao/matlab_projects/sleep_data_extraction/408_YFP_NOR.mat'
+    # mat = loadmat(path + mat_file)
     mat_file = "C:/Users/yzhao/matlab_projects/sleep_data_extraction/2023-10-17_Day1_no_stim_705/2023-10-17_Day1_no_stim_705.mat"
-    pred = loadmat(mat_file)
-    fig = make_figure(pred)
+    mat = loadmat(mat_file)
+    fig = make_figure(mat)
     fig.show_dash(config={"scrollZoom": True})

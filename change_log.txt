@@ -1,3 +1,6 @@
+#### v0.7.2
+1. Added visualization for not scored or manually scored sleep data. With this this version, you can visualize .mat files without sleep scores (called "pred_labels") or confidence. If no sleep scores are given, initialize sleep scores with all "Wake". If no confidence is given, initialize it with all 0s.
+
 #### v0.7.0
 1. Got rid of the annotation box once an annotation is made. This allows the user to quickly draw smaller annotation boxes within the previous box and make annotations.
 2. Kept only time and confidence in hover info box and make it 50% see-through. This reduces view blocking.
@@ -6,7 +9,7 @@
 5. Added a resampling (to 512 Hz) step before feeding the EEG and EMG data to the model. The app can now handle data sampled at higher frequencies such as 610 Hz.
 6. Downsampled NE to 10 Hz in visualization.
 7. Added tiny gaps in the confidence heatmap, which serve as xticks.
-7. Added several optimizations, such as converting serverside callbacks to clientside callbacks whenever possible, using partial property updates for callbacks on annotations. These make the app more responsive. 
+8. Added several optimizations, such as converting serverside callbacks to clientside callbacks whenever possible, using partial property updates for callbacks on annotations. These make the app more responsive. 
 
 #### v0.6.0
 1. Added Shadi's 3-class model for sleep scoring data without NE signal.
