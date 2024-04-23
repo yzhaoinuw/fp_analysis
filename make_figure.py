@@ -49,7 +49,7 @@ def make_figure(mat, default_n_shown_samples=4000, ne_fs=10):
             eeg_freq = 610.3516
 
     start_time = 0
-    eeg_end_time = mat["trial_eeg"].size / eeg_freq
+    eeg_end_time = eeg.size / eeg_freq
     # Create the time sequences
     time_eeg = np.linspace(start_time, eeg_end_time, eeg.size)
     eeg_end_time = math.ceil(eeg_end_time)
@@ -68,9 +68,9 @@ def make_figure(mat, default_n_shown_samples=4000, ne_fs=10):
     labels = mat.get("pred_labels")
     confidence = mat.get("confidence")
     if labels is None or labels.size == 0:
-        labels = mat.get("pred_labels")
-    if labels is None or labels.size == 0:
-        labels = [[0] * eeg_end_time]
+        labels = mat.get("sleep_scores")
+        if labels is None or labels.size == 0:
+            labels = [[0] * eeg_end_time]
     if confidence is None or confidence.size == 0:
         confidence = [[False] * eeg_end_time]
 
