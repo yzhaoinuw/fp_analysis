@@ -129,10 +129,6 @@ visualization_div = html.Div(
                         "marginRight": "20px",
                     },
                 ),
-                html.Div(
-                    id="filename-container",
-                    style={"lineHeight": "40px", "marginLeft": "20px"},
-                ),
             ],
         ),
         graph,

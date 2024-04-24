@@ -37,7 +37,7 @@ range_quantile = 0.9999
 range_padding_percent = 0.2
 
 
-def make_figure(mat, default_n_shown_samples=4000, ne_fs=10):
+def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10):
     # Time span and frequencies
     eeg, emg, ne = mat.get("trial_eeg"), mat.get("trial_emg"), mat.get("trial_ne")
     eeg_freq, ne_freq = mat.get("eeg_frequency"), mat.get("ne_frequency")
@@ -228,7 +228,7 @@ def make_figure(mat, default_n_shown_samples=4000, ne_fs=10):
         height=800,
         hovermode="x unified",  # gives crosshair in one subplot
         hoverlabel=dict(bgcolor="rgba(255, 255, 255, 0.6)"),
-        title_text="Predicted Sleep Scores",
+        title_text=mat_name,
         yaxis4=dict(tickvals=[]),  # suppress y ticks on the heatmap
         xaxis4=dict(tickformat="digits"),
         legend=dict(
@@ -292,6 +292,7 @@ def make_figure(mat, default_n_shown_samples=4000, ne_fs=10):
 
 
 if __name__ == "__main__":
+    import os
     import plotly.io as io
     from scipy.io import loadmat
 
@@ -306,5 +307,6 @@ if __name__ == "__main__":
     # mat = loadmat(path + mat_file)
     mat_file = "C:/Users/yzhao/matlab_projects/sleep_data_extraction/2023-10-17_Day1_no_stim_705/2023-10-17_Day1_no_stim_705.mat"
     mat = loadmat(mat_file)
-    fig = make_figure(mat)
+    mat_name = os.path.basename(mat_file)
+    fig = make_figure(mat, mat_name=mat_name)
     fig.show_dash(config={"scrollZoom": True})

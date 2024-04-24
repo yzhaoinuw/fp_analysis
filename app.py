@@ -52,8 +52,8 @@ def open_browser():
     webbrowser.open_new(f"http://127.0.0.1:{PORT}/")
 
 
-def create_fig(mat, default_n_shown_samples=4000):
-    fig = make_figure(mat, default_n_shown_samples)
+def create_fig(mat, mat_name, default_n_shown_samples=4000):
+    fig = make_figure(mat, mat_name, default_n_shown_samples)
     return fig
 
 
@@ -328,22 +328,11 @@ def generate_prediction(ready, model_choice, num_class):
 )
 def create_visualization(ready):
     mat = cache.get("mat")
-    fig = create_fig(mat)
+    mat_name = cache.get("filename")
+    fig = create_fig(mat, mat_name)
     cache.set("fig_resampler", fig)
     components.graph.figure = fig
     return components.visualization_div
-
-
-@app.callback(
-    Output("filename-container", "children"),
-    Input("graph", "clickData"),
-    Input("graph", "selectedData"),
-    Input("graph", "relayoutData"),
-)
-def show_visualization_name(click, select, pan):
-    filename = cache.get("filename")
-    message = f"You are viewing {filename}"
-    return html.Div([message])
 
 
 @app.callback(
@@ -357,7 +346,8 @@ def change_sampling_level(sampling_level):
     sampling_level_map = {"x1": 4000, "x2": 8000, "x4": 16000}
     n_samples = sampling_level_map[sampling_level]
     mat = cache.get("mat")
-    fig = create_fig(mat, default_n_shown_samples=n_samples)
+    mat_name = cache.get("filename")
+    fig = create_fig(mat, mat_name, default_n_shown_samples=n_samples)
     return fig
 
 
