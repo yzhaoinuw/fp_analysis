@@ -7,7 +7,8 @@ Created on Mon Jun 26 15:36:14 2023
 
 import math
 import numpy as np
-from scipy import signal
+
+# from scipy import signal
 
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -39,29 +40,22 @@ range_padding_percent = 0.2
 
 def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10):
     # Time span and frequencies
-    eeg, emg, ne = mat.get("trial_eeg"), mat.get("trial_emg"), mat.get("trial_ne")
+    eeg, emg, ne = mat.get("eeg"), mat.get("emg"), mat.get("ne")
+    eeg, emg = eeg.flatten(), emg.flatten()
     eeg_freq, ne_freq = mat.get("eeg_frequency"), mat.get("ne_frequency")
-    if eeg_freq is None:
-        eeg_freq = eeg.shape[1]
-        if eeg_freq == 512:
-            eeg_freq = 511.9314
-        elif eeg_freq == 610:
-            eeg_freq = 610.3516
-
+    eeg_freq = eeg_freq.item()
     start_time = 0
-    eeg_end_time = eeg.size / eeg_freq
+    eeg_end_time = (eeg.size - 1) / eeg_freq
     # Create the time sequences
     time_eeg = np.linspace(start_time, eeg_end_time, eeg.size)
     eeg_end_time = math.ceil(eeg_end_time)
     time = np.expand_dims(np.arange(1, eeg_end_time + 1), 0)
-    y_eeg = eeg.flatten()
-    y_emg = emg.flatten()
     eeg_lower_range, eeg_upper_range = np.quantile(
-        y_eeg, 1 - range_quantile
-    ), np.quantile(y_eeg, range_quantile)
+        eeg, 1 - range_quantile
+    ), np.quantile(eeg, range_quantile)
     emg_lower_range, emg_upper_range = np.quantile(
-        y_emg, 1 - range_quantile
-    ), np.quantile(y_emg, range_quantile)
+        emg, 1 - range_quantile
+    ), np.quantile(emg, range_quantile)
     eeg_range = max(abs(eeg_lower_range), abs(eeg_upper_range))
     emg_range = max(abs(emg_lower_range), abs(emg_upper_range))
 
@@ -96,22 +90,16 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10):
 
     ne_lower_range, ne_upper_range = 0, 0
     if ne.size > 1:
-        if ne_freq is None:
-            ne_freq = ne.shape[1]
-            if ne_freq == 1017:
-                ne_freq = 1017.2526
-        ne_end_time = ne.size / ne_freq
-        # downsample ne because the user doesn't need its high frequency
-        ne = signal.resample(ne, ne_fs, axis=1)
+        ne = ne.flatten()
+        ne_freq = ne_freq.item()
+        ne_end_time = (ne.size - 1) / ne_freq
 
         # Create the time sequences
         time_ne = np.linspace(start_time, ne_end_time, ne.size)
         ne_end_time = math.ceil(ne_end_time)
-
-        y_ne = ne.flatten()
         ne_lower_range, ne_upper_range = np.quantile(
-            y_ne, 1 - range_quantile
-        ), np.quantile(y_ne, range_quantile)
+            ne, 1 - range_quantile
+        ), np.quantile(ne, range_quantile)
         fig.add_trace(
             go.Scattergl(
                 line=dict(width=1),
@@ -122,7 +110,7 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10):
                 + "<br><b>y</b>: %{y}<extra></extra>",
             ),
             hf_x=time_ne,
-            hf_y=y_ne,
+            hf_y=ne,
             row=3,
             col=1,
         )
@@ -182,7 +170,7 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10):
             hovertemplate="<b>time</b>: %{x:.2f}" + "<br><b>y</b>: %{y}<extra></extra>",
         ),
         hf_x=time_eeg,
-        hf_y=y_eeg,
+        hf_y=eeg,
         row=1,
         col=1,
     )
@@ -195,7 +183,7 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10):
             hovertemplate="<b>time</b>: %{x:.2f}" + "<br><b>y</b>: %{y}<extra></extra>",
         ),
         hf_x=time_eeg,
-        hf_y=y_emg,
+        hf_y=emg,
         row=2,
         col=1,
     )
@@ -297,16 +285,18 @@ if __name__ == "__main__":
     from scipy.io import loadmat
 
     io.renderers.default = "browser"
-    path = ".\\user_test_files\\"
+    data_path = ".\\user_test_files\\"
     # mat_file = "115_35_data_prediction_msda_3class.mat"
     # mat_file = "Klaudia_datatest_prediction_msda_3class.mat"
     # mat_file = "data_prediction_msda_3class.mat"
     # mat_file = "data_no_ne_prediction_msda_3class.mat"
     # mat_file = "20221221_adra_1_238_2_242.mat"
     # mat_file = "data_prediction_sdreamer_4class.mat"
-    # mat = loadmat(path + mat_file)
-    mat_file = "C:/Users/yzhao/matlab_projects/sleep_data_extraction/2023-10-17_Day1_no_stim_705/2023-10-17_Day1_no_stim_705.mat"
-    mat = loadmat(mat_file)
+    mat_file = "408_yfp.mat"
+    mat = loadmat(os.path.join(data_path, mat_file))
+    # mat_file = "C:/Users/yzhao/matlab_projects/sleep_data_extraction/2023-10-17_Day1_no_stim_705/2023-10-17_Day1_no_stim_705.mat"
+
+    # mat = loadmat(mat_file)
     mat_name = os.path.basename(mat_file)
     fig = make_figure(mat, mat_name=mat_name)
     fig.show_dash(config={"scrollZoom": True})

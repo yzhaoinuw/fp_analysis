@@ -231,38 +231,35 @@ def read_mat(extension_validated, contents, filename, task):
         if temp_file.endswith(".mat"):
             os.remove(os.path.join(TEMP_PATH, temp_file))
 
-    trial_eeg = mat.get("trial_eeg")
-    if trial_eeg is None:
+    eeg = mat.get("eeg")
+    if eeg is None:
         return (
             html.Div(["EEG data is missing. Please double check the file selected."]),
             dash.no_update,
             dash.no_update,
             dash.no_update,
         )
-    elif trial_eeg.shape[1] != 512:
-        message += " " + (
-            f"EEG data has a sampling frequency of {trial_eeg.shape[1]} Hz. "
-            "Will resample to 512 Hz."
-        )
 
-    trial_emg = mat.get("trial_emg")
-    if trial_emg is None:
+    emg = mat.get("emg")
+    if emg is None:
         return (
             html.Div(["EMG data is missing. Please double check the file selected."]),
             dash.no_update,
             dash.no_update,
             dash.no_update,
         )
-    elif trial_emg.shape[1] != 512:
-        message += " " + (
-            f"EMG data has a sampling frequency of {trial_emg.shape[1]} Hz. "
-            "Will resample to 512 Hz."
-        )
 
     initiate_cache(cache, filename, mat)
     if task == "gen":
-        trial_ne = mat.get("trial_ne")
-        if trial_ne is None:
+        eeg_freq = mat.get("eeg_frequency")
+        if round(eeg_freq) != 512:
+            message += " " + (
+                f"EEG/EMG data has a sampling frequency of {eeg.shape[1]} Hz. "
+                "Will resample to 512 Hz."
+            )
+
+        ne = mat.get("ne")
+        if ne is None:
             message += " " + "NE data not detected."
 
         message += " " + "Generating predictions... This may take up to 2 minutes."
@@ -548,8 +545,6 @@ def undo_annotation(n_clicks, figure):
     patched_figure = Patch()
     # undo figure
     figure["data"][-4]["z"][0][start:end] = prev_pred
-    # figure["data"][-3]["z"][0][start:end] = prev_pred
-    # figure["data"][-2]["z"][0][start:end] = prev_pred
     figure["data"][-1]["z"][0][start:end] = prev_conf
 
     patched_figure["data"][-4]["z"][0] = figure["data"][-4]["z"][0]
