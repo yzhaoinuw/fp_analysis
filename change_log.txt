@@ -1,3 +1,11 @@
+#### v0.8.0
+1. fixed signal alignment with time axis by dividing number of data point by the true frequency, instead of the rounded frequency, eg., 512; rename some variables to for better readability; when no confidence exists, initialize with lists of False.
+2. Removed the file name component in the app. Instead, show the file name as the title of the figure. 
+3. Modify the app so that it's compatible with the modified sleep data preprocessing pipeline. mods include all signals from .mat files are flat, and ne is already downsampled by a factor of 100; 
+4. Removed messages about reshaping in app in visualization.
+5. Adjusted the color code for the sleep scores so that they look exactly like the color code used in the Viewpoint app. This aims to bring a sense of familiarity to the users.
+
+
 #### v0.7.2
 1. Added visualization for not scored or manually scored sleep data. With this this version, you can visualize .mat files without sleep scores (called "pred_labels") or confidence. If no sleep scores are given, initialize sleep scores with all "Wake". If no confidence is given, initialize it with all 0s.
 
