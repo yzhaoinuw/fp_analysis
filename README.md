@@ -12,6 +12,9 @@
 1. Please do not move the files or the folders around in the "sleep_scoring_app_vx" folder, it may break the app.
 2. If you don't have a preprocessed sleep data file yet and you want to test run the app, you can use the sample preprocessed file called "data.mat" for a demo. You can download it in the same Onedrive folder where you download the app: https://uofr-my.sharepoint.com/:f:/r/personal/yzhao38_ur_rochester_edu/Documents/sleep_scoring_project?csf=1&web=1&e=r8NP3p
 
+#### Demo
+https://github.com/yzhaoinuw/sleep_scoring/assets/22312388/1f83cd67-6952-47d0-9c42-34487f3bb047
+
 #### FAQ
 v0.6.0 (added 11/28/2023)
 1. **Why do the EEG, EMG, and NE signals not recover after I click *Reset*?**
