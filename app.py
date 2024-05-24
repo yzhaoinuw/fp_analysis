@@ -107,14 +107,15 @@ clientside_callback(
     """
     function(num_class, model_choice) {
         if (model_choice === "sdreamer") {
-            num_class = 4;
+            num_class = 3;
         }
         return num_class;
     }
     """,
-    Output("num-class-store", "data"),
+    Output("num-class-store", "data", allow_duplicate=True),
     Input("num-class-choice", "value"),
     State("model-choice-store", "data"),
+    prevent_initial_call=True,
 )
 
 # validate_extension
@@ -203,8 +204,9 @@ clientside_callback(
         return n_intervals === 5 ? "" : dash_clientside.no_update;
     }
     """,
-    Output("annotation-message", "children"),
+    Output("annotation-message", "children", allow_duplicate=True),
     Input("interval-component", "n_intervals"),
+    prevent_initial_call=True,
 )
 
 # %% server side callbacks below
@@ -251,7 +253,7 @@ def read_mat(extension_validated, contents, filename, task):
 
     initiate_cache(cache, filename, mat)
     if task == "gen":
-        eeg_freq = mat.get("eeg_frequency")
+        eeg_freq = mat["eeg_frequency"].item()
         if round(eeg_freq) != 512:
             message += " " + (
                 f"EEG/EMG data has a sampling frequency of {eeg.shape[1]} Hz. "
@@ -308,9 +310,8 @@ def generate_prediction(ready, model_choice, num_class):
     filename = cache.get("filename")
     mat = cache.get("mat")
     temp_mat_path = os.path.join(TEMP_PATH, filename)
-    output_path = os.path.splitext(temp_mat_path)[0] + "_prediction"
     _, _, output_path = run_inference(
-        mat, model_choice, num_class, output_path=output_path
+        mat, model_choice, num_class, output_path=temp_mat_path
     )
     return (
         html.Div(["The prediction has been generated successfully."]),
@@ -580,4 +581,4 @@ def save_annotations(n_clicks):
 
 if __name__ == "__main__":
     Timer(1, open_browser).start()
-    app.run_server(debug=True, port=PORT)
+    app.run_server(debug=False, port=PORT)

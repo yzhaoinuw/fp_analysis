@@ -35,7 +35,7 @@ home_div = html.Div(
                                 {"label": "MSDA by Shadi", "value": "msda"},
                                 {"label": "sDREAMER by Yuan", "value": "sdreamer"},
                             ],
-                            value="msda",
+                            value="sdreamer",
                         )
                     ],
                     style={"display": "none"},
@@ -48,7 +48,7 @@ home_div = html.Div(
                             id="num-class-choice",
                             options=[
                                 {"label": "3 Classes", "value": 3},
-                                {"label": "4 Classes", "value": 4},
+                                # {"label": "4 Classes", "value": 4},
                             ],
                             value=3,
                         )

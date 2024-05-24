@@ -5,7 +5,7 @@ Created on Thu Oct 26 13:55:12 2023
 @author: yzhao
 """
 
-
+import os
 import warnings
 
 warnings.filterwarnings("ignore")
@@ -17,7 +17,7 @@ from scipy.io import loadmat, savemat
 import torch
 import torch.utils.data
 
-from msda_v1.utils import (
+from models.msda_v1.utils import (
     rolling_window,
     run_test,
     edit_one,
@@ -25,23 +25,21 @@ from msda_v1.utils import (
     edit_three,
     find_ma,
 )
+from preprocessing import reshape_sleep_data
 
 
 code_size_map = {100: 128, 200: 96, 400: 64, 300: 96, 600: 32, 500: 32}
 
 
-def infer(data: dict, model_path, num_class=3, output_path=None, batch_size=16):
+def infer(data: dict, model_path, output_path, num_class=3, batch_size=16):
     Fs = 512
     fs = 10
-
-    trial_eeg = data.get("trial_eeg")
-    trial_emg = data.get("trial_emg")
-    trial_ne = data.get("trial_ne")
-
-    trial_eeg = signal.resample(trial_eeg, Fs, axis=1)
-    trial_emg = signal.resample(trial_emg, Fs, axis=1)
-
-    eeg, emg = (trial_eeg.reshape([-1, Fs, 1]), trial_emg.reshape([-1, Fs, 1]))
+    model_path += "msda_v1/checkpoints/"
+    eeg, emg = reshape_sleep_data(data)
+    num_class = data["num_class"]
+    # ne = data.get("ne")
+    ne = None
+    eeg, emg = (eeg.reshape([-1, Fs, 1]), emg.reshape([-1, Fs, 1]))
     eeg_segment = rolling_window(
         eeg, 128, 64
     )  # shape (Time, 1, (data.shape[1] - window) // step + 1, 128)
@@ -55,11 +53,11 @@ def infer(data: dict, model_path, num_class=3, output_path=None, batch_size=16):
     emg = torch.from_numpy(emg_segment)
     fft = torch.from_numpy(fft)
 
-    if trial_ne is not None:
+    if ne is not None:
         has_ne = True
         signaling = 100
-        trial_ne = signal.resample(trial_ne, fs, axis=1)
-        ne = trial_ne.reshape([-1, fs, 1])
+        ne = signal.resample(ne, fs, axis=1)
+        ne = ne.reshape([-1, fs, 1])
         ne = torch.from_numpy(ne)
         test_dataset = torch.utils.data.TensorDataset(
             eeg.float(), ne.float(), emg.float(), fft.float()
@@ -67,7 +65,7 @@ def infer(data: dict, model_path, num_class=3, output_path=None, batch_size=16):
 
     else:
         num_class = 3  # only supports three-class prediction without NE
-        trial_ne = np.nan
+        ne = np.nan
         has_ne = False
         signaling = 200
         test_dataset = torch.utils.data.TensorDataset(
@@ -97,21 +95,20 @@ def infer(data: dict, model_path, num_class=3, output_path=None, batch_size=16):
         "pred_labels": final_predictions,
         "confidence": final_confidence,
         "num_class": num_class,
-        "trial_eeg": trial_eeg,
-        "trial_emg": trial_emg,
-        "trial_ne": trial_ne,
+        "eeg_frequency": data["eeg_frequency"],
+        "ne_frequency": data["ne_frequency"],
+        "eeg": data["eeg"],
+        "emg": data["emg"],
+        "ne": data["ne"],
     }
 
-    if output_path is None:
-        output_path = "./data_prediction"
-    output_path += f"_msda_{num_class}class.mat"
+    output_path = os.path.splitext(output_path)[0] + f"_msda_{num_class}class.mat"
     savemat(output_path, results)
     return final_predictions, final_confidence, output_path
 
 
 if __name__ == "__main__":
-    data = loadmat("C:\\Users\\yzhao\\python_projects\\sleep_scoring\\data.mat")
-    model_path = "./model_save_states/"
-    final_predictions, final_confidence, output_path = infer(
-        data, model_path, num_class=4
-    )
+    mat_file = "./user_test_files/arch_387.mat"
+    data = loadmat(mat_file)
+    model_path = "./models/"
+    final_predictions, final_confidence, output_path = infer(data, model_path, mat_file)

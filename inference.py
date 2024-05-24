@@ -12,10 +12,10 @@ import run_inference_msda
 import run_inference_sdreamer
 
 
-MODEL_PATH = "./model_save_states/"
+MODEL_PATH = "./models/"
 
 
-def run_inference(data, model_choice="msda", num_class=None, output_path=None):
+def run_inference(data, model_choice="sdreamer", num_class=3, output_path=None):
     if model_choice == "msda":
         if num_class is None:
             num_class = 3
