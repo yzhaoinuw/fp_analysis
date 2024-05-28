@@ -287,12 +287,12 @@ if __name__ == "__main__":
     io.renderers.default = "browser"
     data_path = ".\\user_test_files\\"
     # mat_file = "115_35_data_prediction_msda_3class.mat"
-    # mat_file = "Klaudia_datatest_prediction_msda_3class.mat"
+    mat_file = "Klaudia_709_Day3.mat"
     # mat_file = "data_prediction_msda_3class.mat"
     # mat_file = "data_no_ne_prediction_msda_3class.mat"
     # mat_file = "20221221_adra_1_238_2_242.mat"
     # mat_file = "data_prediction_sdreamer_4class.mat"
-    mat_file = "preprocessed_240_BL_v3.mat"
+    # mat_file = "preprocessed_240_BL_v3.mat"
     mat = loadmat(os.path.join(data_path, mat_file))
     # mat_file = "C:/Users/yzhao/matlab_projects/sleep_data_extraction/2023-10-17_Day1_no_stim_705/2023-10-17_Day1_no_stim_705.mat"
 

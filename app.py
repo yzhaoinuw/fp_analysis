@@ -256,7 +256,7 @@ def read_mat(extension_validated, contents, filename, task):
         eeg_freq = mat["eeg_frequency"].item()
         if round(eeg_freq) != 512:
             message += " " + (
-                f"EEG/EMG data has a sampling frequency of {eeg.shape[1]} Hz. "
+                f"EEG/EMG data has a sampling frequency of {eeg_freq} Hz. "
                 "Will resample to 512 Hz."
             )
 

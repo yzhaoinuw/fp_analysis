@@ -32,7 +32,7 @@ def reshape_sleep_data(mat, segment_size=512, standardize=False):
         down, up = (
             Fraction(eeg_freq / segment_size).limit_denominator(100).as_integer_ratio()
         )
-        print(f"file {mat_file} has sampling frequency of {eeg_freq}.")
+        print(f"file has sampling frequency of {eeg_freq}.")
         eeg = signal.resample_poly(eeg, up, down)
         emg = signal.resample_poly(emg, up, down)
         eeg_freq = segment_size
