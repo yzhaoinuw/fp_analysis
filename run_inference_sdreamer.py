@@ -18,38 +18,45 @@ from models.sdreamer import n2nSeqNewMoE2
 from preprocessing import reshape_sleep_data
 
 
-# %%
-def slice_data(data, n_sequences=64):
-    n = len(data)
-    n_to_crop = n % n_sequences
-    if n_to_crop != 0:
-        data = data[:-n_to_crop]
-    assert (n - n_to_crop) % n_sequences == 0
-    n_new_seq = (n - n_to_crop) // n_sequences
-    data = data.reshape(
-        (n_new_seq, n_sequences, data.shape[1], data.shape[2], data.shape[3])
-    )
-    return data
-
-
 class SequenceDataset(Dataset):
-    def __init__(self, eeg, emg, n_sequences=64):
-        eeg = eeg[:, np.newaxis, :]
-        emg = emg[:, np.newaxis, :]
-        data = np.stack((eeg, emg), axis=1)
-        data = torch.from_numpy(data)
-        mean, std = torch.mean(data, dim=0), torch.std(data, dim=0)
-        norm_data = (data - mean) / std
-        # data_sliced = slice_data(data)
-        self.traces = slice_data(norm_data)
-        # self.traces = torch.cat([data_sliced, norm_data_sliced], dim=3)
+    def __init__(self, normalized_sleep_data):
+        self.traces = normalized_sleep_data
 
     def __len__(self):
-        return self.traces.size(0)
+        return self.traces.shape[0]
 
     def __getitem__(self, idx):
         trace = self.traces[idx]
         return trace
+
+
+def make_dataset(data: dict, n_sequences: int = 64):
+    eeg, emg = reshape_sleep_data(data)
+
+    sleep_data = np.stack((eeg, emg), axis=1)
+    sleep_data = torch.from_numpy(sleep_data)
+    sleep_data = torch.unsqueeze(sleep_data, dim=2)  # shape [n_seconds, 2, 1, seq_len]
+    mean, std = torch.mean(sleep_data, dim=0), torch.std(sleep_data, dim=0)
+    normalized_data = (sleep_data - mean) / std
+
+    n_seconds = normalized_data.shape[0]
+    n_to_crop = n_seconds % n_sequences
+    if n_to_crop != 0:
+        normalized_data = torch.cat(
+            [normalized_data[:-n_to_crop], normalized_data[-n_sequences:]], dim=0
+        )
+
+    normalized_data = normalized_data.reshape(
+        (
+            -1,
+            n_sequences,
+            normalized_data.shape[1],
+            normalized_data.shape[2],
+            normalized_data.shape[3],
+        )
+    )
+    dataset = SequenceDataset(normalized_data)
+    return dataset, n_seconds, n_to_crop
 
 
 # %%
@@ -112,8 +119,8 @@ def infer(data, model_path, output_path, batch_size=32):
     ckpt = torch.load(checkpoint_path, map_location=device)
     model.load_state_dict(ckpt["state_dict"])
 
-    eeg_reshaped, emg_reshaped = reshape_sleep_data(data)
-    dataset = SequenceDataset(eeg_reshaped, emg_reshaped)
+    n_sequences = config["n_sequences"]
+    dataset, n_seconds, n_to_crop = make_dataset(data)
     data_loader = DataLoader(
         dataset,
         batch_size=batch_size,
@@ -128,7 +135,7 @@ def infer(data, model_path, output_path, batch_size=32):
         all_pred = []
         all_prob = []
 
-        with tqdm(total=eeg_reshaped.shape[0], unit=" seconds of signal") as pbar:
+        with tqdm(total=n_seconds, unit=" seconds of signal") as pbar:
             for batch, traces in enumerate(data_loader, 1):
                 traces = traces.to(device)  # [batch_size, 64, 2, 1, 512]
                 out_dict = model(traces, label=None)
@@ -140,8 +147,22 @@ def infer(data, model_path, output_path, batch_size=32):
                 pred = np.argmax(out.detach().cpu(), axis=1)
                 all_pred.append(pred)
 
-                pbar.update(batch_size * args.n_sequences)
+                pbar.update(batch_size * n_sequences)
             pbar.set_postfix({"Number of batches": batch})
+
+        if n_to_crop != 0:
+            all_pred[-1] = torch.cat(
+                (
+                    all_pred[-1][: -args.n_sequences],
+                    all_pred[-1][-args.n_sequences :][-n_to_crop:],
+                )
+            )
+            all_prob[-1] = torch.cat(
+                (
+                    all_prob[-1][: -args.n_sequences],
+                    all_prob[-1][-args.n_sequences :][-n_to_crop:],
+                )
+            )
 
         all_pred = np.concatenate(all_pred)
         all_prob = np.concatenate(all_prob)
