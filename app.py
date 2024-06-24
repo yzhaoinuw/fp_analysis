@@ -37,6 +37,8 @@ TEMP_PATH = os.path.join(tempfile.gettempdir(), "sleep_scoring_app_data")
 if not os.path.exists(TEMP_PATH):
     os.makedirs(TEMP_PATH)
 
+# Notes
+# np.nan is converted to None when reading from chache
 cache = Cache(
     app.server,
     config={
@@ -524,7 +526,12 @@ def make_annotation(annotation, figure):
         )
     )
     cache.set("annotation_history", annotation_history)
-    mat["pred_labels"] = np.array(figure["data"][-2]["z"][0])
+
+    pred_labels = mat.get("pred_labels")
+    if pred_labels is not None and pred_labels.size != 0:
+        mat["pred_labels"] = np.array(figure["data"][-2]["z"][0])
+    else:
+        mat["sleep_scores"] = np.array(figure["data"][-2]["z"][0])
     mat["confidence"] = np.array(figure["data"][-1]["z"][0])
     cache.set("mat", mat)
     return {"display": "block"}
@@ -555,7 +562,12 @@ def undo_annotation(n_clicks, figure):
 
     # undo cache
     mat = cache.get("mat")
-    mat["pred_labels"][start:end] = np.array(prev_pred)
+    pred_labels = mat.get("pred_labels")
+    if pred_labels is not None and pred_labels.size != 0:
+        mat["pred_labels"][start:end] = np.array(prev_pred)
+    else:
+        mat["sleep_scores"][start:end] = np.array(prev_pred)
+
     mat["confidence"][start:end] = np.array(prev_conf)
     cache.set("mat", mat)
 
@@ -575,10 +587,16 @@ def save_annotations(n_clicks):
     mat_filename = cache.get("filename")
     temp_mat_path = os.path.join(TEMP_PATH, mat_filename)
     mat = cache.get("mat")
+    sleep_scores = mat.get("sleep_scores")
+    if sleep_scores is not None and sleep_scores.size != 0:
+        np.place(
+            sleep_scores, sleep_scores == None, [-1.0]
+        )  # convert None to -1.0 for scipy's savemat
+
     savemat(temp_mat_path, mat)
     return dcc.send_file(temp_mat_path)
 
 
 if __name__ == "__main__":
     Timer(1, open_browser).start()
-    app.run_server(debug=False, port=PORT)
+    app.run_server(debug=True, port=PORT)

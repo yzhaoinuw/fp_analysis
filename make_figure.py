@@ -60,14 +60,22 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10):
     emg_range = max(abs(emg_lower_range), abs(emg_upper_range))
 
     labels = mat.get("pred_labels")
-    confidence = mat.get("confidence")
     if labels is None or labels.size == 0:
-        labels = mat.get("sleep_scores")
-        if labels is None or labels.size == 0:
-            labels = [[0] * eeg_end_time]
-    if confidence is None or confidence.size == 0:
-        confidence = [[False] * eeg_end_time]
+        # either scored manually or unscored
+        mat["sleep_scores"] = np.array(mat.get("sleep_scores", []), dtype=float)
+        labels = mat["sleep_scores"]
+        if labels.size == 0:
+            # if unscored, initialize with Wake, set confidence to be zero
+            mat["sleep_scores"] = np.zeros((1, eeg_end_time))
+            mat["confidence"] = np.zeros((1, eeg_end_time))
+        else:  # manually scored, but may contain missing scores
+            np.place(
+                labels, labels == -1, [np.nan]
+            )  # convert -1 to None for heatmap visualization
+            mat["confidence"] = np.ones((1, labels.size))
+            mat["confidence"][np.isnan(labels)] = 0.0
 
+    confidence = mat.get("confidence")
     num_class = mat["num_class"].item()
 
     fig = FigureResampler(
@@ -287,11 +295,12 @@ if __name__ == "__main__":
     io.renderers.default = "browser"
     data_path = ".\\user_test_files\\"
     # mat_file = "115_35_data_prediction_msda_3class.mat"
-    mat_file = "Klaudia_709_Day3.mat"
+    # mat_file = "Klaudia_709_Day3.mat"
     # mat_file = "data_prediction_msda_3class.mat"
     # mat_file = "data_no_ne_prediction_msda_3class.mat"
     # mat_file = "20221221_adra_1_238_2_242.mat"
-    # mat_file = "data_prediction_sdreamer_4class.mat"
+    mat_file = "arch_387_sdreamer_3class.mat"
+    mat_file = "C:/Users/yzhao/python_projects/time_series/data/sal_578.mat"
     # mat_file = "preprocessed_240_BL_v3.mat"
     mat = loadmat(os.path.join(data_path, mat_file))
     # mat_file = "C:/Users/yzhao/matlab_projects/sleep_data_extraction/2023-10-17_Day1_no_stim_705/2023-10-17_Day1_no_stim_705.mat"
