@@ -62,13 +62,16 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10):
     labels = mat.get("pred_labels")
     if labels is None or labels.size == 0:
         # either scored manually or unscored
-        mat["sleep_scores"] = np.array(mat.get("sleep_scores", []), dtype=float)
-        labels = mat["sleep_scores"]
-        if labels.size == 0:
+        labels = mat.get("sleep_scores")
+        if labels is None or labels.size == 0:
             # if unscored, initialize with Wake, set confidence to be zero
             mat["sleep_scores"] = np.zeros((1, eeg_end_time))
             mat["confidence"] = np.zeros((1, eeg_end_time))
         else:  # manually scored, but may contain missing scores
+            # make a labels copy and do not modify mat. only need to replace
+            # -1 in labels copy with nan for visualization
+            labels = labels.copy()
+            labels = labels.astype(float)
             np.place(
                 labels, labels == -1, [np.nan]
             )  # convert -1 to None for heatmap visualization
@@ -300,7 +303,7 @@ if __name__ == "__main__":
     # mat_file = "data_no_ne_prediction_msda_3class.mat"
     # mat_file = "20221221_adra_1_238_2_242.mat"
     mat_file = "arch_387_sdreamer_3class.mat"
-    mat_file = "C:/Users/yzhao/python_projects/time_series/data/sal_578.mat"
+    mat_file = "C:/Users/yzhao/python_projects/time_series/data/sal_484.mat"
     # mat_file = "preprocessed_240_BL_v3.mat"
     mat = loadmat(os.path.join(data_path, mat_file))
     # mat_file = "C:/Users/yzhao/matlab_projects/sleep_data_extraction/2023-10-17_Day1_no_stim_705/2023-10-17_Day1_no_stim_705.mat"

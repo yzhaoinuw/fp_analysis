@@ -587,12 +587,15 @@ def save_annotations(n_clicks):
     mat_filename = cache.get("filename")
     temp_mat_path = os.path.join(TEMP_PATH, mat_filename)
     mat = cache.get("mat")
+
+    # only need to replace None in sleep_scores assuming pred_labels will never have nan or None
     sleep_scores = mat.get("sleep_scores")
     if sleep_scores is not None and sleep_scores.size != 0:
+        sleep_scores = sleep_scores.copy()
         np.place(
-            sleep_scores, sleep_scores == None, [-1.0]
-        )  # convert None to -1.0 for scipy's savemat
-
+            sleep_scores, sleep_scores == None, [-1]
+        )  # convert None to -1 for scipy's savemat
+        mat["sleep_scores"] = sleep_scores.astype(int)
     savemat(temp_mat_path, mat)
     return dcc.send_file(temp_mat_path)
 
