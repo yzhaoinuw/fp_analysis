@@ -14,7 +14,7 @@ from tqdm import tqdm
 import numpy as np
 from scipy.io import loadmat, savemat
 
-from models.sdreamer import n2nSeqNewMoE2
+from models.sdreamer import n2nSeqNewMoE2_crf
 from preprocessing import reshape_sleep_data
 
 
@@ -110,11 +110,11 @@ def infer(data, model_path, output_path, batch_size=32):
     num_class = args.c_out
     output_path = os.path.splitext(output_path)[0] + f"_sdreamer_{num_class}class.mat"
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = n2nSeqNewMoE2.Model(args)
+    model = n2nSeqNewMoE2_crf.Model(args)
     model = model.to(device)
     checkpoint_path = (
         model_path
-        + "sdreamer/checkpoints/SeqNewMoE2_Seq_ftALL_pl16_ns64_dm128_el2_dff512_eb0_bs64_f1.pth.tar"
+        + "sdreamer/checkpoints/SeqNewMoE2_Seq_ftALL_pl16_ns64_dm128_el2_dff512_eb0_scale0.0_bs64_f1_crf.pth.tar"
     )
     ckpt = torch.load(checkpoint_path, map_location=device)
     model.load_state_dict(ckpt["state_dict"])
@@ -144,7 +144,8 @@ def infer(data, model_path, output_path, batch_size=32):
                 prob = torch.max(torch.softmax(out, dim=1), dim=1).values
                 all_prob.append(prob.detach().cpu())
 
-                pred = np.argmax(out.detach().cpu(), axis=1)
+                # pred = np.argmax(out.detach().cpu(), axis=1)
+                pred = out_dict["predictions"]
                 all_pred.append(pred)
 
                 pbar.update(batch_size * n_sequences)

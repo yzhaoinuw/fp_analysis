@@ -3,6 +3,11 @@
 Created on Mon Jun 26 15:36:14 2023
 
 @author: Yue
+
+Notes
+1. A common reason that sleep scores or confidence, both of which are heatmaps,
+   don't show up is that they have shape of (N,), instead of (1, N). The heatmap
+   only works with 2d arrays.
 """
 
 import math
@@ -70,6 +75,9 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10):
         else:  # manually scored, but may contain missing scores
             # make a labels copy and do not modify mat. only need to replace
             # -1 in labels copy with nan for visualization
+
+            # sleep_scores will have the length of eeg_end_time. this is
+            # guaranteed in the preprocessing process.
             labels = labels.copy()
             labels = labels.astype(float)
             np.place(
@@ -78,6 +86,7 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10):
             mat["confidence"] = np.ones((1, labels.size))
             mat["confidence"][np.isnan(labels)] = 0.0
 
+    # if pred_labels exists, then there is confidence
     confidence = mat.get("confidence")
     num_class = mat["num_class"].item()
 
@@ -297,13 +306,7 @@ if __name__ == "__main__":
 
     io.renderers.default = "browser"
     data_path = ".\\user_test_files\\"
-    # mat_file = "115_35_data_prediction_msda_3class.mat"
-    # mat_file = "Klaudia_709_Day3.mat"
-    # mat_file = "data_prediction_msda_3class.mat"
-    # mat_file = "data_no_ne_prediction_msda_3class.mat"
-    # mat_file = "20221221_adra_1_238_2_242.mat"
-    mat_file = "arch_387_sdreamer_3class.mat"
-    mat_file = "C:/Users/yzhao/python_projects/time_series/data/sal_484.mat"
+    mat_file = "arch_387.mat"
     # mat_file = "preprocessed_240_BL_v3.mat"
     mat = loadmat(os.path.join(data_path, mat_file))
     # mat_file = "C:/Users/yzhao/matlab_projects/sleep_data_extraction/2023-10-17_Day1_no_stim_705/2023-10-17_Day1_no_stim_705.mat"

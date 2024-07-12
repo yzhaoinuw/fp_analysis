@@ -351,6 +351,22 @@ def change_sampling_level(sampling_level):
     return fig
 
 
+@app.callback(
+    Output("debug-message", "children", allow_duplicate=True),
+    Input("n-sample-dropdown", "value"),
+    prevent_initial_call=True,
+)
+def debug_change_sampling_level(sampling_level):
+    if sampling_level is None:
+        return dash.no_update
+    sampling_level_map = {"x1": 4000, "x2": 8000, "x4": 16000}
+    n_samples = sampling_level_map[sampling_level]
+    mat = cache.get("mat")
+    mat_name = cache.get("filename")
+    pred_labels = mat.get("pred_labels")
+    return str(pred_labels.shape)
+
+
 """
 @app.callback(
     Output("debug-message", "children", allow_duplicate=True),
@@ -373,7 +389,6 @@ def debug_selected_data(box_select, figure):
 )
 def debug_keypress(keyboard_event):
     return str(keyboard_event.get("key"))
-
 
 
 @app.callback(
@@ -465,12 +480,16 @@ def update_sleep_scores(
         raise PreventUpdate
 
     label = int(label) - 1
+    eeg_end_time = len(figure["data"][-1]["z"][0])
     start, end = box_select_range
     if end < 0:
         raise PreventUpdate
-    start_round, end_round = round(start), round(end)
+    if start > eeg_end_time:
+        raise PreventUpdate
 
-    start_round = max(start_round, 0)  # TODO: what about end capping?
+    start_round, end_round = round(start), round(end)
+    start_round = max(start_round, 0)
+    end_round = min(end_round, eeg_end_time)
     if start_round == end_round:
         if (
             start_round - start > end - end_round
@@ -529,10 +548,10 @@ def make_annotation(annotation, figure):
 
     pred_labels = mat.get("pred_labels")
     if pred_labels is not None and pred_labels.size != 0:
-        mat["pred_labels"] = np.array(figure["data"][-2]["z"][0])
+        mat["pred_labels"] = np.array(figure["data"][-2]["z"])
     else:
-        mat["sleep_scores"] = np.array(figure["data"][-2]["z"][0])
-    mat["confidence"] = np.array(figure["data"][-1]["z"][0])
+        mat["sleep_scores"] = np.array(figure["data"][-2]["z"])
+    mat["confidence"] = np.array(figure["data"][-1]["z"])
     cache.set("mat", mat)
     return {"display": "block"}
 
@@ -564,11 +583,11 @@ def undo_annotation(n_clicks, figure):
     mat = cache.get("mat")
     pred_labels = mat.get("pred_labels")
     if pred_labels is not None and pred_labels.size != 0:
-        mat["pred_labels"][start:end] = np.array(prev_pred)
+        mat["pred_labels"][0, start:end] = np.array(prev_pred)
     else:
-        mat["sleep_scores"][start:end] = np.array(prev_pred)
+        mat["sleep_scores"][0, start:end] = np.array(prev_pred)
 
-    mat["confidence"][start:end] = np.array(prev_conf)
+    mat["confidence"][0, start:end] = np.array(prev_conf)
     cache.set("mat", mat)
 
     # update annotation_history
