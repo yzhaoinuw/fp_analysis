@@ -154,6 +154,7 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10):
         zmax=num_class - 1,
         zmin=0,
         showlegend=False,
+        xgap=0.05,  # add small gaps to serve as boundaries / ticks
     )
 
     conf = go.Heatmap(

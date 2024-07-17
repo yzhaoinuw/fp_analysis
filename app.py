@@ -305,16 +305,14 @@ def read_mat(extension_validated, contents, filename, task):
     Output("prediction-download-store", "data"),
     Input("generation-ready-store", "data"),
     State("model-choice-store", "data"),
-    State("num-class-store", "data"),
+    # State("num-class-store", "data"),
     prevent_initial_call=True,
 )
-def generate_prediction(ready, model_choice, num_class):
+def generate_prediction(ready, model_choice):
     filename = cache.get("filename")
     mat = cache.get("mat")
     temp_mat_path = os.path.join(TEMP_PATH, filename)
-    _, _, output_path = run_inference(
-        mat, model_choice, num_class, output_path=temp_mat_path
-    )
+    _, _, output_path = run_inference(mat, model_choice, output_path=temp_mat_path)
     return (
         html.Div(["The prediction has been generated successfully."]),
         dcc.send_file(output_path),

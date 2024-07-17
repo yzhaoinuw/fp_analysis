@@ -32,7 +32,7 @@ home_div = html.Div(
                         dcc.RadioItems(
                             id="model-choice",
                             options=[
-                                {"label": "MSDA by Shadi", "value": "msda"},
+                                # {"label": "MSDA by Shadi", "value": "msda"},
                                 {"label": "sDREAMER by Yuan", "value": "sdreamer"},
                             ],
                             value="sdreamer",
