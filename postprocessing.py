@@ -71,65 +71,155 @@ def merge_consecutive_pred_labels(df):
     return df_merged
 
 
-def modify_SWS(df, pred_labels):
-    """eliminate short SWS (< 5s)"""
-    pred_labels_post = pred_labels.copy()
+def evaluate_Wake(
+    emg, emg_frequency, start, end, prev_start, prev_end, next_start, next_end
+):
+    emg_seg = emg[int(start * emg_frequency) : int((end + 1) * emg_frequency)]
+    prev_emg_seg = emg[
+        int(prev_start * emg_frequency) : int((prev_end + 1) * emg_frequency)
+    ]
+    next_emg_seg = emg[
+        int(next_start * emg_frequency) : int((next_end + 1) * emg_frequency)
+    ]
+    # check 1: NE increases
+    high_emg = (np.percentile(emg_seg, q=75) > np.percentile(prev_emg_seg, q=95)) and (
+        np.percentile(emg_seg, q=85) > np.percentile(next_emg_seg, q=95)
+    )
+    # check 2: NE changes more steeply
+    # NE_steep_increase = np.mean(abs(np.diff(next_ne_seg))) > np.mean(abs(np.diff(ne_segment)))
+    return high_emg
+
+
+def modify_Wake(df, emg, emg_frequency):
+    """change short Wake (<= 5s) if needed"""
+    df_short_Wake = df[(df["pred_labels"] == 0) & (df["duration"] <= 2)]
+    for index, row in df_short_Wake.iterrows():
+        start, end = row["start"], row["end"]
+        prev_start, prev_end = df.loc[index - 1]["start"], df.loc[index - 1]["end"]
+        next_start, next_end = df.loc[index + 1]["start"], df.loc[index + 1]["end"]
+        if evaluate_Wake(
+            emg, emg_frequency, start, end, prev_start, prev_end, next_start, next_end
+        ):
+            continue
+
+        nearest_seg_duration = 0
+        if index >= 1:
+            nearest_seg_duration = df.loc[index - 1]["duration"]
+            label = df.loc[index - 1]["pred_labels"]
+        if index < len(df) - 1:
+            if df.loc[index + 1]["duration"] > nearest_seg_duration:
+                label = df.loc[index + 1]["pred_labels"]
+
+        df.at[index, "pred_labels"] = label
+
+    return df
+
+
+def modify_SWS(df):
+    """eliminate short SWS (<= 5s)"""
     df_short_SWS = df[(df["pred_labels"] == 1) & (df["duration"] <= 5)]
     for index, row in df_short_SWS.iterrows():
-        if index < 1 or index >= len(df):
-            continue
-        # if df.loc[index-1]["pred_labels"] == 0 and df.loc[index+1]["pred_labels"] == 0:
-        df.at[index, "pred_labels"] = 0
-        start, end = row["start"], row["end"]
-        pred_labels_post[start : end + 1] = 0
-    return pred_labels_post, df
+        change = 0
+        if index >= 1:
+            if df.loc[index - 1]["pred_labels"] == 0:
+                change += 1
+        else:
+            change += 1
+
+        if index < len(df) - 1:
+            if df.loc[index + 1]["pred_labels"] == 0:
+                change += 1
+        else:
+            change += 1
+
+        if change == 2:
+            df.at[index, "pred_labels"] = 0
+
+    return df
 
 
-def modify_REM(df, pred_labels):
+def evaluate_REM(ne, ne_frequency, start, end):
+    ne_segment = ne[int(start * ne_frequency) : int(end * ne_frequency)]
+    next_ne_seg = ne[int((end + 1) * ne_frequency) : int((end + 10) * ne_frequency)]
+
+    # check 1: NE increases
+    NE_increase = np.median(next_ne_seg) > np.percentile(ne_segment, q=85)
+    # check 2: NE changes more steeply
+    # NE_steep_increase = np.mean(abs(np.diff(next_ne_seg))) > np.mean(abs(np.diff(ne_segment)))
+    return NE_increase
+
+
+def modify_REM(df, ne, ne_frequency):
     """eliminate short REM (< 7s)"""
-    pred_labels_post = pred_labels.copy()
     df_rem = df[df["pred_labels"] == 2]
     for index, row in df_rem.iterrows():
         rem = True
         start, end = row["start"], row["end"]
-        prev_start, prev_end = df.loc[index - 1]["start"], df.loc[index - 1]["end"]
-        next_start, next_end = df.loc[index + 1]["start"], df.loc[index + 1]["end"]
-        if row["duration"] < 7:
+        prev_start = df.loc[index - 1]["start"]
+        duration = row["duration"]
+        """
+        if duration <= 7:
             df.at[index, "pred_labels"] = 1
-            pred_labels_post[start : end + 1] = 1
             rem = False
+        """
 
-        # if preceded by Wake, change to Wake
+        # if preceded by Wake, make changes
         if rem and df.loc[index - 1]["pred_labels"] == 0:
-            if df.loc[index - 1]["duration"] < row["duration"]:
+            if df.loc[index - 1]["duration"] < duration:
                 df.at[index - 1, "pred_labels"] = 2
-                pred_labels_post[prev_start : prev_end + 1] = 2
             else:
                 df.at[index, "pred_labels"] = 0
-                pred_labels_post[start : end + 1] = 0
                 rem = False
+
+        # if the previous segment was modified to REM
+        elif df.loc[index - 1]["pred_labels"] == 2:
+            start = prev_start
+            duration = end - start
 
         # if proceeded by a SWS, change to
         if rem and df.loc[index + 1]["pred_labels"] == 1:
-            if df.loc[index + 1]["duration"] < row["duration"]:
+            if df.loc[index + 1]["duration"] < duration:
                 df.at[index + 1, "pred_labels"] = 2
-                pred_labels_post[next_start : next_end + 1] = 2
-            # if the previous segment was modified to REM
-            elif df.loc[index - 1]["pred_labels"] == 2:
-                df.at[index, "pred_labels"] = 0
-                pred_labels_post[start : end + 1] = 0
+
             else:
                 df.at[index, "pred_labels"] = 1
-                pred_labels_post[start : end + 1] = 1
-    return pred_labels_post, df
+                df.at[index - 1, "pred_labels"] = 1
+                rem = False
+        """ 
+        # if NE characteristics do not support REM prediction, change to SWS
+        if rem and not evaluate_REM(ne, ne_frequency, start, end):
+            df.at[index, "pred_labels"] = 1
+        """
+
+    return df
 
 
-def postprocess_pred_labels(pred_labels, return_table=False):
+def edit_sleep_scores(sleep_scores, df):
+    pred_labels_post = sleep_scores.copy()
+    for index, row in df.iterrows():
+        start, end = row["start"], row["end"]
+        label = row["pred_labels"]
+        pred_labels_post[start : end + 1] = label
+    return pred_labels_post
+
+
+def postprocess_pred_labels(pred_labels, data, return_table=False):
+    ne_frequency = data.get("ne_frequency").item()
+    ne = data.get("ne").flatten()
+    emg_frequency = data.get(
+        "eeg_frequency"
+    ).item()  # eeg and emg have the same frequency
+    emg = data.get("emg").flatten()
     df = get_sleep_segments(pred_labels)
-    pred_labels_post, df = modify_SWS(df, pred_labels)
+    df = modify_Wake(df, emg, emg_frequency)
     df = merge_consecutive_pred_labels(df)
-    pred_labels_post, df = modify_REM(df, pred_labels_post)
+    df = modify_SWS(df)
     df = merge_consecutive_pred_labels(df)
+    df = modify_REM(df, ne, ne_frequency)
+    df = merge_consecutive_pred_labels(df)
+    # df = modify_REM(df, ne, ne_frequency)
+    # df = merge_consecutive_pred_labels(df)
+    pred_labels_post = edit_sleep_scores(pred_labels, df)
     if return_table:
         return pred_labels_post, df
     return pred_labels_post
@@ -141,5 +231,7 @@ if __name__ == "__main__":
     mat_file = "arch_387_sdreamer_3class_augment10.mat"
     mat = loadmat(os.path.join(data_path, mat_file))
     pred_labels = mat.get("pred_labels").flatten()
-    pred_labels_post, df = postprocess_pred_labels(pred_labels, return_table=True)
+    pred_labels_post, df = postprocess_pred_labels(
+        pred_labels, data=mat, return_table=True
+    )
     df.to_csv("arch_387_table_mod.csv")

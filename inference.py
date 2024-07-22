@@ -23,7 +23,7 @@ def run_inference(
     predictions, confidence = run_inference_sdreamer.infer(data, MODEL_PATH)
 
     if postprocess:
-        predictions = postprocess_pred_labels(predictions)
+        predictions = postprocess_pred_labels(predictions, data)
 
     results = {
         "pred_labels": predictions,
