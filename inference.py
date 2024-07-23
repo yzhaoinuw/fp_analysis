@@ -45,7 +45,7 @@ def run_inference(
 
 if __name__ == "__main__":
     model_choice = "sdreamer"
-    mat_file = "./user_test_files/arch_387.mat"
+    mat_file = "./user_test_files/sal_588.mat"
     data = loadmat(mat_file)
     predictions, confidence, output_path = run_inference(
         data, model_choice, num_class=3

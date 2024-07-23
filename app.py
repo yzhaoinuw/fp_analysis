@@ -266,7 +266,7 @@ def read_mat(extension_validated, contents, filename, task):
         if ne is None:
             message += " " + "NE data not detected."
 
-        message += " " + "Generating predictions... This may take up to 2 minutes."
+        message += " " + "Generating predictions... This may take up to 60 seconds."
         return (
             html.Div([message]),
             True,
