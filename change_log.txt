@@ -6,7 +6,8 @@
 5. Fixed the error that showed up when annotating beyond the recording.
 6. Fixed the error that the sleep scores disappear when changing sampling level amid annotation.
 7. Fixed the error that showed up when saving the annotation while leaving some sections of recording unscored.
-8. Added second-level boundaries to EEG, EMG, and NE signals.  
+8. Added second-level boundaries to EEG, EMG, and NE signals. 
+9. Removed msda model.
 
 #### v0.9.0-beta
 1. Updated sDREAMER model with better performance. See: https://docs.google.com/document/d/1pj3fm7cJ2eW6XDKuYYW0IRGrYlmgvDCexqE3yngLl4c/edit?usp=sharing
