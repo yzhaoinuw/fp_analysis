@@ -616,6 +616,9 @@ def save_annotations(n_clicks):
         np.place(
             sleep_scores, sleep_scores == None, [-1]
         )  # convert None to -1 for scipy's savemat
+        sleep_scores = np.nan_to_num(
+            sleep_scores, nan=-1
+        )  # convert np.nan to -1 for scipy's savemat
         mat["sleep_scores"] = sleep_scores.astype(int)
     savemat(temp_mat_path, mat)
 
