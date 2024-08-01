@@ -196,16 +196,21 @@ def evaluate_REM(df, ne, ne_frequency):
     df_rem = df[df["pred_labels"] == 2]
     for index, row in df_rem.iterrows():
         start, end = row["start"], row["end"]
-        ne_segment = ne[int(start * ne_frequency) : int((end + 1) * ne_frequency)]
-        next_ne_seg = ne[int((end + 2) * ne_frequency) : int((end + 10) * ne_frequency)]
+        ne_segment = ne[int((end - 20) * ne_frequency) : int((end + 1) * ne_frequency)]
+        next_ne_seg = ne[int((end + 1) * ne_frequency) : int((end + 21) * ne_frequency)]
 
+        next_ne_seg = next_ne_seg - min(ne_segment)
+        ne_segment = ne_segment - min(ne_segment)
         # check 1: NE increases
-        NE_increase = np.median(next_ne_seg) > np.percentile(ne_segment, q=85)
-        # check 2: NE changes more steeply
-        # NE_steep_increase = np.mean(abs(np.diff(next_ne_seg))) > np.mean(abs(np.diff(ne_segment)))
+        try:  # if REM is identified at the start or the end, discard REM
+            NE_increase = np.percentile(next_ne_seg, 85) > 5 * np.percentile(
+                ne_segment, q=15
+            )
+        except IndexError:
+            NE_increase = False
         if NE_increase:
             continue
-
+        """
         nearby_seg_duration = 0
         label = 2
         if index >= 1:
@@ -213,8 +218,8 @@ def evaluate_REM(df, ne, ne_frequency):
             label = df.loc[index - 1]["pred_labels"]
         if index < len(df) - 1 and df.loc[index + 1]["duration"] > nearby_seg_duration:
             label = df.loc[index + 1]["pred_labels"]
-
-        df.at[index, "pred_labels"] = label
+        """
+        df.at[index, "pred_labels"] = 1
 
     return df
 
@@ -228,14 +233,14 @@ def edit_sleep_scores(sleep_scores, df):
     return pred_labels_post
 
 
-def postprocess_pred_labels(pred_labels, data, return_table=False):
-    ne_frequency = data.get("ne_frequency").item()
-    ne = data.get("ne").flatten()
-
-    emg_frequency = data.get(
+def postprocess_pred_labels(mat, return_table=False):
+    pred_labels = mat.get("pred_labels").flatten()
+    emg_frequency = mat.get(
         "eeg_frequency"
     ).item()  # eeg and emg have the same frequency
-    emg = data.get("emg").flatten()
+    emg = mat.get("emg").flatten()
+    ne = mat.get("ne")
+
     df = get_sleep_segments(pred_labels)
     df = modify_Wake(df, emg, emg_frequency)
     df = merge_consecutive_pred_labels(df)
@@ -247,22 +252,142 @@ def postprocess_pred_labels(pred_labels, data, return_table=False):
     df = merge_consecutive_pred_labels(df)
     df = check_REM_duration(df)
     df = merge_consecutive_pred_labels(df)
-    if len(ne) > 1:
-        df = evaluate_REM(df, ne, ne_frequency)
-        df = merge_consecutive_pred_labels(df)
+
+    if ne is not None:
+        ne = ne.flatten()
+        if len(ne) > 1:
+            ne_frequency = mat.get("ne_frequency").item()
+            df = evaluate_REM(df, ne, ne_frequency)
+            df = merge_consecutive_pred_labels(df)
+
     pred_labels_post = edit_sleep_scores(pred_labels, df)
     if return_table:
         return pred_labels_post, df
     return pred_labels_post
 
 
+def get_sleep_score_stats(df_sleep_segments: pd.DataFrame):
+    MA_indices = np.flatnonzero(
+        (df_sleep_segments["pred_labels"] == 0) & (df_sleep_segments["duration"] < 15)
+    )
+    df_sleep_segments.loc[MA_indices, "pred_labels"] = 3
+
+    wake_indices = np.flatnonzero(df_sleep_segments["pred_labels"] == 0)
+    SWS_indices = np.flatnonzero(df_sleep_segments["pred_labels"] == 1)
+    REM_indices = np.flatnonzero(df_sleep_segments["pred_labels"] == 2)
+    MA_indices = np.flatnonzero(df_sleep_segments["pred_labels"] == 3)
+
+    total_time = df_sleep_segments["duration"].sum()
+    wake_time = df_sleep_segments.loc[wake_indices]["duration"].sum()
+    SWS_time = df_sleep_segments.loc[SWS_indices]["duration"].sum()
+    REM_time = df_sleep_segments.loc[REM_indices]["duration"].sum()
+    MA_time = df_sleep_segments.loc[MA_indices]["duration"].sum()
+
+    wake_time_percent = round(wake_time / total_time * 100, 2)
+    SWS_time_percent = round(SWS_time / total_time * 100, 2)
+    REM_time_percent = round(REM_time / total_time * 100, 2)
+    MA_time_percent = round(MA_time / total_time * 100, 2)
+
+    wake_seg_count = wake_indices.size
+    SWS_seg_count = SWS_indices.size
+    REM_seg_count = REM_indices.size
+    MA_seg_count = MA_indices.size
+
+    # count transitions
+    df2 = pd.DataFrame(
+        [[-1, np.nan, np.nan, np.nan]], columns=df_sleep_segments.columns
+    )
+    df2 = pd.concat([df_sleep_segments, df2], ignore_index=True)
+
+    df_wake_transition = df2.loc[wake_indices + 1]
+    wake_SWS_transition_count = df_wake_transition[
+        df_wake_transition["pred_labels"] == 1
+    ].shape[0]
+
+    df_SWS_transition = df2.loc[SWS_indices + 1]
+    SWS_wake_transition_count = np.flatnonzero(
+        df_SWS_transition["pred_labels"] == 0
+    ).size
+    SWS_REM_transition_count = np.flatnonzero(
+        df_SWS_transition["pred_labels"] == 2
+    ).size
+    SWS_MA_transition_count = np.flatnonzero(df_SWS_transition["pred_labels"] == 3).size
+
+    df_REM_transition = df2.loc[REM_indices + 1]
+    REM_wake_transition_count = np.flatnonzero(
+        df_REM_transition["pred_labels"] == 0
+    ).size
+    REM_MA_transition_count = np.flatnonzero(df_REM_transition["pred_labels"] == 3).size
+
+    df_MA_transition = df2.loc[MA_indices + 1]
+    MA_SWS_transition_count = np.flatnonzero(df_MA_transition["pred_labels"] == 1).size
+
+    stats = {
+        "Wake": [
+            wake_time,
+            wake_time_percent,
+            wake_seg_count,
+            np.nan,
+            wake_SWS_transition_count,
+            np.nan,
+            np.nan,
+        ],
+        "SWS": [
+            SWS_time,
+            SWS_time_percent,
+            SWS_seg_count,
+            SWS_wake_transition_count,
+            np.nan,
+            SWS_REM_transition_count,
+            SWS_MA_transition_count,
+        ],
+        "REM": [
+            REM_time,
+            REM_time_percent,
+            REM_seg_count,
+            REM_wake_transition_count,
+            np.nan,
+            np.nan,
+            REM_MA_transition_count,
+        ],
+        "MA": [
+            MA_time,
+            MA_time_percent,
+            MA_seg_count,
+            np.nan,
+            MA_SWS_transition_count,
+            np.nan,
+            np.nan,
+        ],
+    }
+
+    df_stats = pd.DataFrame(data=stats)
+    df_stats.index = [
+        "Time (s)",
+        "Time (%)",
+        "Count",
+        "Wake Transition Count",
+        "SWS Transition Count",
+        "REM Transition Count",
+        "MA Transition Count",
+    ]
+    return df_stats
+
+
 # %%
 if __name__ == "__main__":
     data_path = ".\\user_test_files\\"
-    mat_file = "arch_387_sdreamer_3class_augment10.mat"
+    mat_file = "aud_403_sdreamer_3class.mat"
+    filename = os.path.splitext(os.path.basename(mat_file))[0]
     mat = loadmat(os.path.join(data_path, mat_file))
-    pred_labels = mat.get("pred_labels").flatten()
-    pred_labels_post, df = postprocess_pred_labels(
-        pred_labels, data=mat, return_table=True
-    )
-    df.to_csv("arch_387_table_mod.csv")
+    pred_labels_post, df = postprocess_pred_labels(mat=mat, return_table=True)
+    df.to_excel(os.path.join(data_path, f"{filename}_table.xlsx"))
+
+    """ write two sheets in one xlsx file
+    df_stats = get_sleep_score_stats(df)
+    with pd.ExcelWriter(os.path.join(data_path, f"{filename}_table.xlsx")) as writer:  
+        df.to_excel(writer, sheet_name='Sleep_bouts')
+        df_stats.to_excel(writer, sheet_name='Sleep_stats')
+        worksheet = writer.sheets['Sleep_stats']
+        worksheet.set_column(0, 0, 20)
+    """

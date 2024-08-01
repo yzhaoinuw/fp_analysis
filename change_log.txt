@@ -1,3 +1,17 @@
+#### v0.10.0
+1. Added postprocessing to the prediction of the sDREAMER model. The postprocessing aims to correct any wrong transitions involving REM. In addition, it also eliminates SWS or REM that are too short and short Wake that does not have high EMG magnitude.
+2. Added visualization right after it generates sleep score predictions for a file. In that visualization, you can interact with, annotate, and save the results.
+3. Added sleep score spreadsheet as an output when saving the annotations.  It includes two sheets. The first shows the start, end, and duration of all sleep bouts in the order of their occurrence. The second sheet shows the stats of the sleep score distribution, transition counts, and so on. 
+4. Made the change that when all EEG, EMG, and NE are present in the .mat file, they will be clipped to the shortest duration of the three.
+5. Fixed the error that showed up when annotating beyond the recording.
+6. Fixed the error that the sleep scores disappear when changing sampling level amid annotation.
+7. Fixed the error that showed up when saving the annotation while leaving some sections of recording unscored.
+8. Added second-level boundaries to EEG, EMG, and NE signals.  
+
+#### v0.9.0-beta
+1. Updated sDREAMER model with better performance. See: https://docs.google.com/document/d/1pj3fm7cJ2eW6XDKuYYW0IRGrYlmgvDCexqE3yngLl4c/edit?usp=sharing
+
+
 #### v0.8.0
 1. fixed signal alignment with time axis by dividing number of data point by the true frequency, instead of the rounded frequency, eg., 512; rename some variables to for better readability; when no confidence exists, initialize with lists of False.
 2. Removed the file name component in the app. Instead, show the file name as the title of the figure. 

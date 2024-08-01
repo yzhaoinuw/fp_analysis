@@ -5,6 +5,7 @@ Created on Fri May 17 12:17:16 2024
 @author: yzhao
 """
 
+import glob
 import argparse
 
 import torch
@@ -108,10 +109,7 @@ def infer(data, model_path, batch_size=32):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = n2nSeqNewMoE2.Model(args)
     model = model.to(device)
-    checkpoint_path = (
-        model_path
-        + "sdreamer/checkpoints/SeqNewMoE2_Seq_ftALL_pl16_ns64_dm128_el2_dff512_eb0_scale0.0_bs64_f1_augment_10.pth.tar"
-    )
+    checkpoint_path = glob.glob(model_path + "*.tar")[0]
     ckpt = torch.load(checkpoint_path, map_location=device)
     model.load_state_dict(ckpt["state_dict"])
 
@@ -170,7 +168,7 @@ def infer(data, model_path, batch_size=32):
 if __name__ == "__main__":
     from scipy.io import loadmat
 
-    model_path = "./models/"
-    mat_file = "./user_test_files/arch_387.mat"
+    model_path = "./models/sdreamer/checkpoints/"
+    mat_file = "./user_test_files/sal_588.mat"
     data = loadmat(mat_file)
     all_pred, all_prob = infer(data, model_path)

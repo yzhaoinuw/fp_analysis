@@ -5,7 +5,7 @@ Created on Mon Jun 26 15:36:14 2023
 @author: Yue
 
 Notes
-1. A common reason that sleep scores or confidence, both of which are heatmaps,
+1. A common reason that sleep scores and confidence, both of which are heatmaps,
    don't show up is that they have shape of (N,), instead of (1, N). The heatmap
    only works with 2d arrays.
 """
@@ -88,6 +88,12 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10):
 
     # if pred_labels exists, then there is confidence
     confidence = mat.get("confidence")
+
+    # convert flat array to 2D array for visualization to work
+    if len(labels.shape) == 1:
+        labels = np.expand_dims(labels, axis=0)
+    if len(confidence.shape) == 1:
+        confidence = np.expand_dims(confidence, axis=0)
     num_class = mat["num_class"].item()
 
     fig = FigureResampler(
@@ -307,8 +313,7 @@ if __name__ == "__main__":
 
     io.renderers.default = "browser"
     data_path = ".\\user_test_files\\"
-    mat_file = "arch_387.mat"
-    # mat_file = "preprocessed_240_BL_v3.mat"
+    mat_file = "arch_412_sdreamer_3class.mat"
     mat = loadmat(os.path.join(data_path, mat_file))
     # mat_file = "C:/Users/yzhao/matlab_projects/sleep_data_extraction/2023-10-17_Day1_no_stim_705/2023-10-17_Day1_no_stim_705.mat"
 

@@ -147,6 +147,7 @@ visualization_div = html.Div(
                     children=[
                         html.Button("Save Annotations", id="save-button"),
                         dcc.Download(id="download-annotations"),
+                        dcc.Download(id="download-spreadsheet"),
                         html.Button(
                             "Undo Annotation",
                             id="undo-button",

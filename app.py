@@ -20,12 +20,14 @@ from dash.dependencies import Input, Output, State
 from dash import Dash, dcc, html, ctx, clientside_callback, Patch
 
 import numpy as np
+import pandas as pd
 from flask_caching import Cache
 from scipy.io import loadmat, savemat
 
 from components import Components
 from inference import run_inference
 from make_figure import make_figure
+from postprocessing import get_sleep_segments, get_sleep_score_stats
 
 
 app = Dash(__name__, title="Sleep Scoring App", suppress_callback_exceptions=True)
@@ -59,7 +61,7 @@ def create_fig(mat, mat_name, default_n_shown_samples=4000):
     return fig
 
 
-def initiate_cache(cache, filename, mat):
+def set_cache(cache, filename, mat):
     cache.set("filename", filename)
     cache.set("mat", mat)
     cache.set("annotation_history", deque(maxlen=3))
@@ -217,7 +219,7 @@ clientside_callback(
 @app.callback(
     Output("data-upload-message", "children", allow_duplicate=True),
     Output("generation-ready-store", "data"),
-    Output("visualization-ready-store", "data"),
+    Output("visualization-ready-store", "data", allow_duplicate=True),
     Output("num-class-store", "data", allow_duplicate=True),
     Input("extension-validation-store", "data"),
     State(components.mat_upload_box, "contents"),
@@ -230,9 +232,9 @@ def read_mat(extension_validated, contents, filename, task):
     decoded = base64.b64decode(content_string)
     mat = loadmat(BytesIO(decoded))
     message = "File validated."
-    # clear TEMP_PATH regularly
+    # clean TEMP_PATH regularly by deleting temp files written there
     for temp_file in os.listdir(TEMP_PATH):
-        if temp_file.endswith(".mat"):
+        if temp_file.endswith(".mat") or temp_file.endswith(".xlsx"):
             os.remove(os.path.join(TEMP_PATH, temp_file))
 
     eeg = mat.get("eeg")
@@ -253,7 +255,7 @@ def read_mat(extension_validated, contents, filename, task):
             dash.no_update,
         )
 
-    initiate_cache(cache, filename, mat)
+    set_cache(cache, filename, mat)
     if task == "gen":
         eeg_freq = mat["eeg_frequency"].item()
         if round(eeg_freq) != 512:
@@ -302,19 +304,22 @@ def read_mat(extension_validated, contents, filename, task):
 
 @app.callback(
     Output("data-upload-message", "children", allow_duplicate=True),
+    Output("visualization-ready-store", "data", allow_duplicate=True),
     Output("prediction-download-store", "data"),
     Input("generation-ready-store", "data"),
     State("model-choice-store", "data"),
-    # State("num-class-store", "data"),
     prevent_initial_call=True,
 )
 def generate_prediction(ready, model_choice):
     filename = cache.get("filename")
     mat = cache.get("mat")
     temp_mat_path = os.path.join(TEMP_PATH, filename)
-    _, _, output_path = run_inference(mat, model_choice, output_path=temp_mat_path)
+    mat, output_path = run_inference(mat, model_choice, output_path=temp_mat_path)
+    set_cache(cache, os.path.basename(output_path), mat)
+
     return (
         html.Div(["The prediction has been generated successfully."]),
+        True,
         dcc.send_file(output_path),
     )
 
@@ -349,6 +354,7 @@ def change_sampling_level(sampling_level):
     return fig
 
 
+"""
 @app.callback(
     Output("debug-message", "children", allow_duplicate=True),
     Input("n-sample-dropdown", "value"),
@@ -364,8 +370,6 @@ def debug_change_sampling_level(sampling_level):
     pred_labels = mat.get("pred_labels")
     return str(pred_labels.shape)
 
-
-"""
 @app.callback(
     Output("debug-message", "children", allow_duplicate=True),
     Input("graph", "selectedData"),
@@ -516,8 +520,6 @@ def update_sleep_scores(
     patched_figure["data"][-2]["z"][0] = figure["data"][-4]["z"][0]
     patched_figure["data"][-1]["z"][0] = figure["data"][-1]["z"][0]
     # remove box select after an update is made
-    # selections = figure["layout"].get("selections")
-    # selections.pop()
     patched_figure["layout"]["selections"].clear()
 
     return patched_figure, (start, end, prev_labels, prev_conf)
@@ -597,6 +599,7 @@ def undo_annotation(n_clicks, figure):
 
 @app.callback(
     Output("download-annotations", "data"),
+    Output("download-spreadsheet", "data"),
     Input("save-button", "n_clicks"),
     prevent_initial_call=True,
 )
@@ -604,9 +607,10 @@ def save_annotations(n_clicks):
     mat_filename = cache.get("filename")
     temp_mat_path = os.path.join(TEMP_PATH, mat_filename)
     mat = cache.get("mat")
-
     # only need to replace None in sleep_scores assuming pred_labels will never have nan or None
     sleep_scores = mat.get("sleep_scores")
+    pred_labels = mat.get("pred_labels")
+
     if sleep_scores is not None and sleep_scores.size != 0:
         sleep_scores = sleep_scores.copy()
         np.place(
@@ -614,7 +618,22 @@ def save_annotations(n_clicks):
         )  # convert None to -1 for scipy's savemat
         mat["sleep_scores"] = sleep_scores.astype(int)
     savemat(temp_mat_path, mat)
-    return dcc.send_file(temp_mat_path)
+
+    if pred_labels is not None and pred_labels.size != 0:
+        pred_labels = pred_labels.flatten()
+        df = get_sleep_segments(pred_labels)
+        df_stats = get_sleep_score_stats(df)
+
+        temp_excel_path = os.path.splitext(temp_mat_path)[0] + "_table.xlsx"
+        with pd.ExcelWriter(temp_excel_path) as writer:
+            df.to_excel(writer, sheet_name="Sleep_bouts")
+            df_stats.to_excel(writer, sheet_name="Sleep_stats")
+            worksheet = writer.sheets["Sleep_stats"]
+            worksheet.set_column(0, 0, 20)
+
+        return dcc.send_file(temp_mat_path), dcc.send_file(temp_excel_path)
+
+    return dcc.send_file(temp_mat_path), dash.no_update
 
 
 if __name__ == "__main__":

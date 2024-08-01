@@ -17,15 +17,18 @@ from scipy.io import loadmat
 def reshape_sleep_data(mat, segment_size=512, standardize=False):
     eeg = mat["eeg"].flatten()
     emg = mat["emg"].flatten()
+    ne = mat["ne"].flatten()
+    eeg_freq = mat["eeg_frequency"].item()
+    ne_freq = mat.get("ne_frequency").item()
 
+    # take the shorter duration as the end time for all time series, if applicable
+    if len(ne) > 1:
+        end_time = min(math.floor(eeg.size / eeg_freq), math.floor(ne.size / ne_freq))
+    else:
+        end_time = math.floor(eeg.size / eeg_freq)
     if standardize:
         eeg = stats.zscore(eeg)
         emg = stats.zscore(emg)
-
-    eeg_freq = mat["eeg_frequency"].item()
-
-    # clip the last non-full second and take the shorter duration of the two
-    end_time = math.floor(eeg.size / eeg_freq)
 
     # if sampling rate is much higher than 512, downsample using poly resample
     if math.ceil(eeg_freq) != segment_size and math.floor(eeg_freq) != segment_size:
