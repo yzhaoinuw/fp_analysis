@@ -37,11 +37,7 @@ def run_inference(
 
 if __name__ == "__main__":
     model_choice = "sdreamer"
-    data_path = "C:/Users/yzhao/python_projects/time_series/data/"
-    mat_file = os.path.join(data_path, "arch_412.mat")
+    data_path = "C:/Users/yzhao/python_projects/sleep_scoring/610Hz data/"
+    mat_file = os.path.join(data_path, "20240808_3_FP_Temp_BS_rep.mat")
     mat = loadmat(mat_file)
-    mat, output_path = run_inference(
-        mat,
-        model_choice,
-        num_class=3,
-    )
+    mat, output_path = run_inference(mat, model_choice, postprocess=False)

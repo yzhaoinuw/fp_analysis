@@ -93,8 +93,8 @@ def evaluate_Wake(
 def modify_Wake(df, emg, emg_frequency):
     """change short Wake (<= 5s) if needed"""
     df_short_Wake = df[(df["pred_labels"] == 0) & (df["duration"] <= 2)]
-    for index, row in df_short_Wake.iterrows():
-        start, end = row["start"], row["end"]
+    for row in df_short_Wake.itertuples():
+        index, start, end = row[0], row[2], row[3]
         prev_start, prev_end = df.loc[index - 1]["start"], df.loc[index - 1]["end"]
         next_start, next_end = df.loc[index + 1]["start"], df.loc[index + 1]["end"]
         if evaluate_Wake(
@@ -103,7 +103,7 @@ def modify_Wake(df, emg, emg_frequency):
             continue
 
         label = 0
-        nearest_seg_duration = row["duration"]
+        nearest_seg_duration = row[4]
         if index >= 1 and df.loc[index - 1]["duration"] > nearest_seg_duration:
             nearest_seg_duration = df.loc[index - 1]["duration"]
             label = df.loc[index - 1]["pred_labels"]
@@ -118,7 +118,8 @@ def modify_Wake(df, emg, emg_frequency):
 def modify_SWS(df):
     """eliminate short SWS (<= 5s)"""
     df_short_SWS = df[(df["pred_labels"] == 1) & (df["duration"] <= 5)]
-    for index, row in df_short_SWS.iterrows():
+    for row in df_short_SWS.itertuples():
+        index = row[0]
         change = 0
         if index >= 1:
             if df.loc[index - 1]["pred_labels"] == 0:
@@ -141,11 +142,11 @@ def modify_SWS(df):
 def check_REM_transitions(df):
     """check for wrong transitions"""
     df_rem = df[df["pred_labels"] == 2]
-    for index, row in df_rem.iterrows():
+    for row in df_rem.itertuples():
+        index, start, end = row[0], row[2], row[3]
         rem = True
-        start, end = row["start"], row["end"]
         prev_start = df.loc[index - 1]["start"]
-        duration = row["duration"]
+        duration = row[4]
 
         # if preceded by Wake, make changes
         if index >= 1:
@@ -178,7 +179,8 @@ def check_REM_transitions(df):
 def check_REM_duration(df):
     """eliminate short REM (< 7s)"""
     df_rem_short = df[(df["pred_labels"] == 2) & (df["duration"] < 7)]
-    for index, row in df_rem_short.iterrows():
+    for row in df_rem_short.itertuples():
+        index = row[0]
         nearby_seg_duration = 0
         label = 2
         if index >= 1:
@@ -194,8 +196,8 @@ def check_REM_duration(df):
 
 def evaluate_REM(df, ne, ne_frequency):
     df_rem = df[df["pred_labels"] == 2]
-    for index, row in df_rem.iterrows():
-        start, end = row["start"], row["end"]
+    for row in df_rem.itertuples():
+        index, start, end = row[0], row[2], row[3]
         ne_segment = ne[int((end - 20) * ne_frequency) : int((end + 1) * ne_frequency)]
         next_ne_seg = ne[int((end + 1) * ne_frequency) : int((end + 21) * ne_frequency)]
 
@@ -224,11 +226,11 @@ def evaluate_REM(df, ne, ne_frequency):
     return df
 
 
-def edit_sleep_scores(sleep_scores, df):
-    pred_labels_post = sleep_scores.copy()
-    for index, row in df.iterrows():
-        start, end = row["start"], row["end"]
-        label = row["pred_labels"]
+def edit_pred_labels(pred_labels, df):
+    pred_labels_post = pred_labels.copy()
+    for row in df.itertuples():
+        start, end = row[2], row[3]
+        label = row[1]
         pred_labels_post[start : end + 1] = label
     return pred_labels_post
 
@@ -260,13 +262,13 @@ def postprocess_pred_labels(mat, return_table=False):
             df = evaluate_REM(df, ne, ne_frequency)
             df = merge_consecutive_pred_labels(df)
 
-    pred_labels_post = edit_sleep_scores(pred_labels, df)
+    pred_labels_post = edit_pred_labels(pred_labels, df)
     if return_table:
         return pred_labels_post, df
     return pred_labels_post
 
 
-def get_sleep_score_stats(df_sleep_segments: pd.DataFrame):
+def get_pred_label_stats(df_sleep_segments: pd.DataFrame):
     MA_indices = np.flatnonzero(
         (df_sleep_segments["pred_labels"] == 0) & (df_sleep_segments["duration"] < 15)
     )
@@ -381,13 +383,12 @@ if __name__ == "__main__":
     filename = os.path.splitext(os.path.basename(mat_file))[0]
     mat = loadmat(os.path.join(data_path, mat_file))
     pred_labels_post, df = postprocess_pred_labels(mat=mat, return_table=True)
-    df.to_excel(os.path.join(data_path, f"{filename}_table.xlsx"))
+    # df.to_excel(os.path.join(data_path, f"{filename}_table.xlsx"))
 
-    """ write two sheets in one xlsx file
-    df_stats = get_sleep_score_stats(df)
-    with pd.ExcelWriter(os.path.join(data_path, f"{filename}_table.xlsx")) as writer:  
-        df.to_excel(writer, sheet_name='Sleep_bouts')
-        df_stats.to_excel(writer, sheet_name='Sleep_stats')
-        worksheet = writer.sheets['Sleep_stats']
+    # write two sheets in one xlsx file
+    df_stats = get_pred_label_stats(df)
+    with pd.ExcelWriter(os.path.join(data_path, f"{filename}_table.xlsx")) as writer:
+        df.to_excel(writer, sheet_name="Sleep_bouts")
+        df_stats.to_excel(writer, sheet_name="Sleep_stats")
+        worksheet = writer.sheets["Sleep_stats"]
         worksheet.set_column(0, 0, 20)
-    """

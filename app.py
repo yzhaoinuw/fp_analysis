@@ -27,7 +27,7 @@ from scipy.io import loadmat, savemat
 from components import Components
 from inference import run_inference
 from make_figure import make_figure
-from postprocessing import get_sleep_segments, get_sleep_score_stats
+from postprocessing import get_sleep_segments, get_pred_label_stats
 
 
 app = Dash(__name__, title="Sleep Scoring App", suppress_callback_exceptions=True)
@@ -625,7 +625,7 @@ def save_annotations(n_clicks):
     if pred_labels is not None and pred_labels.size != 0:
         pred_labels = pred_labels.flatten()
         df = get_sleep_segments(pred_labels)
-        df_stats = get_sleep_score_stats(df)
+        df_stats = get_pred_label_stats(df)
 
         temp_excel_path = os.path.splitext(temp_mat_path)[0] + "_table.xlsx"
         with pd.ExcelWriter(temp_excel_path) as writer:

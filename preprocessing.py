@@ -55,7 +55,7 @@ def reshape_sleep_data(mat, segment_size=512, standardize=False):
 
 
 if __name__ == "__main__":
-    path = "./user_test_files/"
+    path = "./610Hz data/"
     mat_file = path + "preprocessed_240_BL_v2.mat"
     mat = loadmat(mat_file)
     eeg_reshaped, emg_reshaped = reshape_sleep_data(mat)
