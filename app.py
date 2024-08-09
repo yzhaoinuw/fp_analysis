@@ -610,7 +610,8 @@ def save_annotations(n_clicks):
     # only need to replace None in sleep_scores assuming pred_labels will never have nan or None
     sleep_scores = mat.get("sleep_scores")
     pred_labels = mat.get("pred_labels")
-
+    labels = None
+    # replace any None or nan in sleep scores to -1 before saving, otherwise results in save error
     if sleep_scores is not None and sleep_scores.size != 0:
         sleep_scores = sleep_scores.copy()
         np.place(
@@ -620,13 +621,19 @@ def save_annotations(n_clicks):
             sleep_scores, nan=-1
         )  # convert np.nan to -1 for scipy's savemat
         mat["sleep_scores"] = sleep_scores.astype(int)
+
+        # export sleep bout spreadsheet only if the manual scoring is complete
+        if -1 not in sleep_scores:
+            labels = mat["sleep_scores"].flatten()
     savemat(temp_mat_path, mat)
 
     if pred_labels is not None and pred_labels.size != 0:
         pred_labels = pred_labels.flatten()
-        df = get_sleep_segments(pred_labels)
-        df_stats = get_pred_label_stats(df)
+        labels = pred_labels  # pred_labels has priority on spreadsheet export over sleep_scores
 
+    if labels is not None:
+        df = get_sleep_segments(labels)
+        df_stats = get_pred_label_stats(df)
         temp_excel_path = os.path.splitext(temp_mat_path)[0] + "_table.xlsx"
         with pd.ExcelWriter(temp_excel_path) as writer:
             df.to_excel(writer, sheet_name="Sleep_bouts")

@@ -69,9 +69,11 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10):
         # either scored manually or unscored
         labels = mat.get("sleep_scores")
         if labels is None or labels.size == 0:
-            # if unscored, initialize with Wake, set confidence to be zero
+            # if unscored, initialize with nan, set confidence to be zero
             mat["sleep_scores"] = np.zeros((1, eeg_end_time))
+            mat["sleep_scores"][:] = np.nan
             mat["confidence"] = np.zeros((1, eeg_end_time))
+            labels = mat["sleep_scores"]
         else:  # manually scored, but may contain missing scores
             # make a labels copy and do not modify mat. only need to replace
             # -1 in labels copy with nan for visualization
@@ -312,8 +314,8 @@ if __name__ == "__main__":
     from scipy.io import loadmat
 
     io.renderers.default = "browser"
-    data_path = ".\\user_test_files\\"
-    mat_file = "sal_588.mat"
+    data_path = ".\\610Hz data\\"
+    mat_file = "20240808_3_FP_Temp_BS_rep.mat"
     mat = loadmat(os.path.join(data_path, mat_file))
     # mat_file = "C:/Users/yzhao/matlab_projects/sleep_data_extraction/2023-10-17_Day1_no_stim_705/2023-10-17_Day1_no_stim_705.mat"
 
