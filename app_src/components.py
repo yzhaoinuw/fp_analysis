@@ -33,7 +33,7 @@ home_div = html.Div(
                             id="model-choice",
                             options=[
                                 # {"label": "MSDA by Shadi", "value": "msda"},
-                                {"label": "sDREAMER by Yuan", "value": "sdreamer"},
+                                {"label": "sDREAMER", "value": "sdreamer"},
                             ],
                             value="sdreamer",
                         )

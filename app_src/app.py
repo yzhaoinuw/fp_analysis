@@ -11,7 +11,6 @@ import base64
 import tempfile
 import webbrowser
 from io import BytesIO
-from threading import Timer
 from collections import deque
 
 import dash
@@ -24,17 +23,18 @@ import pandas as pd
 from flask_caching import Cache
 from scipy.io import loadmat, savemat
 
-from components import Components
-from inference import run_inference
-from make_figure import make_figure
-from postprocessing import get_sleep_segments, get_pred_label_stats
+from app_src.components import Components
+from app_src.inference import run_inference
+from app_src.make_figure import make_figure
+from app_src.postprocessing import get_sleep_segments, get_pred_label_stats
 
 
-app = Dash(__name__, title="Sleep Scoring App", suppress_callback_exceptions=True)
+app = Dash(
+    __name__, title="Sleep Scoring App v0.11.0", suppress_callback_exceptions=True
+)
 components = Components()
 app.layout = components.home_div
 
-PORT = 8050
 TEMP_PATH = os.path.join(tempfile.gettempdir(), "sleep_scoring_app_data")
 if not os.path.exists(TEMP_PATH):
     os.makedirs(TEMP_PATH)
@@ -52,8 +52,8 @@ cache = Cache(
 )
 
 
-def open_browser():
-    webbrowser.open_new(f"http://127.0.0.1:{PORT}/")
+def open_browser(port):
+    webbrowser.open_new(f"http://127.0.0.1:{port}/")
 
 
 def create_fig(mat, mat_name, default_n_shown_samples=4000):
@@ -647,5 +647,9 @@ def save_annotations(n_clicks):
 
 
 if __name__ == "__main__":
-    Timer(1, open_browser).start()
+    from threading import Timer
+    from functools import partial
+
+    PORT = 8050
+    Timer(1, partial(open_browser, PORT)).start()
     app.run_server(debug=False, port=PORT)

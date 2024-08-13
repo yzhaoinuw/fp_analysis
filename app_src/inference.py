@@ -8,8 +8,8 @@ Created on Sun Oct 29 22:09:21 2023
 import os
 from scipy.io import loadmat, savemat
 
-import run_inference_sdreamer
-from postprocessing import postprocess_pred_labels
+import app_src.run_inference_sdreamer as run_inference_sdreamer
+from app_src.postprocessing import postprocess_pred_labels
 
 
 MODEL_PATH = "./models/sdreamer/checkpoints/"

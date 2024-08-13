@@ -1,3 +1,8 @@
+#### v0.10.1
+1. Fixed slice indexing error that may occur when exporting sleep bout spreadsheets and when only one sleep stage is predicted for the entire recording.
+2. Enabled sleep bout spreadsheet exporting for manual sleep scoring.
+3. Separated the app program from run_app.exe so that future updates and patches can be uploaded directly without repackaging with pyinstaller.
+
 #### v0.10.0
 1. Added postprocessing to the prediction of the sDREAMER model. The postprocessing aims to correct any wrong transitions involving REM. In addition, it also eliminates SWS or REM that are too short and short Wake that does not have high EMG magnitude.
 2. Added visualization right after it generates sleep score predictions for a file. In that visualization, you can interact with, annotate, and save the results.

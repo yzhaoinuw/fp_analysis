@@ -14,7 +14,7 @@ from tqdm import tqdm
 import numpy as np
 
 from models.sdreamer import n2nSeqNewMoE2
-from preprocessing import reshape_sleep_data
+from app_src.preprocessing import reshape_sleep_data
 
 
 class SequenceDataset(Dataset):
@@ -168,7 +168,7 @@ def infer(data, model_path, batch_size=32):
 if __name__ == "__main__":
     from scipy.io import loadmat
 
-    model_path = "./models/sdreamer/checkpoints/"
-    mat_file = "./user_test_files/sal_588.mat"
+    model_path = "../models/sdreamer/checkpoints/"
+    mat_file = "../user_test_files/sal_588.mat"
     data = loadmat(mat_file)
     all_pred, all_prob = infer(data, model_path)
