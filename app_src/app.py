@@ -7,13 +7,12 @@ Created on Fri Oct 20 15:45:29 2023
 
 import os
 import math
-import base64
 import tempfile
 import webbrowser
-from io import BytesIO
 from collections import deque
 
 import dash
+import dash_uploader as du
 from dash.exceptions import PreventUpdate
 from dash.dependencies import Input, Output, State
 from dash import Dash, dcc, html, ctx, clientside_callback, Patch
@@ -29,18 +28,57 @@ from app_src.make_figure import make_figure
 from app_src.postprocessing import get_sleep_segments, get_pred_label_stats
 
 
-app = Dash(
-    __name__, title="Sleep Scoring App v0.11.0", suppress_callback_exceptions=True
-)
-components = Components()
-app.layout = components.home_div
+app = Dash(__name__, title="Sleep Scoring App", suppress_callback_exceptions=True)
 
 TEMP_PATH = os.path.join(tempfile.gettempdir(), "sleep_scoring_app_data")
 if not os.path.exists(TEMP_PATH):
     os.makedirs(TEMP_PATH)
 
+du.configure_upload(app, folder=TEMP_PATH, use_upload_id=True)
+components = Components()
+app.layout = components.home_div
+
+# set up dash uploader
+pred_upload_box = du.Upload(
+    id="pred-data-upload",
+    text="Click here to select File",
+    text_completed="Click here to select File",
+    cancel_button=True,
+    filetypes=["mat"],
+    upload_id="",
+    default_style={
+        "width": "12%",
+        "minHeight": "auto",
+        "lineHeight": "auto",
+        "borderWidth": "1px",
+        "borderStyle": "dashed",
+        "textAlign": "left",
+        "margin": "5px",
+        "borderRadius": "10px",
+    },
+)
+
+vis_upload_box = du.Upload(
+    id="vis-data-upload",
+    text="Click here to select File",
+    text_completed="Click here to select File",
+    cancel_button=True,
+    filetypes=["mat"],
+    upload_id="",
+    default_style={
+        "width": "12%",
+        "minHeight": "auto",
+        "lineHeight": "auto",
+        "borderWidth": "1px",
+        "borderStyle": "dashed",
+        "textAlign": "left",
+        "margin": "5px",
+        "borderRadius": "10px",
+    },
+)
+
 # Notes
-# np.nan is converted to None when reading from chache
+# np.nan is converted to None when reading from cache
 cache = Cache(
     app.server,
     config={
@@ -52,6 +90,7 @@ cache = Cache(
 )
 
 
+# %%
 def open_browser(port):
     webbrowser.open_new(f"http://127.0.0.1:{port}/")
 
@@ -61,9 +100,10 @@ def create_fig(mat, mat_name, default_n_shown_samples=4000):
     return fig
 
 
-def set_cache(cache, filename, mat):
+def set_cache(cache, filename):
     cache.set("filename", filename)
-    cache.set("mat", mat)
+    cache.set("modified_sleep_scores", None)
+    cache.set("modified_confidence", None)
     cache.set("annotation_history", deque(maxlen=3))
     cache.set("fig_resampler", None)
 
@@ -76,73 +116,16 @@ def set_cache(cache, filename, mat):
     Output("model-choice-container", "style"),
     Input("task-selection", "value"),
     Input("model-choice", "value"),
-    Input("num-class-choice", "value"),
 )
-def show_upload_box(task, model_choice, num_class):
-    # if any of task, model choice, or num_class changes, gives a new upload box so that
+def show_upload_box(task, model_choice):
+    # if task or model choice changes, give a new upload box so that
     # the upload of the same file (but running with different model) is allowed
     if task is None:
         raise PreventUpdate
-    if task == "gen":
-        return components.mat_upload_box, {"display": "block"}
+    if task == "pred":
+        return pred_upload_box, {"display": "block"}
     else:
-        return components.mat_upload_box, {"display": "none"}
-
-
-# choose_model
-clientside_callback(
-    """
-    function(model_choice, model_choice_style) {
-        if (model_choice_style.display === "none") {
-            return [{"display": "none"}, model_choice];
-        }
-        return [{"display": "block"}, model_choice];
-    }
-    """,
-    Output("num-class-container", "style"),
-    Output("model-choice-store", "data"),
-    Input("model-choice", "value"),
-    Input("model-choice-container", "style"),
-)
-
-
-# choose_num_class
-clientside_callback(
-    """
-    function(num_class, model_choice) {
-        if (model_choice === "sdreamer") {
-            num_class = 3;
-        }
-        return num_class;
-    }
-    """,
-    Output("num-class-store", "data", allow_duplicate=True),
-    Input("num-class-choice", "value"),
-    State("model-choice-store", "data"),
-    prevent_initial_call=True,
-)
-
-# validate_extension
-clientside_callback(
-    """
-    function(contents, filename) {
-        if (!contents) {
-            return ["Please select a .mat file.", dash_clientside.no_update];
-        }
-
-        if (!filename.endsWith(".mat")) {
-            return ["Please select a .mat file only.", dash_clientside.no_update];
-        }
-
-        return ["Loading and validating file... This may take up to 10 seconds.", true];
-    }
-    """,
-    Output("data-upload-message", "children", allow_duplicate=True),
-    Output("extension-validation-store", "data"),
-    Input(components.mat_upload_box, "contents"),
-    State(components.mat_upload_box, "filename"),
-    prevent_initial_call=True,
-)
+        return vis_upload_box, {"display": "none"}
 
 
 # pan_figures
@@ -216,33 +199,30 @@ clientside_callback(
 # %% server side callbacks below
 
 
-@app.callback(
-    Output("data-upload-message", "children", allow_duplicate=True),
-    Output("generation-ready-store", "data"),
-    Output("visualization-ready-store", "data", allow_duplicate=True),
-    Output("num-class-store", "data", allow_duplicate=True),
-    Input("extension-validation-store", "data"),
-    State(components.mat_upload_box, "contents"),
-    State(components.mat_upload_box, "filename"),
-    State("task-selection", "value"),
-    prevent_initial_call=True,
+@du.callback(
+    output=[
+        Output("data-upload-message", "children", allow_duplicate=True),
+        Output("prediction-ready-store", "data"),
+    ],
+    id="pred-data-upload",
 )
-def read_mat(extension_validated, contents, filename, task):
-    content_type, content_string = contents.split(",")
-    decoded = base64.b64decode(content_string)
-    mat = loadmat(BytesIO(decoded))
+def read_mat_pred(status):
     message = "File validated."
+    mat_file = status.latest_file
+    filename = os.path.basename(mat_file)
     # clean TEMP_PATH regularly by deleting temp files written there
+
     for temp_file in os.listdir(TEMP_PATH):
         if temp_file.endswith(".mat") or temp_file.endswith(".xlsx"):
+            if temp_file == filename:
+                continue
             os.remove(os.path.join(TEMP_PATH, temp_file))
 
+    mat = loadmat(mat_file)
     eeg = mat.get("eeg")
     if eeg is None:
         return (
             html.Div(["EEG data is missing. Please double check the file selected."]),
-            dash.no_update,
-            dash.no_update,
             dash.no_update,
         )
 
@@ -251,54 +231,56 @@ def read_mat(extension_validated, contents, filename, task):
         return (
             html.Div(["EMG data is missing. Please double check the file selected."]),
             dash.no_update,
-            dash.no_update,
-            dash.no_update,
         )
 
-    set_cache(cache, filename, mat)
-    if task == "gen":
-        eeg_freq = mat["eeg_frequency"].item()
-        if round(eeg_freq) != 512:
-            message += " " + (
-                f"EEG/EMG data has a sampling frequency of {eeg_freq} Hz. "
-                "Will resample to 512 Hz."
-            )
-
-        ne = mat.get("ne")
-        if ne is None:
-            message += " " + "NE data not detected."
-
-        message += " " + "Generating predictions... This may take up to 60 seconds."
-        return (
-            html.Div([message]),
-            True,
-            dash.no_update,
-            dash.no_update,
+    set_cache(cache, filename)
+    eeg_freq = mat["eeg_frequency"].item()
+    if round(eeg_freq) != 512:
+        message += " " + (
+            f"EEG/EMG data has a sampling frequency of {eeg_freq} Hz. "
+            "Will resample to 512 Hz."
         )
 
-    # else visualizing predictions
-    num_class = mat.get("num_class")
-    if mat.get("num_class") is None:
-        return (
-            html.Div(
-                [
-                    "Missing the number of unique sleep scores. Please double check the file selected."
-                ]
-            ),
-            dash.no_update,
-            dash.no_update,
-            dash.no_update,
-        )
-    num_class = num_class.item()
+    ne = mat.get("ne")
+    if ne is None:
+        message += " " + "NE data not detected."
+
+    message += (
+        " "
+        + "Generating predictions... This may take up to 3 minutes. Check Terminal for the progress."
+    )
+    return (
+        html.Div([message]),
+        True,
+    )
+
+
+@du.callback(
+    output=[
+        Output("data-upload-message", "children", allow_duplicate=True),
+        Output("visualization-ready-store", "data", allow_duplicate=True),
+    ],
+    id="vis-data-upload",
+)
+def read_mat_vis(status):
+    # clean TEMP_PATH regularly by deleting temp files written there
+    mat_file = status.latest_file
+    filename = os.path.basename(mat_file)
+    for temp_file in os.listdir(TEMP_PATH):
+        if temp_file.endswith(".mat") or temp_file.endswith(".xlsx"):
+            if temp_file == filename:
+                continue
+            os.remove(os.path.join(TEMP_PATH, temp_file))
+
+    set_cache(cache, filename)
+
     return (
         html.Div(
             [
-                "File validated. Creating visualizations... This may take up to 20 seconds."
+                "File validated. Creating visualizations... This may take up to 30 seconds."
             ]
         ),
-        dash.no_update,
         True,
-        num_class,
     )
 
 
@@ -306,17 +288,15 @@ def read_mat(extension_validated, contents, filename, task):
     Output("data-upload-message", "children", allow_duplicate=True),
     Output("visualization-ready-store", "data", allow_duplicate=True),
     Output("prediction-download-store", "data"),
-    Input("generation-ready-store", "data"),
-    State("model-choice-store", "data"),
+    Input("prediction-ready-store", "data"),
     prevent_initial_call=True,
 )
-def generate_prediction(ready, model_choice):
+def generate_prediction(ready):
     filename = cache.get("filename")
-    mat = cache.get("mat")
     temp_mat_path = os.path.join(TEMP_PATH, filename)
-    mat, output_path = run_inference(mat, model_choice, output_path=temp_mat_path)
-    set_cache(cache, os.path.basename(output_path), mat)
-
+    mat = loadmat(temp_mat_path)
+    mat, output_path = run_inference(mat, output_path=temp_mat_path)
+    set_cache(cache, os.path.basename(output_path))
     return (
         html.Div(["The prediction has been generated successfully."]),
         True,
@@ -330,8 +310,8 @@ def generate_prediction(ready, model_choice):
     prevent_initial_call=True,
 )
 def create_visualization(ready):
-    mat = cache.get("mat")
     mat_name = cache.get("filename")
+    mat = loadmat(os.path.join(TEMP_PATH, mat_name))
     fig = create_fig(mat, mat_name)
     cache.set("fig_resampler", fig)
     components.graph.figure = fig
@@ -348,8 +328,19 @@ def change_sampling_level(sampling_level):
         return dash.no_update
     sampling_level_map = {"x1": 4000, "x2": 8000, "x4": 16000}
     n_samples = sampling_level_map[sampling_level]
-    mat = cache.get("mat")
     mat_name = cache.get("filename")
+    mat = loadmat(os.path.join(TEMP_PATH, mat_name))
+
+    # copy modified (through annotation) sleep scores and confidence over
+    modified_sleep_scores = cache.get("modified_sleep_scores")
+    if modified_sleep_scores is not None:
+        modified_confidence = cache.get("modified_confidence")
+        if mat.get("pred_labels") is not None and mat["pred_labels"].size != 0:
+            mat["pred_labels"] = modified_sleep_scores.copy()
+        else:
+            mat["sleep_scores"] = modified_sleep_scores.copy()
+        mat["confidence"] = modified_confidence.copy()
+
     fig = create_fig(mat, mat_name, default_n_shown_samples=n_samples)
     return fig
 
@@ -428,7 +419,6 @@ def debug_annotate(box_select_range, keyboard_press, keyboard_event, num_class):
 )
 def update_fig(relayoutdata):
     fig = cache.get("fig_resampler")
-    # return fig.construct_update_data(relayoutdata)
     return fig.construct_update_data_patch(relayoutdata)
 
 
@@ -467,18 +457,15 @@ def read_box_select(box_select, figure):
     Input("box-select-store", "data"),
     Input("keyboard", "n_events"),  # a keyboard press
     State("keyboard", "event"),
-    State("num-class-store", "data"),
     State("graph", "figure"),
     prevent_initial_call=True,
 )
-def update_sleep_scores(
-    box_select_range, keyboard_press, keyboard_event, num_class, figure
-):
+def update_sleep_scores(box_select_range, keyboard_press, keyboard_event, figure):
     if not (ctx.triggered_id == "keyboard" and box_select_range):
         raise PreventUpdate
 
     label = keyboard_event.get("key")
-    if label not in ["1", "2", "3", "4"][:num_class]:
+    if label not in ["1", "2", "3"]:
         raise PreventUpdate
 
     label = int(label) - 1
@@ -531,10 +518,9 @@ def update_sleep_scores(
     State("graph", "figure"),
     prevent_initial_call=True,
 )
-def make_annotation(annotation, figure):
+def write_annotation(annotation, figure):
     """write to annotation history, update mat in cache, and make undo button availabe"""
     start, end, prev_labels, prev_conf = annotation
-    mat = cache.get("mat")
     annotation_history = cache.get("annotation_history")
     annotation_history.append(
         (
@@ -544,15 +530,11 @@ def make_annotation(annotation, figure):
             prev_conf,  # previous confidence
         )
     )
+    labels = np.array(figure["data"][-2]["z"]).astype(float)
+    confidence = np.array(figure["data"][-1]["z"]).astype(float)
     cache.set("annotation_history", annotation_history)
-
-    pred_labels = mat.get("pred_labels")
-    if pred_labels is not None and pred_labels.size != 0:
-        mat["pred_labels"] = np.array(figure["data"][-2]["z"])
-    else:
-        mat["sleep_scores"] = np.array(figure["data"][-2]["z"])
-    mat["confidence"] = np.array(figure["data"][-1]["z"])
-    cache.set("mat", mat)
+    cache.set("modified_sleep_scores", labels)
+    cache.set("modified_confidence", confidence)
     return {"display": "block"}
 
 
@@ -567,11 +549,12 @@ def make_annotation(annotation, figure):
 def undo_annotation(n_clicks, figure):
     annotation_history = cache.get("annotation_history")
     prev_annotation = annotation_history.pop()
-    (start, end, prev_pred, prev_conf) = prev_annotation
+    (start, end, prev_labels, prev_conf) = prev_annotation
+    prev_labels, prev_conf = np.array(prev_labels), np.array(prev_conf)
 
     patched_figure = Patch()
     # undo figure
-    figure["data"][-4]["z"][0][start:end] = prev_pred
+    figure["data"][-4]["z"][0][start:end] = prev_labels
     figure["data"][-1]["z"][0][start:end] = prev_conf
 
     patched_figure["data"][-4]["z"][0] = figure["data"][-4]["z"][0]
@@ -580,15 +563,13 @@ def undo_annotation(n_clicks, figure):
     patched_figure["data"][-1]["z"][0] = figure["data"][-1]["z"][0]
 
     # undo cache
-    mat = cache.get("mat")
-    pred_labels = mat.get("pred_labels")
-    if pred_labels is not None and pred_labels.size != 0:
-        mat["pred_labels"][0, start:end] = np.array(prev_pred)
-    else:
-        mat["sleep_scores"][0, start:end] = np.array(prev_pred)
-
-    mat["confidence"][0, start:end] = np.array(prev_conf)
-    cache.set("mat", mat)
+    modified_sleep_scores, modified_confidence = cache.get(
+        "modified_sleep_scores"
+    ), cache.get("modified_confidence")
+    modified_sleep_scores[0, start:end] = prev_labels
+    modified_confidence[0, start:end] = prev_conf
+    cache.set("modified_sleep_scores", modified_sleep_scores)
+    cache.set("modified_confidence", modified_confidence)
 
     # update annotation_history
     cache.set("annotation_history", annotation_history)
@@ -606,32 +587,39 @@ def undo_annotation(n_clicks, figure):
 def save_annotations(n_clicks):
     mat_filename = cache.get("filename")
     temp_mat_path = os.path.join(TEMP_PATH, mat_filename)
-    mat = cache.get("mat")
-    # only need to replace None in sleep_scores assuming pred_labels will never have nan or None
-    sleep_scores = mat.get("sleep_scores")
-    pred_labels = mat.get("pred_labels")
-    labels = None
-    # replace any None or nan in sleep scores to -1 before saving, otherwise results in save error
-    if sleep_scores is not None and sleep_scores.size != 0:
-        sleep_scores = sleep_scores.copy()
-        np.place(
-            sleep_scores, sleep_scores == None, [-1]
-        )  # convert None to -1 for scipy's savemat
-        sleep_scores = np.nan_to_num(
-            sleep_scores, nan=-1
-        )  # convert np.nan to -1 for scipy's savemat
-        mat["sleep_scores"] = sleep_scores.astype(int)
+    mat = loadmat(temp_mat_path)
 
-        # export sleep bout spreadsheet only if the manual scoring is complete
-        if -1 not in sleep_scores:
-            labels = mat["sleep_scores"].flatten()
+    # only need to replace None in sleep_scores assuming pred_labels will never have nan or None
+    modified_sleep_scores = mat.get("modified_sleep_scores")
+    modified_confidence = mat.get("modified_confidence")
+    labels = None
+    if modified_sleep_scores is not None:
+        # replace any None or nan in sleep scores to -1 before saving, otherwise results in save error
+        # make a copy first because we don't want to convert any nan in the cache
+        modified_sleep_scores = modified_sleep_scores.copy()
+        np.place(
+            modified_sleep_scores, modified_sleep_scores == None, [-1]
+        )  # convert None to -1 for scipy's savemat
+        modified_sleep_scores = np.nan_to_num(
+            modified_sleep_scores, nan=-1
+        )  # convert np.nan to -1 for scipy's savemat
+
+        if mat.get("pred_labels") is not None and mat["pred_labels"].size != 0:
+            mat["pred_labels"] = modified_sleep_scores
+        else:
+            mat["sleep_scores"] = modified_sleep_scores
+        mat["confidence"] = modified_confidence.copy()
     savemat(temp_mat_path, mat)
 
-    if pred_labels is not None and pred_labels.size != 0:
-        pred_labels = pred_labels.flatten()
-        labels = pred_labels  # pred_labels has priority on spreadsheet export over sleep_scores
+    # export sleep bout spreadsheet only if the manual scoring is complete
+    if mat.get("sleep_scores") is not None and -1 not in mat["sleep_scores"]:
+        labels = mat["sleep_scores"].flatten()
+
+    if mat.get("pred_labels") is not None and mat["pred_labels"].size != 0:
+        labels = mat["pred_labels"].flatten()
 
     if labels is not None:
+        labels = labels.astype(int)
         df = get_sleep_segments(labels)
         df_stats = get_pred_label_stats(df)
         temp_excel_path = os.path.splitext(temp_mat_path)[0] + "_table.xlsx"

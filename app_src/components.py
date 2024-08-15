@@ -6,8 +6,6 @@ Created on Fri Oct 20 16:27:03 2023
 """
 
 from dash import dcc, html
-
-# from trace_updater import TraceUpdater
 from dash_extensions import EventListener
 
 
@@ -20,7 +18,7 @@ home_div = html.Div(
                     dcc.RadioItems(
                         id="task-selection",
                         options=[
-                            {"label": "Generate prediction", "value": "gen"},
+                            {"label": "Generate prediction", "value": "pred"},
                             {"label": "Visualize existing prediction", "value": "vis"},
                         ],
                         style={"marginRight": "50px"},
@@ -32,7 +30,6 @@ home_div = html.Div(
                         dcc.RadioItems(
                             id="model-choice",
                             options=[
-                                # {"label": "MSDA by Shadi", "value": "msda"},
                                 {"label": "sDREAMER", "value": "sdreamer"},
                             ],
                             value="sdreamer",
@@ -41,33 +38,19 @@ home_div = html.Div(
                     style={"display": "none"},
                 ),
                 html.Div([" "], id="invisible-gap", style={"marginRight": "50px"}),
-                html.Div(
-                    id="num-class-container",
-                    children=[
-                        dcc.RadioItems(
-                            id="num-class-choice",
-                            options=[
-                                {"label": "3 Classes", "value": 3},
-                                # {"label": "4 Classes", "value": 4},
-                            ],
-                            value=3,
-                        )
-                    ],
-                    style={"display": "none"},
-                ),
             ],
         ),
         html.Div(id="upload-container"),
         html.Div(id="data-upload-message"),
-        dcc.Store(id="model-choice-store"),
-        dcc.Store(id="num-class-store"),
-        dcc.Store(id="extension-validation-store"),
-        dcc.Store(id="generation-ready-store"),
+        # dcc.Store(id="model-choice-store"),
+        # dcc.Store(id="annotation-made-store"),
+        # dcc.Store(id="extension-validation-store"),
+        dcc.Store(id="prediction-ready-store"),
         dcc.Store(id="visualization-ready-store"),
         dcc.Download(id="prediction-download-store"),
     ]
 )
-
+"""
 mat_upload_box = dcc.Upload(
     id="data-upload",
     children=html.Button(
@@ -84,7 +67,7 @@ mat_upload_box = dcc.Upload(
     },
     multiple=False,
 )
-
+"""
 graph = dcc.Graph(
     id="graph",
     config={
@@ -132,7 +115,6 @@ visualization_div = html.Div(
             ],
         ),
         graph,
-        # TraceUpdater(id="trace-updater", gdID="graph"),
         html.Div(
             style={"display": "flex"},
             children=[
@@ -172,6 +154,5 @@ visualization_div = html.Div(
 class Components:
     def __init__(self):
         self.home_div = home_div
-        self.mat_upload_box = mat_upload_box
         self.graph = graph
         self.visualization_div = visualization_div

@@ -80,7 +80,6 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10):
 
             # sleep_scores will have the length of eeg_end_time. this is
             # guaranteed in the preprocessing process.
-            labels = labels.copy()
             labels = labels.astype(float)
             np.place(
                 labels, labels == -1, [np.nan]
