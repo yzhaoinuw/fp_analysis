@@ -42,7 +42,7 @@ app.layout = components.home_div
 pred_upload_box = du.Upload(
     id="pred-data-upload",
     text="Click here to select File",
-    text_completed="Click here to select File",
+    text_completed="Completed loading",
     cancel_button=True,
     filetypes=["mat"],
     upload_id="",
@@ -61,7 +61,7 @@ pred_upload_box = du.Upload(
 vis_upload_box = du.Upload(
     id="vis-data-upload",
     text="Click here to select File",
-    text_completed="Click here to select File",
+    text_completed="Completed loading",
     cancel_button=True,
     filetypes=["mat"],
     upload_id="",
@@ -112,10 +112,11 @@ def set_cache(cache, filename):
 
 
 @app.callback(
-    Output("upload-container", "children"),
+    Output("upload-container", "children", allow_duplicate=True),
     Output("model-choice-container", "style"),
     Input("task-selection", "value"),
     Input("model-choice", "value"),
+    prevent_initial_call=True,
 )
 def show_upload_box(task, model_choice):
     # if task or model choice changes, give a new upload box so that
@@ -203,6 +204,7 @@ clientside_callback(
     output=[
         Output("data-upload-message", "children", allow_duplicate=True),
         Output("prediction-ready-store", "data"),
+        Output("upload-container", "children", allow_duplicate=True),
     ],
     id="pred-data-upload",
 )
@@ -224,6 +226,7 @@ def read_mat_pred(status):
         return (
             html.Div(["EEG data is missing. Please double check the file selected."]),
             dash.no_update,
+            pred_upload_box,
         )
 
     emg = mat.get("emg")
@@ -231,6 +234,7 @@ def read_mat_pred(status):
         return (
             html.Div(["EMG data is missing. Please double check the file selected."]),
             dash.no_update,
+            pred_upload_box,
         )
 
     set_cache(cache, filename)
@@ -249,16 +253,14 @@ def read_mat_pred(status):
         " "
         + "Generating predictions... This may take up to 3 minutes. Check Terminal for the progress."
     )
-    return (
-        html.Div([message]),
-        True,
-    )
+    return (html.Div([message]), True, pred_upload_box)
 
 
 @du.callback(
     output=[
         Output("data-upload-message", "children", allow_duplicate=True),
         Output("visualization-ready-store", "data", allow_duplicate=True),
+        Output("upload-container", "children", allow_duplicate=True),
     ],
     id="vis-data-upload",
 )
@@ -281,6 +283,7 @@ def read_mat_vis(status):
             ]
         ),
         True,
+        vis_upload_box,
     )
 
 

@@ -145,22 +145,24 @@ def check_REM_transitions(df):
     for row in df_rem.itertuples():
         index, start, end = row[0], row[2], row[3]
         rem = True
+        if index < 1:
+            continue
+
         prev_start = df.loc[index - 1]["start"]
         duration = row[4]
 
         # if preceded by Wake, make changes
-        if index >= 1:
-            if df.loc[index - 1]["pred_labels"] == 0:
-                if df.loc[index - 1]["duration"] < duration:
-                    df.at[index - 1, "pred_labels"] = 2
-                else:
-                    df.at[index, "pred_labels"] = 0
-                    rem = False
+        if df.loc[index - 1]["pred_labels"] == 0:
+            if df.loc[index - 1]["duration"] < duration:
+                df.at[index - 1, "pred_labels"] = 2
+            else:
+                df.at[index, "pred_labels"] = 0
+                rem = False
 
-            # if the previous segment was modified to REM
-            elif df.loc[index - 1]["pred_labels"] == 2:
-                start = prev_start
-                duration = end - start
+        # if the previous segment was modified to REM
+        elif df.loc[index - 1]["pred_labels"] == 2:
+            start = prev_start
+            duration = end - start
 
         # if proceeded by a SWS, make changes
         if rem and index < len(df) - 1:

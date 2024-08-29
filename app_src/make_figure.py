@@ -13,8 +13,6 @@ Notes
 import math
 import numpy as np
 
-# from scipy import signal
-
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from plotly_resampler import FigureResampler
@@ -313,8 +311,8 @@ if __name__ == "__main__":
     from scipy.io import loadmat
 
     io.renderers.default = "browser"
-    data_path = ".\\610Hz data\\"
-    mat_file = "20240808_3_FP_Temp_BS_rep.mat"
+    data_path = "..\\user_test_files\\"
+    mat_file = "try_app.mat"
     mat = loadmat(os.path.join(data_path, mat_file))
     # mat_file = "C:/Users/yzhao/matlab_projects/sleep_data_extraction/2023-10-17_Day1_no_stim_705/2023-10-17_Day1_no_stim_705.mat"
 
