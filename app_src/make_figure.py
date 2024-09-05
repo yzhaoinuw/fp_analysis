@@ -53,12 +53,12 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10):
     time_eeg = np.linspace(start_time, eeg_end_time, eeg.size)
     eeg_end_time = math.ceil(eeg_end_time)
     time = np.expand_dims(np.arange(1, eeg_end_time + 1), 0)
-    eeg_lower_range, eeg_upper_range = np.quantile(
+    eeg_lower_range, eeg_upper_range = np.nanquantile(
         eeg, 1 - range_quantile
-    ), np.quantile(eeg, range_quantile)
-    emg_lower_range, emg_upper_range = np.quantile(
+    ), np.nanquantile(eeg, range_quantile)
+    emg_lower_range, emg_upper_range = np.nanquantile(
         emg, 1 - range_quantile
-    ), np.quantile(emg, range_quantile)
+    ), np.nanquantile(emg, range_quantile)
     eeg_range = max(abs(eeg_lower_range), abs(eeg_upper_range))
     emg_range = max(abs(emg_lower_range), abs(emg_upper_range))
 
@@ -122,9 +122,9 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10):
         # Create the time sequences
         time_ne = np.linspace(start_time, ne_end_time, ne.size)
         ne_end_time = math.ceil(ne_end_time)
-        ne_lower_range, ne_upper_range = np.quantile(
+        ne_lower_range, ne_upper_range = np.nanquantile(
             ne, 1 - range_quantile
-        ), np.quantile(ne, range_quantile)
+        ), np.nanquantile(ne, range_quantile)
         fig.add_trace(
             go.Scattergl(
                 line=dict(width=1),
@@ -313,10 +313,9 @@ if __name__ == "__main__":
     io.renderers.default = "browser"
     data_path = "..\\user_test_files\\"
     mat_file = "try_app.mat"
-    mat = loadmat(os.path.join(data_path, mat_file))
-    # mat_file = "C:/Users/yzhao/matlab_projects/sleep_data_extraction/2023-10-17_Day1_no_stim_705/2023-10-17_Day1_no_stim_705.mat"
-
-    # mat = loadmat(mat_file)
+    #mat = loadmat(os.path.join(data_path, mat_file))
+    mat_file = 'C:/Users/yzhao/matlab_projects/sleep_data/box1_COM18_RZ10_2_1_2024-06-03_11-00-00-079.mat'
+    mat = loadmat(mat_file)
     mat_name = os.path.basename(mat_file)
     fig = make_figure(mat, mat_name=mat_name)
     fig.show_dash(config={"scrollZoom": True})
