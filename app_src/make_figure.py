@@ -47,12 +47,16 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10):
     eeg, emg = eeg.flatten(), emg.flatten()
     eeg_freq, ne_freq = mat.get("eeg_frequency"), mat.get("ne_frequency")
     eeg_freq = eeg_freq.item()
-    start_time = 0
-    eeg_end_time = (eeg.size - 1) / eeg_freq
+    start_time = mat.get("start_time")
+    if start_time is None:
+        start_time = 0
+    else:
+        start_time = start_time.item()
+    eeg_end_time = (eeg.size - 1) / eeg_freq + start_time
     # Create the time sequences
     time_eeg = np.linspace(start_time, eeg_end_time, eeg.size)
     eeg_end_time = math.ceil(eeg_end_time)
-    time = np.expand_dims(np.arange(1, eeg_end_time + 1), 0)
+    time = np.expand_dims(np.arange(start_time + 1, eeg_end_time + 1), 0)
     eeg_lower_range, eeg_upper_range = np.nanquantile(
         eeg, 1 - range_quantile
     ), np.nanquantile(eeg, range_quantile)
@@ -117,11 +121,11 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10):
     if ne.size > 1:
         ne = ne.flatten()
         ne_freq = ne_freq.item()
-        ne_end_time = (ne.size - 1) / ne_freq
+        ne_end_time = (ne.size - 1) / ne_freq + start_time
 
         # Create the time sequences
         time_ne = np.linspace(start_time, ne_end_time, ne.size)
-        ne_end_time = math.ceil(ne_end_time)
+        # ne_end_time = math.ceil(ne_end_time)
         ne_lower_range, ne_upper_range = np.nanquantile(
             ne, 1 - range_quantile
         ), np.nanquantile(ne, range_quantile)
@@ -147,7 +151,7 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10):
 
     # Create a heatmap for stages
     sleep_scores = go.Heatmap(
-        x0=0.5,
+        x0=start_time + 0.5,
         dx=1,
         y0=0,
         dy=heatmap_width,  # assuming that the max abs value of eeg, emg, or ne is no more than 10
@@ -163,7 +167,7 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10):
     )
 
     conf = go.Heatmap(
-        x0=0.5,
+        x0=start_time + 0.5,
         dx=1,
         z=confidence,
         customdata=time,
@@ -313,8 +317,9 @@ if __name__ == "__main__":
     io.renderers.default = "browser"
     data_path = "..\\user_test_files\\"
     mat_file = "try_app.mat"
-    #mat = loadmat(os.path.join(data_path, mat_file))
-    mat_file = 'C:/Users/yzhao/matlab_projects/sleep_data/box1_COM18_RZ10_2_1_2024-06-03_11-00-00-079.mat'
+    # mat = loadmat(os.path.join(data_path, mat_file))
+    mat_file = "C:/Users/yzhao/matlab_projects/sleep_data/box1_COM18_RZ10_2_1_2024-06-03_11-00-00-079.mat"
+    mat_file = "C:/Users/yzhao/python_projects/sleep_scoring/user_test_files/box1_COM18_RZ10_2_1_2024-06-03_09-04-56-902.mat"
     mat = loadmat(mat_file)
     mat_name = os.path.basename(mat_file)
     fig = make_figure(mat, mat_name=mat_name)

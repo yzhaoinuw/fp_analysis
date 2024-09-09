@@ -102,6 +102,7 @@ def create_fig(mat, mat_name, default_n_shown_samples=4000):
 
 def set_cache(cache, filename):
     cache.set("filename", filename)
+    cache.set("start_time", 0)
     cache.set("modified_sleep_scores", None)
     cache.set("modified_confidence", None)
     cache.set("annotation_history", deque(maxlen=3))
@@ -316,6 +317,12 @@ def create_visualization(ready):
     mat_name = cache.get("filename")
     mat = loadmat(os.path.join(TEMP_PATH, mat_name))
     fig = create_fig(mat, mat_name)
+    start_time = mat.get("start_time")
+    if start_time is None:
+        start_time = 0
+    else:
+        start_time = start_time.item()
+    cache.set("start_time", start_time)
     cache.set("fig_resampler", fig)
     components.graph.figure = fig
     return components.visualization_div
@@ -441,6 +448,8 @@ def read_box_select(box_select, figure):
     patched_figure = Patch()
     if len(selections) > 1:
         selections.pop(0)
+
+    # take the min as start and max as end so that how the box is drawn doesn't matter
     start, end = min(selections[0]["x0"], selections[0]["x1"]), max(
         selections[0]["x0"], selections[0]["x1"]
     )
@@ -472,15 +481,18 @@ def update_sleep_scores(box_select_range, keyboard_press, keyboard_event, figure
         raise PreventUpdate
 
     label = int(label) - 1
-    eeg_end_time = len(figure["data"][-1]["z"][0])
+    eeg_duration = len(figure["data"][-1]["z"][0])
     start, end = box_select_range
-    if end < 0:
+    eeg_start_time = cache.get("start_time")
+    eeg_end_time = eeg_start_time + eeg_duration
+
+    if end < eeg_start_time:
         raise PreventUpdate
     if start > eeg_end_time:
         raise PreventUpdate
 
     start_round, end_round = round(start), round(end)
-    start_round = max(start_round, 0)
+    start_round = max(start_round, eeg_start_time)
     end_round = min(end_round, eeg_end_time)
     if start_round == end_round:
         if (
@@ -492,7 +504,7 @@ def update_sleep_scores(box_select_range, keyboard_press, keyboard_event, figure
             end_round = math.ceil(end)
             start_round = math.floor(end)
 
-    start, end = start_round, end_round
+    start, end = start_round - eeg_start_time, end_round - eeg_start_time
     # If the annotation does not change anything, don't add to history
     if (
         figure["data"][-2]["z"][0][start:end] == np.array([label] * (end - start))
@@ -593,8 +605,8 @@ def save_annotations(n_clicks):
     mat = loadmat(temp_mat_path)
 
     # only need to replace None in sleep_scores assuming pred_labels will never have nan or None
-    modified_sleep_scores = mat.get("modified_sleep_scores")
-    modified_confidence = mat.get("modified_confidence")
+    modified_sleep_scores = cache.get("modified_sleep_scores")
+    modified_confidence = cache.get("modified_confidence")
     labels = None
     if modified_sleep_scores is not None:
         # replace any None or nan in sleep scores to -1 before saving, otherwise results in save error
