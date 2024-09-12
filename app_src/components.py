@@ -42,32 +42,12 @@ home_div = html.Div(
         ),
         html.Div(id="upload-container"),
         html.Div(id="data-upload-message"),
-        # dcc.Store(id="model-choice-store"),
-        # dcc.Store(id="annotation-made-store"),
-        # dcc.Store(id="extension-validation-store"),
         dcc.Store(id="prediction-ready-store"),
         dcc.Store(id="visualization-ready-store"),
         dcc.Download(id="prediction-download-store"),
     ]
 )
-"""
-mat_upload_box = dcc.Upload(
-    id="data-upload",
-    children=html.Button(
-        ["Click here to select File"],
-        id="select-file-button",
-    ),
-    style={
-        "width": "12%",
-        "height": "auto",
-        "borderWidth": "0px",
-        "borderStyle": "dashed",
-        "textAlign": "left",
-        "margin": "5px",
-    },
-    multiple=False,
-)
-"""
+
 graph = dcc.Graph(
     id="graph",
     config={
@@ -81,7 +61,6 @@ graph = dcc.Graph(
         },
     },
 )
-
 
 visualization_div = html.Div(
     children=[
@@ -101,7 +80,6 @@ visualization_div = html.Div(
                             ["x1", "x2", "x4"],
                             "x1",
                             id="n-sample-dropdown",
-                            # placeholder="Select a sampling level",
                         )
                     ],
                     style={
@@ -112,6 +90,8 @@ visualization_div = html.Div(
                         "marginRight": "20px",
                     },
                 ),
+                dcc.Store(id="update-fft-store"),
+                html.Img(id="fft-image"),
             ],
         ),
         graph,

@@ -318,8 +318,7 @@ if __name__ == "__main__":
     data_path = "..\\user_test_files\\"
     mat_file = "try_app.mat"
     # mat = loadmat(os.path.join(data_path, mat_file))
-    mat_file = "C:/Users/yzhao/matlab_projects/sleep_data/box1_COM18_RZ10_2_1_2024-06-03_11-00-00-079.mat"
-    mat_file = "C:/Users/yzhao/python_projects/sleep_scoring/user_test_files/box1_COM18_RZ10_2_1_2024-06-03_09-04-56-902.mat"
+    mat_file = "C:/Users/yzhao/python_projects/sleep_scoring/user_test_files/box1_COM18_RZ10_2_1_2024-06-03_09-04-56-902_sdreamer_3class.mat"
     mat = loadmat(mat_file)
     mat_name = os.path.basename(mat_file)
     fig = make_figure(mat, mat_name=mat_name)

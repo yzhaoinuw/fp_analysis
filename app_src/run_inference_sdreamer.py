@@ -169,6 +169,6 @@ if __name__ == "__main__":
     from scipy.io import loadmat
 
     model_path = "../models/sdreamer/checkpoints/"
-    mat_file = "../user_test_files/sal_588.mat"
+    mat_file = "../user_test_files/box1_COM18_RZ10_2_1_2024-06-03_09-04-56-902.mat"
     data = loadmat(mat_file)
     all_pred, all_prob = infer(data, model_path)

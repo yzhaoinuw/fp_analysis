@@ -7,8 +7,10 @@ Created on Fri Oct 20 15:45:29 2023
 
 import os
 import math
+import base64
 import tempfile
 import webbrowser
+from io import BytesIO
 from collections import deque
 
 import dash
@@ -22,8 +24,9 @@ import pandas as pd
 from flask_caching import Cache
 from scipy.io import loadmat, savemat
 
-from app_src.components import Components
+from app_src.plot_fft import plot_fft
 from app_src.inference import run_inference
+from app_src.components import Components
 from app_src.make_figure import make_figure
 from app_src.postprocessing import get_sleep_segments, get_pred_label_stats
 
@@ -103,6 +106,8 @@ def create_fig(mat, mat_name, default_n_shown_samples=4000):
 def set_cache(cache, filename):
     cache.set("filename", filename)
     cache.set("start_time", 0)
+    cache.set("eeg", [])  # needed for quicker fft plotting
+    cache.set("eeg_frequency", None)  # needed for quicker fft plotting
     cache.set("modified_sleep_scores", None)
     cache.set("modified_confidence", None)
     cache.set("annotation_history", deque(maxlen=3))
@@ -300,6 +305,9 @@ def generate_prediction(ready):
     temp_mat_path = os.path.join(TEMP_PATH, filename)
     mat = loadmat(temp_mat_path)
     mat, output_path = run_inference(mat, output_path=temp_mat_path)
+    # it is necessart to set cache again here because the output file
+    # which includes prediction and confidence has a new name (old_name + "_sdreamer"),
+    # it is this file that should be used for the subsequent visualization.
     set_cache(cache, os.path.basename(output_path))
     return (
         html.Div(["The prediction has been generated successfully."]),
@@ -322,7 +330,12 @@ def create_visualization(ready):
         start_time = 0
     else:
         start_time = start_time.item()
+    eeg_frequency = mat.get("eeg_frequency").item()
+    eeg = mat.get("eeg").flatten()
+
     cache.set("start_time", start_time)
+    cache.set("eeg_frequency", eeg_frequency)
+    cache.set("eeg", eeg)
     cache.set("fig_resampler", fig)
     components.graph.figure = fig
     return components.visualization_div
@@ -436,31 +449,89 @@ def update_fig(relayoutdata):
     Output("box-select-store", "data"),
     Output("graph", "figure", allow_duplicate=True),
     Output("annotation-message", "children", allow_duplicate=True),
+    Output("update-fft-store", "data"),
     Input("graph", "selectedData"),
     State("graph", "figure"),
     prevent_initial_call=True,
 )
 def read_box_select(box_select, figure):
     selections = figure["layout"].get("selections")
+    update_fft = False
     if not selections:
-        return [], dash.no_update, ""
+        return [], dash.no_update, "", update_fft
 
     patched_figure = Patch()
+    # allow only at most one select box in all subplots
     if len(selections) > 1:
         selections.pop(0)
+
+    patched_figure["layout"][
+        "selections"
+    ] = selections  # patial property update: https://dash.plotly.com/partial-properties#update
 
     # take the min as start and max as end so that how the box is drawn doesn't matter
     start, end = min(selections[0]["x0"], selections[0]["x1"]), max(
         selections[0]["x0"], selections[0]["x1"]
     )
-    patched_figure["layout"][
-        "selections"
-    ] = selections  # patial property update: https://dash.plotly.com/partial-properties#update
+
+    eeg_start_time = cache.get("start_time")
+    eeg_duration = len(figure["data"][-1]["z"][0])
+    eeg_end_time = eeg_start_time + eeg_duration
+
+    if end < eeg_start_time or start > eeg_end_time:
+        return [], patched_figure, "", update_fft
+
+    start_round, end_round = round(start), round(end)
+    start_round = max(start_round, eeg_start_time)
+    end_round = min(end_round, eeg_end_time)
+    if start_round == end_round:
+        if (
+            start_round - start > end - end_round
+        ):  # spanning over two consecutive seconds
+            end_round = math.ceil(start)
+            start_round = math.floor(start)
+        else:
+            end_round = math.ceil(end)
+            start_round = math.floor(end)
+
+    start, end = start_round - eeg_start_time, end_round - eeg_start_time
+
+    if 5 <= end - start <= 100:
+        update_fft = True
+
     return (
         [start, end],
         patched_figure,
         "Press 1 for Wake, 2 for SWS, 3 for REM, and 4 for MA, if applicable.",
+        update_fft,
     )
+
+
+@app.callback(
+    Output("fft-image", "src"),
+    Input("update-fft-store", "data"),
+    State("box-select-store", "data"),
+    prevent_initial_call=True,
+)
+def update_fft_figure(update_fft, box_select_range):
+    if not update_fft:
+        fig = plot_fft([])
+    else:
+        start, end = box_select_range
+        eeg, eeg_frequency = cache.get("eeg"), cache.get("eeg_frequency")
+        start_ind = math.floor(start * eeg_frequency)
+        end_ind = math.floor(end * eeg_frequency)
+        eeg_seg = eeg[start_ind:end_ind]
+        fig = plot_fft(eeg_seg, eeg_frequency)
+
+    # Save it to a temporary buffer.
+    buf = BytesIO()
+    fig.savefig(buf, format="png")
+    # Embed the result in the html output.
+    fig_data = base64.b64encode(buf.getbuffer()).decode("ascii")
+    fft_fig = f"data:image/png;base64,{fig_data}"
+
+    return fft_fig
 
 
 @app.callback(
@@ -481,30 +552,7 @@ def update_sleep_scores(box_select_range, keyboard_press, keyboard_event, figure
         raise PreventUpdate
 
     label = int(label) - 1
-    eeg_duration = len(figure["data"][-1]["z"][0])
     start, end = box_select_range
-    eeg_start_time = cache.get("start_time")
-    eeg_end_time = eeg_start_time + eeg_duration
-
-    if end < eeg_start_time:
-        raise PreventUpdate
-    if start > eeg_end_time:
-        raise PreventUpdate
-
-    start_round, end_round = round(start), round(end)
-    start_round = max(start_round, eeg_start_time)
-    end_round = min(end_round, eeg_end_time)
-    if start_round == end_round:
-        if (
-            start_round - start > end - end_round
-        ):  # spanning over two consecutive seconds
-            end_round = math.ceil(start)
-            start_round = math.floor(start)
-        else:
-            end_round = math.ceil(end)
-            start_round = math.floor(end)
-
-    start, end = start_round - eeg_start_time, end_round - eeg_start_time
     # If the annotation does not change anything, don't add to history
     if (
         figure["data"][-2]["z"][0][start:end] == np.array([label] * (end - start))
