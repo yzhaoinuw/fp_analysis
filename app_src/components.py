@@ -62,6 +62,16 @@ graph = dcc.Graph(
     },
 )
 
+fft_graph = dcc.Graph(
+    id="fft-graph",
+    # style={'width': '200', 'height': '200'},
+    config={
+        "scrollZoom": False,
+        "editable": False,
+        "staticPlot": True,
+    },
+)
+
 visualization_div = html.Div(
     children=[
         html.Div(
@@ -70,6 +80,7 @@ visualization_div = html.Div(
                 html.Div(
                     ["Sampling Level"],
                     style={
+                        "display": "inline-block",
                         "marginRight": "10px",
                         "lineHeight": "40px",
                     },
@@ -88,10 +99,15 @@ visualization_div = html.Div(
                         "textAlign": "left",
                         "margin": "2px",
                         "marginRight": "20px",
+                        "display": "inline-block",
                     },
                 ),
                 dcc.Store(id="update-fft-store"),
-                html.Img(id="fft-image"),
+                html.Div(
+                    id="fft-div",
+                    children=[fft_graph],
+                    style={"display": "none"},
+                ),
             ],
         ),
         graph,

@@ -16,4 +16,4 @@ if __name__ == "__main__":
     VERSION = "v0.11.0"
     Timer(1, partial(open_browser, PORT)).start()
     app.title = f"Sleep Scoring App {VERSION}"
-    app.run_server(debug=True, port=PORT)
+    app.run_server(debug=False, port=PORT)

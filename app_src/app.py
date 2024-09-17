@@ -7,10 +7,8 @@ Created on Fri Oct 20 15:45:29 2023
 
 import os
 import math
-import base64
 import tempfile
 import webbrowser
-from io import BytesIO
 from collections import deque
 
 import dash
@@ -449,6 +447,7 @@ def update_fig(relayoutdata):
     Output("box-select-store", "data"),
     Output("graph", "figure", allow_duplicate=True),
     Output("annotation-message", "children", allow_duplicate=True),
+    Output("fft-div", "style"),
     Output("update-fft-store", "data"),
     Input("graph", "selectedData"),
     State("graph", "figure"),
@@ -456,9 +455,10 @@ def update_fig(relayoutdata):
 )
 def read_box_select(box_select, figure):
     selections = figure["layout"].get("selections")
-    update_fft = False
+    update_fft = True
+    fft_div_style = {"display": "none"}
     if not selections:
-        return [], dash.no_update, "", update_fft
+        return [], dash.no_update, "", fft_div_style, dash.no_update
 
     patched_figure = Patch()
     # allow only at most one select box in all subplots
@@ -479,7 +479,7 @@ def read_box_select(box_select, figure):
     eeg_end_time = eeg_start_time + eeg_duration
 
     if end < eeg_start_time or start > eeg_end_time:
-        return [], patched_figure, "", update_fft
+        return [], patched_figure, "", fft_div_style, dash.no_update
 
     start_round, end_round = round(start), round(end)
     start_round = max(start_round, eeg_start_time)
@@ -496,40 +496,35 @@ def read_box_select(box_select, figure):
 
     start, end = start_round - eeg_start_time, end_round - eeg_start_time
 
-    if 5 <= end - start <= 100:
-        update_fft = True
+    # only show the spectral estimation if the box select is made in EEG subplot
+    if selections[0]["yref"] == "y":
+        fft_div_style = {"display": "block"}
 
     return (
         [start, end],
         patched_figure,
         "Press 1 for Wake, 2 for SWS, 3 for REM, and 4 for MA, if applicable.",
+        fft_div_style,
         update_fft,
     )
 
 
 @app.callback(
-    Output("fft-image", "src"),
+    Output("fft-graph", "figure"),
     Input("update-fft-store", "data"),
     State("box-select-store", "data"),
     prevent_initial_call=True,
 )
 def update_fft_figure(update_fft, box_select_range):
-    if not update_fft:
-        fig = plot_fft([])
-    else:
+    fft_fig = plot_fft([])
+    if box_select_range:
         start, end = box_select_range
-        eeg, eeg_frequency = cache.get("eeg"), cache.get("eeg_frequency")
-        start_ind = math.floor(start * eeg_frequency)
-        end_ind = math.floor(end * eeg_frequency)
-        eeg_seg = eeg[start_ind:end_ind]
-        fig = plot_fft(eeg_seg, eeg_frequency)
-
-    # Save it to a temporary buffer.
-    buf = BytesIO()
-    fig.savefig(buf, format="png")
-    # Embed the result in the html output.
-    fig_data = base64.b64encode(buf.getbuffer()).decode("ascii")
-    fft_fig = f"data:image/png;base64,{fig_data}"
+        if 5 <= end - start <= 300:
+            eeg, eeg_frequency = cache.get("eeg"), cache.get("eeg_frequency")
+            start_ind = math.floor(start * eeg_frequency)
+            end_ind = math.floor(end * eeg_frequency)
+            eeg_seg = eeg[start_ind:end_ind]
+            fft_fig = plot_fft(eeg_seg, eeg_frequency)
 
     return fft_fig
 
