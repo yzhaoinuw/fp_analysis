@@ -5,10 +5,9 @@ Created on Thu Sep 12 22:18:15 2024
 @author: yzhao
 """
 
-import numpy as np
 import plotly.io as io
-from scipy.io import loadmat
 import plotly.graph_objects as go
+from scipy.io import loadmat
 from scipy.fft import rfft, rfftfreq
 
 
@@ -34,7 +33,7 @@ def plot_fft(eeg_seg=[], eeg_frequency=None):
             tickfont=dict(size=6),
         ),
         yaxis=dict(
-            title_text=r"$|X(f)|/\tau$",
+            title_text="Magnitude: |X(f)|/t",
             titlefont=dict(size=8),
             rangemode="tozero",
             tickfont=dict(size=6),

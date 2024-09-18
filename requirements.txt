@@ -14,4 +14,4 @@ pandas==1.5.3
 openpyxl==3.1.5
 XlsxWriter==3.2.0
 dash-uploader==0.7.0a1
-packaging==21.3
+packaging==21.3.0

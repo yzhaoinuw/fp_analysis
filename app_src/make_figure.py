@@ -170,8 +170,8 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10):
         x0=start_time + 0.5,
         dx=1,
         z=confidence,
-        customdata=time,
-        hovertemplate="<b>time</b>: %{customdata}<extra></extra>",
+        customdata=time / 3600,
+        hovertemplate="<b>time</b>: %{customdata:.2f}h<extra></extra>",
         colorscale="speed",
         zmax=1,
         zmin=0,
@@ -242,11 +242,18 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10):
 
     fig.update_layout(
         autosize=True,
-        margin=dict(t=50, l=20, r=20, b=40),
+        margin=dict(t=0, l=10, r=10, b=0),
         height=800,
         hovermode="x unified",  # gives crosshair in one subplot
         hoverlabel=dict(bgcolor="rgba(255, 255, 255, 0.6)"),
-        title_text=mat_name,
+        title=dict(
+            text=mat_name,
+            font=dict(size=16),
+            xanchor="left",
+            x=0,
+            yanchor="top",
+            yref="container",
+        ),
         yaxis4=dict(tickvals=[]),  # suppress y ticks on the heatmap
         xaxis4=dict(tickformat="digits"),
         legend=dict(
@@ -255,9 +262,6 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10):
             orientation="h",  # makes legend items horizontal
             bgcolor="rgba(0,0,0,0)",  # transparent legend background
             font=dict(size=10),  # adjust legend text size
-        ),
-        font=dict(
-            size=12,  # title font size
         ),
         modebar_remove=["lasso2d", "zoom", "autoScale"],
         dragmode="pan",
@@ -274,6 +278,14 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10):
         row=4,
         col=1,
         title_text="<b>Time (s)</b>",
+        minor=dict(
+            tick0=0,
+            dtick=3600,
+            tickcolor="black",
+            ticks="outside",
+            ticklen=5,
+            tickwidth=2,
+        ),
     )
     fig.update_yaxes(
         range=[

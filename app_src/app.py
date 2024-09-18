@@ -22,6 +22,7 @@ import pandas as pd
 from flask_caching import Cache
 from scipy.io import loadmat, savemat
 
+from app_src import VERSION
 from app_src.plot_fft import plot_fft
 from app_src.inference import run_inference
 from app_src.components import Components
@@ -29,7 +30,9 @@ from app_src.make_figure import make_figure
 from app_src.postprocessing import get_sleep_segments, get_pred_label_stats
 
 
-app = Dash(__name__, title="Sleep Scoring App", suppress_callback_exceptions=True)
+app = Dash(
+    __name__, title=f"Sleep Scoring App {VERSION}", suppress_callback_exceptions=True
+)
 
 TEMP_PATH = os.path.join(tempfile.gettempdir(), "sleep_scoring_app_data")
 if not os.path.exists(TEMP_PATH):
@@ -39,6 +42,7 @@ du.configure_upload(app, folder=TEMP_PATH, use_upload_id=True)
 components = Components()
 app.layout = components.home_div
 
+
 # set up dash uploader
 pred_upload_box = du.Upload(
     id="pred-data-upload",
@@ -47,16 +51,7 @@ pred_upload_box = du.Upload(
     cancel_button=True,
     filetypes=["mat"],
     upload_id="",
-    default_style={
-        "width": "12%",
-        "minHeight": "auto",
-        "lineHeight": "auto",
-        "borderWidth": "1px",
-        "borderStyle": "dashed",
-        "textAlign": "left",
-        "margin": "5px",
-        "borderRadius": "10px",
-    },
+    default_style=components.upload_box_style,
 )
 
 vis_upload_box = du.Upload(
@@ -66,16 +61,7 @@ vis_upload_box = du.Upload(
     cancel_button=True,
     filetypes=["mat"],
     upload_id="",
-    default_style={
-        "width": "12%",
-        "minHeight": "auto",
-        "lineHeight": "auto",
-        "borderWidth": "1px",
-        "borderStyle": "dashed",
-        "textAlign": "left",
-        "margin": "5px",
-        "borderRadius": "10px",
-    },
+    default_style=components.upload_box_style,
 )
 
 # Notes

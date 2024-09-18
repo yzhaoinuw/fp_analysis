@@ -1,6 +1,6 @@
 ### Installation
 1. Download "sleep_scoring_app_vx" (the suffix "vx" denotes the current version) and unzip it as needed. Note if you unzip it to the same location where the zip file is, you may end up with a layered folder, ie., a "sleep_scoring_app_vx" inside a "sleep_scoring_app_vx". If this is the case , you need to peel it and move the inner "sleep_scoring_app_vx" somewhere else and delete the outer "sleep_scoring_app_vx". Please make sure you check this.  
-2. Examine the content of the unzipped "sleep_scoring_app_vx". If it doesn't contain a folder called "model_save_states", download "model_save_states" and unzip it as needed, to "sleep_scoring_app_vx", where you see "run_app.exe".
+2. Examine the content of the unzipped "sleep_scoring_app_vx". It should contain three folders: 1) _internal, 2) app_src, 3) models, and a .exe file called run_app.exe.
 
 ### Usage 
 1. Double click "run_app.exe" to open the app, which will open a page in your web browser.

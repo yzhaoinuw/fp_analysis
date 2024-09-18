@@ -64,18 +64,18 @@ graph = dcc.Graph(
 
 fft_graph = dcc.Graph(
     id="fft-graph",
-    # style={'width': '200', 'height': '200'},
     config={
         "scrollZoom": False,
         "editable": False,
         "staticPlot": True,
     },
+    style={"height": "150px", "width": "300px"},
 )
 
 visualization_div = html.Div(
     children=[
         html.Div(
-            style={"display": "flex"},
+            style={"display": "flex", "marginBottom": "5px"},
             children=[
                 html.Div(
                     ["Sampling Level"],
@@ -102,26 +102,20 @@ visualization_div = html.Div(
                         "display": "inline-block",
                     },
                 ),
-                dcc.Store(id="update-fft-store"),
                 html.Div(
                     id="fft-div",
                     children=[fft_graph],
                     style={"display": "none"},
                 ),
+                dcc.Store(id="update-fft-store"),
             ],
         ),
-        graph,
+        html.Div(children=[graph], style={"marginTop": "5px", "marginLeft": "20px"}),
         html.Div(
             style={"display": "flex"},
             children=[
-                dcc.Store(id="box-select-store"),
-                dcc.Store(id="annotation-store"),
-                EventListener(
-                    id="keyboard",
-                    events=[{"event": "keydown", "props": ["key"]}],
-                ),
                 html.Div(
-                    style={"display": "flex", "margin-right": "5px"},
+                    style={"display": "flex", "marginRight": "5px"},
                     children=[
                         html.Button("Save Annotations", id="save-button"),
                         dcc.Download(id="download-annotations"),
@@ -133,17 +127,37 @@ visualization_div = html.Div(
                         ),
                     ],
                 ),
+                html.Div(id="annotation-message"),
+                html.Div(id="debug-message"),
+                dcc.Store(id="box-select-store"),
+                dcc.Store(id="annotation-store"),
+                EventListener(
+                    id="keyboard",
+                    events=[{"event": "keydown", "props": ["key"]}],
+                ),
                 dcc.Interval(
                     id="interval-component",
                     interval=1 * 1000,  # in milliseconds
                     max_intervals=0,  # stop after the first interval
                 ),
-                html.Div(id="annotation-message"),
-                html.Div(id="debug-message"),
             ],
         ),
     ],
 )
+
+upload_box_style = {
+    "fontSize": "18px",
+    "width": "15%",
+    "height": "auto",
+    "minHeight": "auto",
+    "lineHeight": "auto",
+    "borderWidth": "1px",
+    "borderStyle": "none",
+    "textAlign": "center",
+    "margin": "5px",  # spacing between the upload box and the div it's in
+    "borderRadius": "10px",  # rounded corner
+    "backgroundColor": "lightgrey",
+}
 
 
 # %%
@@ -152,3 +166,4 @@ class Components:
         self.home_div = home_div
         self.graph = graph
         self.visualization_div = visualization_div
+        self.upload_box_style = upload_box_style
