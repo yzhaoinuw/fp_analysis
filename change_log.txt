@@ -1,6 +1,8 @@
-#### v0.11.0-beta
+#### v0.11.0
 1. Added Spectral Density Estimation (SDE) plot, previously referred to as FFT plot by the users, for EEG. It is displayed when the user draws a box that's no more than 300 seconds in the EEG subplot.
-2. Replaced the Dash native upload component with dash-upload to allow for longer recordings, ie., larger files, to be visualized.
+2. Replaced the Dash native upload component with dash-upload to allow for longer recordings, ie., larger files, to be visualized. This change also includes a progress bar for file upload (can be understood as a proxy for file reading).
+3. Added hour marks as minor ticks in the Time axis of Confidence subplot. Changed the time label from seconds to hours when hovering over the Confidence subplot. 
+4. Adjusted start time to true start time (not always at second 0) for mat files that are from second bin or later of the original recording.
 
 #### v0.10.1
 1. Fixed slice indexing error that may occur when exporting sleep bout spreadsheets and when only one sleep stage is predicted for the entire recording.
