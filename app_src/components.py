@@ -19,7 +19,7 @@ home_div = html.Div(
                         id="task-selection",
                         options=[
                             {"label": "Generate prediction", "value": "pred"},
-                            {"label": "Visualize existing prediction", "value": "vis"},
+                            {"label": "Visualize a recording", "value": "vis"},
                         ],
                         style={"marginRight": "50px"},
                     )

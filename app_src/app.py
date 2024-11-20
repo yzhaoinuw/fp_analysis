@@ -71,7 +71,7 @@ cache = Cache(
     config={
         "CACHE_TYPE": "filesystem",
         "CACHE_DIR": TEMP_PATH,
-        "CACHE_THRESHOLD": 10,
+        "CACHE_THRESHOLD": 20,
         "CACHE_DEFAULT_TIMEOUT": 86400,  # to save cache for 1 day, otherwise it is default to 300 seconds
     },
 )
@@ -280,7 +280,7 @@ def read_mat_vis(status):
 @app.callback(
     Output("data-upload-message", "children", allow_duplicate=True),
     Output("visualization-ready-store", "data", allow_duplicate=True),
-    Output("prediction-download-store", "data"),
+    #Output("prediction-download-store", "data"),
     Input("prediction-ready-store", "data"),
     prevent_initial_call=True,
 )
@@ -288,7 +288,7 @@ def generate_prediction(ready):
     filename = cache.get("filename")
     temp_mat_path = os.path.join(TEMP_PATH, filename)
     mat = loadmat(temp_mat_path)
-    mat, output_path = run_inference(mat, output_path=temp_mat_path)
+    mat, output_path = run_inference(mat, output_path=temp_mat_path, save_inference=True)
     # it is necessart to set cache again here because the output file
     # which includes prediction and confidence has a new name (old_name + "_sdreamer"),
     # it is this file that should be used for the subsequent visualization.
@@ -296,7 +296,7 @@ def generate_prediction(ready):
     return (
         html.Div(["The prediction has been generated successfully."]),
         True,
-        dcc.send_file(output_path),
+        #dcc.send_file(output_path),
     )
 
 
@@ -350,72 +350,6 @@ def change_sampling_level(sampling_level):
 
     fig = create_fig(mat, mat_name, default_n_shown_samples=n_samples)
     return fig
-
-
-"""
-@app.callback(
-    Output("debug-message", "children", allow_duplicate=True),
-    Input("n-sample-dropdown", "value"),
-    prevent_initial_call=True,
-)
-def debug_change_sampling_level(sampling_level):
-    if sampling_level is None:
-        return dash.no_update
-    sampling_level_map = {"x1": 4000, "x2": 8000, "x4": 16000}
-    n_samples = sampling_level_map[sampling_level]
-    mat = cache.get("mat")
-    mat_name = cache.get("filename")
-    pred_labels = mat.get("pred_labels")
-    return str(pred_labels.shape)
-
-@app.callback(
-    Output("debug-message", "children", allow_duplicate=True),
-    Input("graph", "selectedData"),
-    State("graph", "figure"),
-    prevent_initial_call=True,
-)
-def debug_selected_data(box_select, figure):
-    if box_select is None:
-        return dash.no_update
-    #return str(box_select)
-    return str(figure["layout"].get("selections"))
-
-@app.callback(
-    Output("debug-message", "children", allow_duplicate=True),
-    #Input("keyboard", "n_events"),
-    Input("keyboard", "event"),
-    #State("keyboard", "event"),
-    prevent_initial_call=True,
-)
-def debug_keypress(keyboard_event):
-    return str(keyboard_event.get("key"))
-
-
-@app.callback(
-    Output("debug-message", "children", allow_duplicate=True),
-    Input("box-select-store", "data"),
-    Input("keyboard", "n_events"),
-    State("keyboard", "event"),
-    State("num-class-store", "data"),
-    prevent_initial_call=True,
-)
-def debug_annotate(box_select_range, keyboard_press, keyboard_event, num_class):
-    if not (ctx.triggered_id == "keyboard" and box_select_range):
-        raise PreventUpdate
-
-    label = keyboard_event.get("key")
-    if label not in ["1", "2", "3", "4"][:num_class]:
-        raise PreventUpdate
-
-    return (
-        " callback triggered from: "
-        + str(ctx.triggered_id)
-        + ", box select range: "
-        + str(box_select_range)
-        + ", key pressed: "
-        + str(label)
-    )
-"""
 
 
 @app.callback(

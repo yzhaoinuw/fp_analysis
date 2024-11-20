@@ -16,7 +16,7 @@ MODEL_PATH = "./models/sdreamer/checkpoints/"
 
 
 def run_inference(
-    mat, model_choice="sdreamer", num_class=3, postprocess=True, output_path=None
+    mat, model_choice="sdreamer", num_class=3, postprocess=True, output_path=None, save_inference=False,
 ):
     # num_class = 3
     predictions, confidence = run_inference_sdreamer.infer(mat, MODEL_PATH)
@@ -31,7 +31,8 @@ def run_inference(
         output_path = (
             os.path.splitext(output_path)[0] + f"_sdreamer_{num_class}class.mat"
         )
-        savemat(output_path, mat)
+        if save_inference:
+            savemat(output_path, mat)
     return mat, output_path
 
 
