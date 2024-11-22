@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Fri May 17 12:17:16 2024
+Created on Wed Nov 13 19:02:18 2024
 
 @author: yzhao
 """
@@ -13,61 +13,77 @@ from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 import numpy as np
 
-from models.sdreamer import n2nSeqNewMoE2
-from app_src.preprocessing import reshape_sleep_data
+from models.sdreamer import n2nBaseLineNE
+from app_src.preprocessing import reshape_sleep_data_ne
 
 
 class SequenceDataset(Dataset):
-    def __init__(self, normalized_sleep_data):
-        self.traces = normalized_sleep_data
+    def __init__(self, eeg_emg_standardized, normalized_ne_data):
+        self.eeg_emg_traces = eeg_emg_standardized
+        self.ne_trace = normalized_ne_data
 
     def __len__(self):
-        return self.traces.shape[0]
+        return self.eeg_emg_traces.shape[0]
 
     def __getitem__(self, idx):
-        trace = self.traces[idx]
-        return trace
+        eeg_emg_trace = self.eeg_emg_traces[idx]
+        ne_trace = self.ne_trace[idx]
+        return eeg_emg_trace, ne_trace
 
 
 def make_dataset(data: dict, n_sequences: int = 64):
-    eeg, emg, _ = reshape_sleep_data(data)
-    sleep_data = np.stack((eeg, emg), axis=1)
-    sleep_data = torch.from_numpy(sleep_data)
-    sleep_data = torch.unsqueeze(sleep_data, dim=2)  # shape [n_seconds, 2, 1, seq_len]
-    mean, std = torch.mean(sleep_data, dim=0), torch.std(sleep_data, dim=0)
-    normalized_data = (sleep_data - mean) / std
+    eeg_standardized, emg_standardized, ne_standardized = reshape_sleep_data_ne(
+        data, standardize=True, has_labels=False
+    )
+    eeg_emg_standardized = np.stack((eeg_standardized, emg_standardized), axis=1)
+    eeg_emg_standardized = np.expand_dims(
+        eeg_emg_standardized, axis=2
+    )  # shape [n_seconds, 2, 1, seq_len]
+    eeg_emg_standardized = torch.from_numpy(eeg_emg_standardized)
+    # ne_standardized = np.expand_dims(ne_standardized, axis=2)
+    ne_standardized = torch.from_numpy(ne_standardized)
 
-    n_seconds = normalized_data.shape[0]
+    n_seconds = eeg_emg_standardized.shape[0]
     n_to_crop = n_seconds % n_sequences
     if n_to_crop != 0:
-        normalized_data = torch.cat(
-            [normalized_data[:-n_to_crop], normalized_data[-n_sequences:]], dim=0
+        eeg_emg_standardized = torch.cat(
+            [eeg_emg_standardized[:-n_to_crop], eeg_emg_standardized[-n_sequences:]],
+            dim=0,
+        )
+        ne_standardized = torch.cat(
+            [ne_standardized[:-n_to_crop], ne_standardized[-n_sequences:]], dim=0
         )
 
-    normalized_data = normalized_data.reshape(
+    eeg_emg_standardized = eeg_emg_standardized.reshape(
         (
             -1,
             n_sequences,
-            normalized_data.shape[1],
-            normalized_data.shape[2],
-            normalized_data.shape[3],
+            eeg_emg_standardized.shape[1],
+            eeg_emg_standardized.shape[2],
+            eeg_emg_standardized.shape[3],
         )
     )
-    dataset = SequenceDataset(normalized_data)
+    ne_standardized = ne_standardized.reshape(
+        (
+            -1,
+            n_sequences,
+            1,
+            ne_standardized.shape[1],
+        )
+    )
+    dataset = SequenceDataset(eeg_emg_standardized, ne_standardized)
     return dataset, n_seconds, n_to_crop
 
 
 # %%
 
 config = dict(
-    # model="SeqNewMoE2",
-    # data="Seq",
-    # isNE=False,
     features="ALL",
-    n_sequences=64,
+    n_sequences=256,
     useNorm=True,
     seq_len=512,
     patch_len=16,
+    ne_patch_len=10,
     stride=8,
     padding_patch="end",
     subtract_last=0,
@@ -106,14 +122,13 @@ def build_args(**kwargs):
 def infer(data, model_path, batch_size=32):
     args = build_args()
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = n2nSeqNewMoE2.Model(args)
+    model = n2nBaseLineNE.Model(args)
     model = model.to(device)
-    checkpoint_path = glob.glob(model_path + "*augment_10.tar")[0]
+    checkpoint_path = glob.glob(model_path + "*ne_256.tar")[0]
     ckpt = torch.load(checkpoint_path, map_location=device)
-    model.load_state_dict(ckpt["state_dict"])
-
+    model.load_state_dict(ckpt["state_dict"], strict=False)
     n_sequences = config["n_sequences"]
-    dataset, n_seconds, n_to_crop = make_dataset(data)
+    dataset, n_seconds, n_to_crop = make_dataset(data, n_sequences=n_sequences)
     data_loader = DataLoader(
         dataset,
         batch_size=batch_size,
@@ -129,18 +144,15 @@ def infer(data, model_path, batch_size=32):
         all_prob = []
 
         with tqdm(total=n_seconds, unit=" seconds of signal") as pbar:
-            for batch, traces in enumerate(data_loader, 1):
+            for batch, (traces, ne_trace) in enumerate(data_loader, 1):
                 traces = traces.to(device)  # [batch_size, 64, 2, 1, 512]
-                out_dict = model(traces, label=None)
+                ne_trace = ne_trace.to(device)
+                out_dict = model(traces, ne_trace, label=None)
                 out = out_dict["out"]
-
                 prob = torch.max(torch.softmax(out, dim=1), dim=1).values
                 all_prob.append(prob.detach().cpu())
-
                 pred = np.argmax(out.detach().cpu(), axis=1)
-                # pred = out_dict["predictions"]
                 all_pred.append(pred)
-
                 pbar.update(batch_size * n_sequences)
             pbar.set_postfix({"Number of batches": batch})
 
@@ -164,10 +176,19 @@ def infer(data, model_path, batch_size=32):
     return all_pred, all_prob
 
 
+# %%
 if __name__ == "__main__":
     from scipy.io import loadmat
 
-    model_path = "../models/sdreamer/checkpoints/"
-    mat_file = "../user_test_files/box1_COM18_RZ10_2_1_2024-06-03_09-04-56-902.mat"
+    model_path = (
+        "C:/Users/yzhao/python_projects/sleep_scoring/models/sdreamer/checkpoints/"
+    )
+    mat_file = (
+        "C:/Users/yzhao/python_projects/sleep_scoring/user_test_files/COM5_bin1_gs.mat"
+    )
     data = loadmat(mat_file)
     all_pred, all_prob = infer(data, model_path)
+
+    sleep_scores = data["sleep_scores"].flatten()
+    clip_len = min(len(all_pred), len(sleep_scores))
+    acc = np.sum(all_pred[:clip_len] == sleep_scores[:clip_len]) / clip_len

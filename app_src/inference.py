@@ -8,7 +8,8 @@ Created on Sun Oct 29 22:09:21 2023
 import os
 from scipy.io import loadmat, savemat
 
-import app_src.run_inference_sdreamer as run_inference_sdreamer
+# import app_src.run_inference_sdreamer as run_inference_sdreamer
+import app_src.run_inference_ne as run_inference_sdreamer
 from app_src.postprocessing import postprocess_pred_labels
 
 
@@ -16,7 +17,12 @@ MODEL_PATH = "./models/sdreamer/checkpoints/"
 
 
 def run_inference(
-    mat, model_choice="sdreamer", num_class=3, postprocess=True, output_path=None, save_inference=False,
+    mat,
+    model_choice="sdreamer",
+    num_class=3,
+    postprocess=False,
+    output_path=None,
+    save_inference=False,
 ):
     # num_class = 3
     predictions, confidence = run_inference_sdreamer.infer(mat, MODEL_PATH)
@@ -29,7 +35,7 @@ def run_inference(
 
     if output_path is not None:
         output_path = (
-            os.path.splitext(output_path)[0] + f"_sdreamer_{num_class}class.mat"
+            os.path.splitext(output_path)[0] + f"_sdreamer_ne_{num_class}class.mat"
         )
         if save_inference:
             savemat(output_path, mat)

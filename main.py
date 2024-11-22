@@ -22,13 +22,14 @@ else:
 # Add the base path to sys.path to find app_src
 sys.path.insert(0, base_path)
 
-try:
-    from app_src.app import app, open_browser
-except ImportError as e:
-    print(f"Error importing app_src: {e}")
-    # sys.exit(1)
-
 if __name__ == "__main__":
-    PORT = 8050
-    Timer(1, partial(open_browser, PORT)).start()
-    app.run_server(debug=False, port=PORT)
+    try:
+        from app_src.app import app, open_browser
+
+        PORT = 8050
+        Timer(1, partial(open_browser, PORT)).start()
+        app.run_server(debug=False, port=PORT)
+
+    except ImportError as e:
+        print(f"Error importing app_src: {e}")
+        # sys.exit(1)

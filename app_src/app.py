@@ -280,7 +280,7 @@ def read_mat_vis(status):
 @app.callback(
     Output("data-upload-message", "children", allow_duplicate=True),
     Output("visualization-ready-store", "data", allow_duplicate=True),
-    #Output("prediction-download-store", "data"),
+    # Output("prediction-download-store", "data"),
     Input("prediction-ready-store", "data"),
     prevent_initial_call=True,
 )
@@ -288,7 +288,9 @@ def generate_prediction(ready):
     filename = cache.get("filename")
     temp_mat_path = os.path.join(TEMP_PATH, filename)
     mat = loadmat(temp_mat_path)
-    mat, output_path = run_inference(mat, output_path=temp_mat_path, save_inference=True)
+    mat, output_path = run_inference(
+        mat, output_path=temp_mat_path, save_inference=True
+    )
     # it is necessart to set cache again here because the output file
     # which includes prediction and confidence has a new name (old_name + "_sdreamer"),
     # it is this file that should be used for the subsequent visualization.
@@ -296,7 +298,7 @@ def generate_prediction(ready):
     return (
         html.Div(["The prediction has been generated successfully."]),
         True,
-        #dcc.send_file(output_path),
+        # dcc.send_file(output_path),
     )
 
 
