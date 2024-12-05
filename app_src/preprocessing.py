@@ -57,7 +57,7 @@ def reshape_sleep_data_ne(
     resampled_end_time_eeg = math.floor(len(eeg) / eeg_freq)
 
     ne = mat.get("ne")
-    if ne is not None:
+    if ne is not None and len(ne) != 0:
         ne = ne.flatten()
         if standardize:
             ne = stats.zscore(ne)
@@ -66,7 +66,7 @@ def reshape_sleep_data_ne(
         end_time = min(resampled_end_time_eeg, resampled_end_time_ne)
     else:
         ne_freq = segment_size_ne
-        ne = np.zeros(resampled_end_time_eeg * ne_freq)
+        ne = np.zeros(resampled_end_time_eeg * ne_freq, dtype=np.float32)
         end_time = resampled_end_time_eeg
 
     time_sec = np.arange(end_time)

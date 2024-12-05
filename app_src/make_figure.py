@@ -327,11 +327,11 @@ if __name__ == "__main__":
     from scipy.io import loadmat
 
     io.renderers.default = "browser"
-    data_path = "..\\user_test_files\\"
-    mat_file = "try_app.mat"
-    # mat = loadmat(os.path.join(data_path, mat_file))
-    mat_file = "C:/Users/yzhao/python_projects/sleep_scoring/user_test_files/box1_COM18_RZ10_2_1_2024-06-03_09-04-56-902_sdreamer_3class.mat"
-    mat = loadmat(mat_file)
+    data_path = "../user_test_files/"
+    mat_file = "20241113_1_263_2_259_24h_test/bin_1.mat"
+    mat = loadmat(os.path.join(data_path, mat_file))
+    # mat_file = "C:/Users/yzhao/python_projects/sleep_scoring/user_test_files/box1_COM18_RZ10_2_1_2024-06-03_09-04-56-902_sdreamer_3class.mat"
+    # mat = loadmat(mat_file)
     mat_name = os.path.basename(mat_file)
     fig = make_figure(mat, mat_name=mat_name)
     fig.show_dash(config={"scrollZoom": True})

@@ -22,7 +22,7 @@ import pandas as pd
 from flask_caching import Cache
 from scipy.io import loadmat, savemat
 
-from app_src import VERSION
+from app_src import VERSION, config
 from app_src.plot_fft import plot_fft
 from app_src.inference import run_inference
 from app_src.components import Components
@@ -289,7 +289,10 @@ def generate_prediction(ready):
     temp_mat_path = os.path.join(TEMP_PATH, filename)
     mat = loadmat(temp_mat_path)
     mat, output_path = run_inference(
-        mat, output_path=temp_mat_path, save_inference=True
+        mat,
+        postprocess=config["postprocess"],
+        output_path=temp_mat_path,
+        save_inference=True,
     )
     # it is necessart to set cache again here because the output file
     # which includes prediction and confidence has a new name (old_name + "_sdreamer"),

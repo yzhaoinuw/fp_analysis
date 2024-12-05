@@ -124,9 +124,13 @@ def infer(data, model_path, batch_size=32):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = n2nBaseLineNE.Model(args)
     model = model.to(device)
-    checkpoint_path = glob.glob(model_path + "*ne_256.tar")[0]
-    ckpt = torch.load(checkpoint_path, map_location=device)
-    model.load_state_dict(ckpt["state_dict"], strict=False)
+    state_dicts = glob.glob(model_path + "*ne_256.pt")
+    if state_dicts:
+        state_dict_path = state_dicts[0]
+    else:
+        state_dict_path = glob.glob(model_path + "*.pt")[0]
+    state_dict = torch.load(state_dict_path, map_location=device, weights_only=True)
+    model.load_state_dict(state_dict, strict=False)
     n_sequences = config["n_sequences"]
     dataset, n_seconds, n_to_crop = make_dataset(data, n_sequences=n_sequences)
     data_loader = DataLoader(
@@ -183,12 +187,11 @@ if __name__ == "__main__":
     model_path = (
         "C:/Users/yzhao/python_projects/sleep_scoring/models/sdreamer/checkpoints/"
     )
-    mat_file = (
-        "C:/Users/yzhao/python_projects/sleep_scoring/user_test_files/COM5_bin1_gs.mat"
-    )
+    mat_file = "C:/Users/yzhao/python_projects/sleep_scoring/user_test_files/20241113_1_263_2_259_24h_test/bin_1.mat"
     data = loadmat(mat_file)
     all_pred, all_prob = infer(data, model_path)
-
-    sleep_scores = data["sleep_scores"].flatten()
-    clip_len = min(len(all_pred), len(sleep_scores))
-    acc = np.sum(all_pred[:clip_len] == sleep_scores[:clip_len]) / clip_len
+    sleep_scores = data.get("sleep_scores")
+    if sleep_scores is not None:
+        sleep_scores = data["sleep_scores"].flatten()
+        clip_len = min(len(all_pred), len(sleep_scores))
+        acc = np.sum(all_pred[:clip_len] == sleep_scores[:clip_len]) / clip_len

@@ -30,39 +30,39 @@ class SequenceDataset(Dataset):
 
 
 def make_dataset(data: dict, n_sequences: int = 64):
-    eeg, emg, _ = reshape_sleep_data(data)
-    sleep_data = np.stack((eeg, emg), axis=1)
-    sleep_data = torch.from_numpy(sleep_data)
-    sleep_data = torch.unsqueeze(sleep_data, dim=2)  # shape [n_seconds, 2, 1, seq_len]
-    mean, std = torch.mean(sleep_data, dim=0), torch.std(sleep_data, dim=0)
-    normalized_data = (sleep_data - mean) / std
+    eeg_standardized, emg_standardized = reshape_sleep_data(
+        data, standardize=True, has_labels=False
+    )
+    eeg_emg_standardized = np.stack((eeg_standardized, emg_standardized), axis=1)
+    eeg_emg_standardized = np.expand_dims(
+        eeg_emg_standardized, axis=2
+    )  # shape [n_seconds, 2, 1, seq_len]
+    eeg_emg_standardized = torch.from_numpy(eeg_emg_standardized)
 
-    n_seconds = normalized_data.shape[0]
+    n_seconds = eeg_emg_standardized.shape[0]
     n_to_crop = n_seconds % n_sequences
     if n_to_crop != 0:
-        normalized_data = torch.cat(
-            [normalized_data[:-n_to_crop], normalized_data[-n_sequences:]], dim=0
+        eeg_emg_standardized = torch.cat(
+            [eeg_emg_standardized[:-n_to_crop], eeg_emg_standardized[-n_sequences:]],
+            dim=0,
         )
 
-    normalized_data = normalized_data.reshape(
+    eeg_emg_standardized = eeg_emg_standardized.reshape(
         (
             -1,
             n_sequences,
-            normalized_data.shape[1],
-            normalized_data.shape[2],
-            normalized_data.shape[3],
+            eeg_emg_standardized.shape[1],
+            eeg_emg_standardized.shape[2],
+            eeg_emg_standardized.shape[3],
         )
     )
-    dataset = SequenceDataset(normalized_data)
+    dataset = SequenceDataset(eeg_emg_standardized)
     return dataset, n_seconds, n_to_crop
 
 
 # %%
 
 config = dict(
-    # model="SeqNewMoE2",
-    # data="Seq",
-    # isNE=False,
     features="ALL",
     n_sequences=64,
     useNorm=True,
@@ -108,9 +108,9 @@ def infer(data, model_path, batch_size=32):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = n2nSeqNewMoE2.Model(args)
     model = model.to(device)
-    checkpoint_path = glob.glob(model_path + "*augment_10.tar")[0]
-    ckpt = torch.load(checkpoint_path, map_location=device)
-    model.load_state_dict(ckpt["state_dict"])
+    state_dict_path = glob.glob(model_path + "*augment_10.pt")[0]
+    state_dict = torch.load(state_dict_path, map_location=device, weights_only=True)
+    model.load_state_dict(state_dict)
 
     n_sequences = config["n_sequences"]
     dataset, n_seconds, n_to_crop = make_dataset(data)
