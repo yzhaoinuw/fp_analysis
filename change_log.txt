@@ -1,3 +1,12 @@
+#### v0.12.0
+1. Added spectrogram at the top of the visualization page. Also added theta/delta ratio on top of the spectrogram. 
+
+#### v0.12.0-dev
+1. Added inference using the sdreamer ne model. The app will use the NE model if NE is detected. Otherwise, it will use the previous sdreamermodel.
+2. Adjusted to "soft" postprocessing which will not kill many detected REMs, but may allow REM-SWS-REM transition to pass through. Still a work in progress.
+3. Made postprocessing optional. You can configure this by changing "postprocessing" to True or False in __init__.py in the app_src folder.
+4. Made the figure title reflect whether the NE model is used and whether postprocessing is applied.
+
 #### v0.11.0
 1. Added Spectral Density Estimation (SDE) plot, previously referred to as FFT plot by the users, for EEG. It is displayed when the user draws a box that's no more than 300 seconds in the EEG subplot.
 2. Replaced the Dash native upload component with dash-upload to allow for longer recordings, ie., larger files, to be visualized. This change also includes a progress bar for file upload (can be understood as a proxy for file reading).

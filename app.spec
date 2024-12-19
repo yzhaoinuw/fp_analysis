@@ -14,6 +14,7 @@ from app_src import VERSION
 datas=[
     ('C:\\Users\\yzhao\\miniconda3\\envs\\sleep_scoring_dist\\lib\\site-packages\\dash_extensions', 'dash_extensions'),
     ('C:\\Users\\yzhao\\python_projects\\sleep_scoring\\app_src\\assets', 'assets'),
+    ('C:\\Users\\yzhao\\miniconda3\\envs\\sleep_scoring_dist\\lib\\site-packages\\scipy', 'scipy'),
 ]
 datas += collect_data_files('timm', include_py_files=True)
 

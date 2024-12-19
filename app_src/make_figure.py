@@ -176,6 +176,7 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10):
         zmax=1,
         zmin=0,
         colorbar=dict(
+            orientation="h",
             thicknessmode="fraction",  # set the mode of thickness to fraction
             thickness=0.005,  # the thickness of the colorbar
             lenmode="fraction",  # set the mode of length to fraction
@@ -183,7 +184,7 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10):
             yanchor="bottom",  # anchor the colorbar at the top
             y=0.08,  # the y position of the colorbar
             xanchor="right",  # anchor the colorbar at the left
-            x=0.75,  # the x position of the colorbar
+            x=0.8,  # the x position of the colorbar
             tickfont=dict(size=8),
         ),
         showscale=True,
@@ -242,7 +243,7 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10):
 
     fig.update_layout(
         autosize=True,
-        margin=dict(t=0, l=10, r=10, b=0),
+        margin=dict(t=20, l=10, r=10, b=20),
         height=800,
         hovermode="x unified",  # gives crosshair in one subplot
         hoverlabel=dict(bgcolor="rgba(255, 255, 255, 0.6)"),
@@ -250,7 +251,7 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10):
             text=mat_name,
             font=dict(size=16),
             xanchor="left",
-            x=0,
+            x=0.03,
             yanchor="top",
             yref="container",
         ),
@@ -258,7 +259,7 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10):
         xaxis4=dict(tickformat="digits"),
         legend=dict(
             x=0.6,  # adjust these values to position the sleep score legend stage_names
-            y=1.05,
+            y=1.03,
             orientation="h",  # makes legend items horizontal
             bgcolor="rgba(0,0,0,0)",  # transparent legend background
             font=dict(size=10),  # adjust legend text size
@@ -269,7 +270,6 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10):
     )
 
     fig.update_traces(xaxis="x4")  # gives crosshair across all subplots
-    fig.update_traces(colorbar_orientation="h", selector=dict(type="heatmap"))
     fig.update_xaxes(range=[start_time, eeg_end_time], row=1, col=1)
     fig.update_xaxes(range=[start_time, eeg_end_time], row=2, col=1)
     fig.update_xaxes(range=[start_time, eeg_end_time], row=3, col=1)
@@ -278,6 +278,8 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10):
         row=4,
         col=1,
         title_text="<b>Time (s)</b>",
+        title_standoff=5,
+        ticklabelstandoff=5,  # keep some distance between tick label and the minor ticks
         minor=dict(
             tick0=0,
             dtick=3600,

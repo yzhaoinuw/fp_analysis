@@ -23,7 +23,7 @@ from flask_caching import Cache
 from scipy.io import loadmat, savemat
 
 from app_src import VERSION, config
-from app_src.plot_fft import plot_fft
+from app_src.plot_spectrogram import plot_spectrogram
 from app_src.inference import run_inference
 from app_src.components import Components
 from app_src.make_figure import make_figure
@@ -90,8 +90,6 @@ def create_fig(mat, mat_name, default_n_shown_samples=4000):
 def set_cache(cache, filename):
     cache.set("filename", filename)
     cache.set("start_time", 0)
-    cache.set("eeg", [])  # needed for quicker fft plotting
-    cache.set("eeg_frequency", None)  # needed for quicker fft plotting
     cache.set("modified_sleep_scores", None)
     cache.set("modified_confidence", None)
     cache.set("annotation_history", deque(maxlen=3))
@@ -157,6 +155,61 @@ app.clientside_callback(
     State("graph", "figure"),
     prevent_initial_call=True,
 )
+
+# synch_fft_figure
+app.clientside_callback(
+    """
+    function(relayoutData, figure, fftRelayoutData, fftFigure) {
+        // Ensure the main figure's xaxis4 range exists
+        if (!figure.layout.xaxis4 || !figure.layout.xaxis4.range) {
+            return [fftRelayoutData, fftFigure];
+        }
+
+        // Extract the range
+        var range = figure.layout.xaxis4.range;
+        var fftFigStart = range[0];
+        var fftFigEnd = range[1];
+
+        // Ensure fftRelayoutData is initialized
+        fftRelayoutData = fftRelayoutData || {};
+        fftRelayoutData['xaxis.range[0]'] = fftFigStart;
+        fftRelayoutData['xaxis.range[1]'] = fftFigEnd;
+
+        // Create a new copy of fftFigure to ensure re-render
+        let updatedFftFigure = JSON.parse(JSON.stringify(fftFigure));
+        updatedFftFigure.layout = updatedFftFigure.layout || {};
+        updatedFftFigure.layout.xaxis = updatedFftFigure.layout.xaxis || {};
+        updatedFftFigure.layout.xaxis.range = [fftFigStart, fftFigEnd];
+
+        return [fftRelayoutData, updatedFftFigure];
+    }
+    """,
+    [Output("fft-graph", "relayoutData"), Output("fft-graph", "figure")],
+    [Input("graph", "relayoutData")],
+    [
+        State("graph", "figure"),
+        State("fft-graph", "relayoutData"),
+        State("fft-graph", "figure"),
+    ],
+)
+
+
+"""
+@app.callback(
+    Output("fft-graph", "relayoutData"),
+    Output("fft-graph", "figure"),
+    Input("graph", "relayoutData"),
+    State("graph", "figure"),
+    State("fft-graph", "relayoutData"),
+    State("fft-graph", "figure"),
+    prevent_initial_call=True,
+)
+def synch_fft_figure(relayoutdata, figure, fft_relayoutdata, fft_fig):
+    fft_fig_start,  fft_fig_end = figure["layout"]["xaxis4"]["range"]
+    fft_relayoutdata['xaxis.range[0]'], fft_relayoutdata['xaxis.range.[1]'] = fft_fig_start, fft_fig_end
+    fft_fig["layout"]["xaxis"]["range"] = [fft_fig_start, fft_fig_end]
+    return fft_relayoutdata, fft_fig
+"""
 
 # show_save_annotation_status
 clientside_callback(
@@ -321,13 +374,13 @@ def create_visualization(ready):
         start_time = start_time.item()
     eeg_frequency = mat.get("eeg_frequency").item()
     eeg = mat.get("eeg").flatten()
-
+    fft_fig = plot_spectrogram(eeg, eeg_frequency, start_time=start_time)
     cache.set("start_time", start_time)
-    cache.set("eeg_frequency", eeg_frequency)
-    cache.set("eeg", eeg)
     cache.set("fig_resampler", fig)
+
     components.graph.figure = fig
-    return components.visualization_div
+    components.fft_graph.figure = fft_fig
+    return (components.visualization_div,)
 
 
 @app.callback(
@@ -372,18 +425,14 @@ def update_fig(relayoutdata):
     Output("box-select-store", "data"),
     Output("graph", "figure", allow_duplicate=True),
     Output("annotation-message", "children", allow_duplicate=True),
-    Output("fft-div", "style"),
-    Output("update-fft-store", "data"),
     Input("graph", "selectedData"),
     State("graph", "figure"),
     prevent_initial_call=True,
 )
 def read_box_select(box_select, figure):
     selections = figure["layout"].get("selections")
-    update_fft = True
-    fft_div_style = {"display": "none"}
     if not selections:
-        return [], dash.no_update, "", fft_div_style, dash.no_update
+        return [], dash.no_update, ""
 
     patched_figure = Patch()
     # allow only at most one select box in all subplots
@@ -404,7 +453,7 @@ def read_box_select(box_select, figure):
     eeg_end_time = eeg_start_time + eeg_duration
 
     if end < eeg_start_time or start > eeg_end_time:
-        return [], patched_figure, "", fft_div_style, dash.no_update
+        return [], patched_figure, ""
 
     start_round, end_round = round(start), round(end)
     start_round = max(start_round, eeg_start_time)
@@ -421,37 +470,25 @@ def read_box_select(box_select, figure):
 
     start, end = start_round - eeg_start_time, end_round - eeg_start_time
 
-    # only show the spectral estimation if the box select is made in EEG subplot
-    if selections[0]["yref"] == "y":
-        fft_div_style = {"display": "block"}
-
     return (
         [start, end],
         patched_figure,
         "Press 1 for Wake, 2 for SWS, 3 for REM, and 4 for MA, if applicable.",
-        fft_div_style,
-        update_fft,
     )
 
 
+"""
 @app.callback(
-    Output("fft-graph", "figure"),
-    Input("update-fft-store", "data"),
-    State("box-select-store", "data"),
+    Output("debug-message", "children"),
+    Input("graph", "relayoutData"),
+    State("graph", "figure"),
+    State("fft-graph", "relayoutData"),
+    State("fft-graph", "figure"),
     prevent_initial_call=True,
 )
-def update_fft_figure(update_fft, box_select_range):
-    fft_fig = plot_fft([])
-    if box_select_range:
-        start, end = box_select_range
-        if 5 <= end - start <= 300:
-            eeg, eeg_frequency = cache.get("eeg"), cache.get("eeg_frequency")
-            start_ind = math.floor(start * eeg_frequency)
-            end_ind = math.floor(end * eeg_frequency)
-            eeg_seg = eeg[start_ind:end_ind]
-            fft_fig = plot_fft(eeg_seg, eeg_frequency)
-
-    return fft_fig
+def debug_fft_fig(relayoutdata, figure, fft_relayoutdata, fft_fig):
+    return str(fft_relayoutdata)
+"""
 
 
 @app.callback(

@@ -64,24 +64,20 @@ graph = dcc.Graph(
 
 fft_graph = dcc.Graph(
     id="fft-graph",
-    config={
-        "scrollZoom": False,
-        "editable": False,
-        "staticPlot": True,
-    },
-    style={"height": "150px", "width": "300px"},
+    config={"scrollZoom": True, "editable": False, "displayModeBar": True},
 )
 
 visualization_div = html.Div(
     children=[
         html.Div(
-            style={"display": "flex", "marginBottom": "5px"},
+            style={"display": "flex", "marginBottom": "0px"},
             children=[
                 html.Div(
                     ["Sampling Level"],
                     style={
                         "display": "inline-block",
-                        "marginRight": "10px",
+                        "marginRight": "5px",
+                        "marginLeft": "10px",
                         "lineHeight": "40px",
                     },
                 ),
@@ -97,25 +93,29 @@ visualization_div = html.Div(
                         "width": "50px",
                         "height": "auto",
                         "textAlign": "left",
-                        "margin": "2px",
-                        "marginRight": "20px",
+                        "marginLeft": "5px",
+                        # "marginRight": "20px",
                         "display": "inline-block",
                     },
                 ),
-                html.Div(
-                    id="fft-div",
-                    children=[fft_graph],
-                    style={"display": "none"},
-                ),
-                dcc.Store(id="update-fft-store"),
             ],
         ),
-        html.Div(children=[graph], style={"marginTop": "5px", "marginLeft": "20px"}),
+        html.Div(
+            children=[fft_graph], style={"marginTop": "0px", "marginLeft": "48px"}
+        ),
+        html.Div(
+            children=[graph],
+            style={"marginTop": "1px", "marginLeft": "30px", "marginRight": "28px"},
+        ),
         html.Div(
             style={"display": "flex"},
             children=[
                 html.Div(
-                    style={"display": "flex", "marginRight": "5px"},
+                    style={
+                        "display": "flex",
+                        "marginRight": "5px",
+                        "marginLeft": "10px",
+                    },
                     children=[
                         html.Button("Save Annotations", id="save-button"),
                         dcc.Download(id="download-annotations"),
@@ -131,6 +131,7 @@ visualization_div = html.Div(
                 html.Div(id="debug-message"),
                 dcc.Store(id="box-select-store"),
                 dcc.Store(id="annotation-store"),
+                dcc.Store(id="update-fft-store"),
                 EventListener(
                     id="keyboard",
                     events=[{"event": "keydown", "props": ["key"]}],
@@ -165,5 +166,6 @@ class Components:
     def __init__(self):
         self.home_div = home_div
         self.graph = graph
+        self.fft_graph = fft_graph
         self.visualization_div = visualization_div
         self.upload_box_style = upload_box_style
