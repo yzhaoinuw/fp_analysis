@@ -100,8 +100,16 @@ visualization_div = html.Div(
                 ),
             ],
         ),
-        html.Div(
-            children=[fft_graph], style={"marginTop": "0px", "marginLeft": "48px"}
+        html.Details(
+            children=[
+                html.Summary("Show/Hide Spectrogram"),
+                html.Div(
+                    children=[fft_graph],
+                    style={"marginTop": "0px", "marginLeft": "0px"},
+                ),
+            ],
+            id="collapse-fft",
+            style={"marginTop": "0px", "marginLeft": "60px"},
         ),
         html.Div(
             children=[graph],

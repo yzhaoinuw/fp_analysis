@@ -211,6 +211,7 @@ def synch_fft_figure(relayoutdata, figure, fft_relayoutdata, fft_fig):
     return fft_relayoutdata, fft_fig
 """
 
+
 # show_save_annotation_status
 clientside_callback(
     """
@@ -333,7 +334,6 @@ def read_mat_vis(status):
 @app.callback(
     Output("data-upload-message", "children", allow_duplicate=True),
     Output("visualization-ready-store", "data", allow_duplicate=True),
-    # Output("prediction-download-store", "data"),
     Input("prediction-ready-store", "data"),
     prevent_initial_call=True,
 )
@@ -347,14 +347,13 @@ def generate_prediction(ready):
         output_path=temp_mat_path,
         save_inference=True,
     )
-    # it is necessart to set cache again here because the output file
+    # it is necessary to set cache again here because the output file
     # which includes prediction and confidence has a new name (old_name + "_sdreamer"),
     # it is this file that should be used for the subsequent visualization.
     set_cache(cache, os.path.basename(output_path))
     return (
         html.Div(["The prediction has been generated successfully."]),
         True,
-        # dcc.send_file(output_path),
     )
 
 
@@ -418,6 +417,19 @@ def change_sampling_level(sampling_level):
 )
 def update_fig(relayoutdata):
     fig = cache.get("fig_resampler")
+    if fig is None:
+        return dash.no_update
+
+    # manually supply xaxis4.range[0] and xaxis4.range[1] after clicking
+    # reset axes button because it only gives xaxis4.range. It seems
+    # updating fig_resampler requires xaxis4.range[0] and xaxis4.range[1]
+    if (
+        relayoutdata.get("xaxis4.range") is not None
+        and relayoutdata.get("xaxis4.range[0]") is None
+    ):
+        relayoutdata["xaxis4.range[0]"], relayoutdata["xaxis4.range[1]"] = relayoutdata[
+            "xaxis4.range"
+        ]
     return fig.construct_update_data_patch(relayoutdata)
 
 
