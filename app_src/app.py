@@ -117,8 +117,43 @@ def show_upload_box(task, model_choice):
         return vis_upload_box, {"display": "none"}
 
 
-# pan_figures
+# switch_mode by pressing "m"
 app.clientside_callback(
+    """
+    function(keyboard_nevents, keyboard_event, figure) {
+        if (!keyboard_event || !figure) {
+            return dash_clientside.no_update;
+        }
+
+        var key = keyboard_event.key;
+
+        if (key === "m" || key === "M") {
+            let updatedFigure = JSON.parse(JSON.stringify(figure));
+            if (figure.layout.dragmode === "pan") {
+                updatedFigure.layout.dragmode = "select"
+            } else if (figure.layout.dragmode === "select") {
+                var selections = figure.layout.selections;
+                if (selections) {
+                    if (selections.length > 0) {
+                        updatedFigure.layout.selections = [];  // Remove the first selection (equivalent to pop(0) in Python)
+                    }
+                }
+                updatedFigure.layout.dragmode = "pan"
+            }
+            return updatedFigure;
+        }
+
+        return dash_clientside.no_update;
+    }
+    """,
+    Output("graph", "figure"),
+    Input("keyboard", "n_events"),
+    State("keyboard", "event"),
+    State("graph", "figure"),
+)
+
+# pan_figures
+clientside_callback(
     """
     function(keyboard_nevents, keyboard_event, relayoutdata, figure) {
         if (!keyboard_event || !figure) {
@@ -156,8 +191,8 @@ app.clientside_callback(
     prevent_initial_call=True,
 )
 
-# synch_fft_figure
-app.clientside_callback(
+# sync_fft_figure
+clientside_callback(
     """
     function(relayoutData, figure, fftRelayoutData, fftFigure) {
         // Ensure the main figure's xaxis4 range exists
@@ -383,7 +418,7 @@ def create_visualization(ready):
 
 
 @app.callback(
-    Output("graph", "figure"),
+    Output("graph", "figure", allow_duplicate=True),
     Input("n-sample-dropdown", "value"),
     prevent_initial_call=True,
 )

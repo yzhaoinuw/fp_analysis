@@ -41,7 +41,7 @@ range_quantile = 0.9999
 range_padding_percent = 0.2
 
 
-def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10):
+def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10, num_class=3):
     # Time span and frequencies
     eeg, emg, ne = mat.get("eeg"), mat.get("emg"), mat.get("ne")
     eeg, emg = eeg.flatten(), emg.flatten()
@@ -97,7 +97,9 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10):
         labels = np.expand_dims(labels, axis=0)
     if len(confidence.shape) == 1:
         confidence = np.expand_dims(confidence, axis=0)
-    num_class = mat["num_class"].item()
+
+    if mat.get("num_class") is not None:
+        num_class = mat["num_class"].item()
 
     fig = FigureResampler(
         make_subplots(
@@ -118,7 +120,7 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10):
     )
 
     ne_lower_range, ne_upper_range = 0, 0
-    if ne.size > 1:
+    if ne is not None and ne.size > 1:
         ne = ne.flatten()
         ne_freq = ne_freq.item()
         ne_end_time = (ne.size - 1) / ne_freq + start_time

@@ -130,6 +130,7 @@ def infer(data, model_path, batch_size=32):
 
         with tqdm(total=n_seconds, unit=" seconds of signal") as pbar:
             for batch, traces in enumerate(data_loader, 1):
+                traces = traces.float()
                 traces = traces.to(device)  # [batch_size, 64, 2, 1, 512]
                 out_dict = model(traces, label=None)
                 out = out_dict["out"]

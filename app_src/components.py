@@ -52,13 +52,6 @@ graph = dcc.Graph(
     id="graph",
     config={
         "scrollZoom": True,
-        "editable": True,
-        "edits": {
-            "axisTitleText": False,
-            "titleText": False,
-            "colorbarTitleText": False,
-            "annotationText": False,
-        },
     },
 )
 
