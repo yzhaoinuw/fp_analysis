@@ -1,3 +1,7 @@
+#### v0.12.1
+1. Added "Show/Hide Spectrogram" button.
+2. Added a shortcut to switch between Pan and Annotation mode: pressing "m" on keyboard.
+
 #### v0.12.0
 1. Added spectrogram at the top of the visualization page. Also added theta/delta ratio on top of the spectrogram. 
 
