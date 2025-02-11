@@ -14,19 +14,34 @@
 ### Video Demo
 To visualize a recording
 
-
 https://github.com/user-attachments/assets/07009c58-2aff-4fe1-84c8-472346718b4d
 
 To generate a sleep score prediction
 
-
 https://github.com/user-attachments/assets/8f826c2c-926c-48f5-b779-62485f443660
-
 
 
 ### Note:
 In step 5, if you are not presented with a file finder window that lets you name the file to be saved after you clicked "Save Annotations", it's likely that the browser you use automatically downloads it to a Download folder. You can check or change the setting of your browser to make sure you save the mat file to a location you want.
 
+
+## Input File 
+The input files to the app must be .mat (matlab) files, and contain the following fields.
+### Required Fields
+| Field Name        | Data Type      |
+| ------------------|----------------|
+| **eeg**           | 1 x *N* single |
+| **eeg_frequency** | double         |
+| **emg**           | 1 x *N* single |
+
+### Optional Fields
+| Field Name    | Data Type      |
+| --------------|----------------|
+| ne            | 1 x *M* single |
+| ne_frequency  | double         |
+| sleep_scores  | single         |
+| start_time    | uint32         |
+ 
 
 ## Build from Source (Run using Anaconda)
 There are three preparation processes that you need to do beforing using the app with Anaconda.
