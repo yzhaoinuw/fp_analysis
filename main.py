@@ -28,7 +28,9 @@ if __name__ == "__main__":
 
         PORT = 8050
         Timer(1, partial(open_browser, PORT)).start()
-        app.run_server(debug=False, port=PORT)
+        app.run_server(
+            debug=True, port=PORT, use_reloader=False, dev_tools_hot_reload=False
+        )
 
     except ImportError as e:
         print(f"Error importing app_src: {e}")

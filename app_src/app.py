@@ -12,7 +12,8 @@ import webbrowser
 from collections import deque
 
 import dash
-import dash_uploader as du
+import dash_player
+import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 from dash.dependencies import Input, Output, State
 from dash import Dash, dcc, html, ctx, clientside_callback, Patch
@@ -23,26 +24,30 @@ from flask_caching import Cache
 from scipy.io import loadmat, savemat
 
 from app_src import VERSION, config
-from app_src.plot_spectrogram import plot_spectrogram
-from app_src.inference import run_inference
+from app_src.make_mp4 import avi_to_mp4
 from app_src.components import Components
+from app_src.inference import run_inference
 from app_src.make_figure import make_figure
+from app_src.plot_spectrogram import plot_spectrogram
 from app_src.postprocessing import get_sleep_segments, get_pred_label_stats
 
 
 app = Dash(
-    __name__, title=f"Sleep Scoring App {VERSION}", suppress_callback_exceptions=True
+    __name__,
+    title=f"Sleep Scoring App {VERSION}",
+    suppress_callback_exceptions=True,
+    external_stylesheets=[dbc.themes.BOOTSTRAP],
 )
 
 TEMP_PATH = os.path.join(tempfile.gettempdir(), "sleep_scoring_app_data")
 if not os.path.exists(TEMP_PATH):
     os.makedirs(TEMP_PATH)
 
-du.configure_upload(app, folder=TEMP_PATH, use_upload_id=True)
+# du.configure_upload(app, folder=TEMP_PATH, use_upload_id=True)
 components = Components()
 app.layout = components.home_div
-
-
+du = components.configure_du(app, TEMP_PATH)
+"""
 # set up dash uploader
 pred_upload_box = du.Upload(
     id="pred-data-upload",
@@ -63,7 +68,7 @@ vis_upload_box = du.Upload(
     upload_id="",
     default_style=components.upload_box_style,
 )
-
+"""
 # Notes
 # np.nan is converted to None when reading from cache
 cache = Cache(
@@ -97,25 +102,6 @@ def set_cache(cache, filename):
 
 
 # %% client side callbacks below
-
-
-@app.callback(
-    Output("upload-container", "children", allow_duplicate=True),
-    Output("model-choice-container", "style"),
-    Input("task-selection", "value"),
-    Input("model-choice", "value"),
-    prevent_initial_call=True,
-)
-def show_upload_box(task, model_choice):
-    # if task or model choice changes, give a new upload box so that
-    # the upload of the same file (but running with different model) is allowed
-    if task is None:
-        raise PreventUpdate
-    if task == "pred":
-        return pred_upload_box, {"display": "block"}
-    else:
-        return vis_upload_box, {"display": "none"}
-
 
 # switch_mode by pressing "m"
 app.clientside_callback(
@@ -279,6 +265,24 @@ clientside_callback(
 # %% server side callbacks below
 
 
+@app.callback(
+    Output("upload-container", "children", allow_duplicate=True),
+    Output("model-choice-container", "style"),
+    Input("task-selection", "value"),
+    Input("model-choice", "value"),
+    prevent_initial_call=True,
+)
+def show_upload_box(task, model_choice):
+    # if task or model choice changes, give a new upload box so that
+    # the upload of the same file (but running with different model) is allowed
+    if task is None:
+        raise PreventUpdate
+    if task == "pred":
+        return components.pred_upload_box, {"display": "block"}
+    else:
+        return components.vis_upload_box, {"display": "none"}
+
+
 @du.callback(
     output=[
         Output("data-upload-message", "children", allow_duplicate=True),
@@ -305,7 +309,7 @@ def read_mat_pred(status):
         return (
             html.Div(["EEG data is missing. Please double check the file selected."]),
             dash.no_update,
-            pred_upload_box,
+            components.pred_upload_box,
         )
 
     emg = mat.get("emg")
@@ -313,7 +317,7 @@ def read_mat_pred(status):
         return (
             html.Div(["EMG data is missing. Please double check the file selected."]),
             dash.no_update,
-            pred_upload_box,
+            components.pred_upload_box,
         )
 
     set_cache(cache, filename)
@@ -332,7 +336,7 @@ def read_mat_pred(status):
         " "
         + "Generating predictions... This may take up to 3 minutes. Check Terminal for the progress."
     )
-    return (html.Div([message]), True, pred_upload_box)
+    return (html.Div([message]), True, components.pred_upload_box)
 
 
 @du.callback(
@@ -362,7 +366,7 @@ def read_mat_vis(status):
             ]
         ),
         True,
-        vis_upload_box,
+        components.vis_upload_box,
     )
 
 
@@ -414,7 +418,7 @@ def create_visualization(ready):
 
     components.graph.figure = fig
     components.fft_graph.figure = fft_fig
-    return (components.visualization_div,)
+    return components.visualization_div
 
 
 @app.callback(
@@ -445,6 +449,87 @@ def change_sampling_level(sampling_level):
 
 
 @app.callback(
+    Output("video-modal", "is_open"),
+    Output("video-path-store", "data", allow_duplicate=True),
+    Output("video-container", "children", allow_duplicate=True),
+    Output("video-message", "children", allow_duplicate=True),
+    Input("video-button", "n_clicks"),
+    State("video-modal", "is_open"),
+    prevent_initial_call=True,
+)
+def prepare_video(n_clicks, is_open):
+    message = ""
+    # if original avi has not been uploaded, ask for it
+    avi_file = "20220914_788_FP_2022-09-14_13-53-27-322_video_0.avi"
+    if avi_file not in os.listdir(TEMP_PATH):
+        message = "Please upload the original video above."
+        return dash.no_update, components.video_upload_box, message
+
+    message = "Preparing clip..."
+    avi_path = os.path.join(TEMP_PATH, avi_file)
+
+    return (not is_open), avi_path, "", message
+
+
+@du.callback(
+    output=[
+        Output("video-path-store", "data"),
+        Output("video-message", "children", allow_duplicate=True),
+    ],
+    id="video-upload",
+)
+def upload_video(status):
+    avi_path = status.latest_file
+    filename = os.path.basename(avi_path)
+    for temp_file in os.listdir(TEMP_PATH):
+        if temp_file.endswith(".avi"):
+            if temp_file == filename:
+                continue
+            os.remove(os.path.join(TEMP_PATH, temp_file))
+
+    return avi_path, "Preparing clip..."
+
+
+@app.callback(
+    # Output("debug-message", "children"),
+    Output("clip-name-store", "data"),
+    Input("video-path-store", "data"),
+    State("box-select-store", "data"),
+    prevent_initial_call=True,
+)
+def make_clip(video_path, box_select_range):
+    video_dir = "./app_src/assets/videos/"
+    for file in os.listdir(video_dir):
+        if file.endswith(".mp4"):
+            os.remove(os.path.join(video_dir, file))
+
+    start, end = box_select_range
+    save_path, clip_name = avi_to_mp4(
+        video_path, start_time=start, end_time=end, save_dir="./app_src/assets/videos/"
+    )
+    return clip_name
+
+
+@app.callback(
+    Output("video-container", "children"),
+    Output("video-message", "children"),
+    Input("clip-name-store", "data"),
+    prevent_initial_call=True,
+)
+def show_clip(clip_name):
+    clip_path = os.path.join("/assets/videos/", clip_name)
+    player = dash_player.DashPlayer(
+        id="player",
+        url=clip_path,
+        controls=True,
+        width="100%",
+        height="100%",
+    )
+
+    return player, ""
+
+
+@app.callback(
     Output("graph", "figure", allow_duplicate=True),
     Input("graph", "relayoutData"),
     prevent_initial_call=True,
@@ -472,14 +557,16 @@ def update_fig(relayoutdata):
     Output("box-select-store", "data"),
     Output("graph", "figure", allow_duplicate=True),
     Output("annotation-message", "children", allow_duplicate=True),
+    Output("video-button", "style"),
     Input("graph", "selectedData"),
     State("graph", "figure"),
     prevent_initial_call=True,
 )
 def read_box_select(box_select, figure):
+    video_button_style = {"display": "none"}
     selections = figure["layout"].get("selections")
     if not selections:
-        return [], dash.no_update, ""
+        return [], dash.no_update, "", video_button_style
 
     patched_figure = Patch()
     # allow only at most one select box in all subplots
@@ -500,7 +587,7 @@ def read_box_select(box_select, figure):
     eeg_end_time = eeg_start_time + eeg_duration
 
     if end < eeg_start_time or start > eeg_end_time:
-        return [], patched_figure, ""
+        return [], patched_figure, "", video_button_style
 
     start_round, end_round = round(start), round(end)
     start_round = max(start_round, eeg_start_time)
@@ -516,11 +603,14 @@ def read_box_select(box_select, figure):
             start_round = math.floor(end)
 
     start, end = start_round - eeg_start_time, end_round - eeg_start_time
+    if 1 <= end - start <= 300:
+        video_button_style = {"display": "block"}
 
     return (
         [start, end],
         patched_figure,
         "Press 1 for Wake, 2 for SWS, 3 for REM, and 4 for MA, if applicable.",
+        video_button_style,
     )
 
 
@@ -707,4 +797,4 @@ if __name__ == "__main__":
 
     PORT = 8050
     Timer(1, partial(open_browser, PORT)).start()
-    app.run_server(debug=False, port=PORT)
+    app.run_server(debug=False, port=PORT, dev_tools_hot_reload=False)
