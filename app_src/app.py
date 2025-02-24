@@ -36,39 +36,20 @@ app = Dash(
     __name__,
     title=f"Sleep Scoring App {VERSION}",
     suppress_callback_exceptions=True,
-    external_stylesheets=[dbc.themes.BOOTSTRAP],
+    external_stylesheets=[
+        dbc.themes.BOOTSTRAP
+    ],  # need this for the modal to work properly
 )
 
+VIDEO_DIR = "./app_src/assets/videos/"
 TEMP_PATH = os.path.join(tempfile.gettempdir(), "sleep_scoring_app_data")
 if not os.path.exists(TEMP_PATH):
     os.makedirs(TEMP_PATH)
 
-# du.configure_upload(app, folder=TEMP_PATH, use_upload_id=True)
 components = Components()
 app.layout = components.home_div
 du = components.configure_du(app, TEMP_PATH)
-"""
-# set up dash uploader
-pred_upload_box = du.Upload(
-    id="pred-data-upload",
-    text="Click here to select File",
-    text_completed="Completed loading",
-    cancel_button=True,
-    filetypes=["mat"],
-    upload_id="",
-    default_style=components.upload_box_style,
-)
 
-vis_upload_box = du.Upload(
-    id="vis-data-upload",
-    text="Click here to select File",
-    text_completed="Completed loading",
-    cancel_button=True,
-    filetypes=["mat"],
-    upload_id="",
-    default_style=components.upload_box_style,
-)
-"""
 # Notes
 # np.nan is converted to None when reading from cache
 cache = Cache(
@@ -76,8 +57,10 @@ cache = Cache(
     config={
         "CACHE_TYPE": "filesystem",
         "CACHE_DIR": TEMP_PATH,
-        "CACHE_THRESHOLD": 20,
-        "CACHE_DEFAULT_TIMEOUT": 86400,  # to save cache for 1 day, otherwise it is default to 300 seconds
+        "CACHE_THRESHOLD": 30,
+        "CACHE_DEFAULT_TIMEOUT": 20
+        * 24
+        * 3600,  # to save cache for 20 days, otherwise it is default to 300 seconds
     },
 )
 
@@ -92,9 +75,20 @@ def create_fig(mat, mat_name, default_n_shown_samples=4000):
     return fig
 
 
-def set_cache(cache, filename):
+def reset_cache(cache, filename):
     cache.set("filename", filename)
+    recent_files_with_video = cache.get("recent_files_with_video")
+    if recent_files_with_video is None:
+        recent_files_with_video = []
+    file_video_record = cache.get("file_video_record")
+    if file_video_record is None:
+        file_video_record = {}
+    cache.set("recent_files_with_video", recent_files_with_video)
+    cache.set("file_video_record", file_video_record)
     cache.set("start_time", 0)
+    cache.set("video_start_time", 0)
+    cache.set("video_name", "")
+    cache.set("video_path", "")
     cache.set("modified_sleep_scores", None)
     cache.set("modified_confidence", None)
     cache.set("annotation_history", deque(maxlen=3))
@@ -215,24 +209,6 @@ clientside_callback(
 )
 
 
-"""
-@app.callback(
-    Output("fft-graph", "relayoutData"),
-    Output("fft-graph", "figure"),
-    Input("graph", "relayoutData"),
-    State("graph", "figure"),
-    State("fft-graph", "relayoutData"),
-    State("fft-graph", "figure"),
-    prevent_initial_call=True,
-)
-def synch_fft_figure(relayoutdata, figure, fft_relayoutdata, fft_fig):
-    fft_fig_start,  fft_fig_end = figure["layout"]["xaxis4"]["range"]
-    fft_relayoutdata['xaxis.range[0]'], fft_relayoutdata['xaxis.range.[1]'] = fft_fig_start, fft_fig_end
-    fft_fig["layout"]["xaxis"]["range"] = [fft_fig_start, fft_fig_end]
-    return fft_relayoutdata, fft_fig
-"""
-
-
 # show_save_annotation_status
 clientside_callback(
     """
@@ -320,7 +296,7 @@ def read_mat_pred(status):
             components.pred_upload_box,
         )
 
-    set_cache(cache, filename)
+    reset_cache(cache, filename)
     eeg_freq = mat["eeg_frequency"].item()
     if round(eeg_freq) != 512:
         message += " " + (
@@ -357,7 +333,7 @@ def read_mat_vis(status):
                 continue
             os.remove(os.path.join(TEMP_PATH, temp_file))
 
-    set_cache(cache, filename)
+    reset_cache(cache, filename)
 
     return (
         html.Div(
@@ -389,7 +365,7 @@ def generate_prediction(ready):
     # it is necessary to set cache again here because the output file
     # which includes prediction and confidence has a new name (old_name + "_sdreamer"),
     # it is this file that should be used for the subsequent visualization.
-    set_cache(cache, os.path.basename(output_path))
+    reset_cache(cache, os.path.basename(output_path))
     return (
         html.Div(["The prediction has been generated successfully."]),
         True,
@@ -406,16 +382,29 @@ def create_visualization(ready):
     mat = loadmat(os.path.join(TEMP_PATH, mat_name))
     fig = create_fig(mat, mat_name)
     start_time = mat.get("start_time")
-    if start_time is None:
-        start_time = 0
-    else:
+    video_start_time = mat.get("video_start_time")
+    video_path = mat.get("video_path", [])
+    video_name = mat.get("video_name", [])
+    if start_time is not None:
         start_time = start_time.item()
+        cache.set("start_time", start_time)
+    else:
+        start_time = 0
+
+    if video_start_time is not None:
+        video_start_time = video_start_time.item()
+        cache.set("video_start_time", video_start_time)
+
+    if video_path:
+        video_path = video_path.item()
+        cache.set("video_path", video_path)
+    if video_name:
+        video_name = video_name.item()
+        cache.set("video_name", video_name)
     eeg_frequency = mat.get("eeg_frequency").item()
     eeg = mat.get("eeg").flatten()
     fft_fig = plot_spectrogram(eeg, eeg_frequency, start_time=start_time)
-    cache.set("start_time", start_time)
     cache.set("fig_resampler", fig)
-
     components.graph.figure = fig
     components.fft_graph.figure = fft_fig
     return components.visualization_div
@@ -458,17 +447,29 @@ def change_sampling_level(sampling_level):
     prevent_initial_call=True,
 )
 def prepare_video(n_clicks, is_open):
-    message = ""
+    file_unseen = True
+    filename = cache.get("filename")
+    recent_files_with_video = cache.get("recent_files_with_video")
+    file_video_record = cache.get("file_video_record")
+    if filename in recent_files_with_video:
+        recent_files_with_video.remove(filename)
+        video_info = file_video_record.get(filename)
+        if video_info is not None and os.path.isfile(video_info["video_path"]):
+            file_unseen = False
+
+    recent_files_with_video.append(filename)
+    cache.set("recent_files_with_video", recent_files_with_video)
+    if not file_unseen:
+        video_path = video_info["video_path"]
+        message = "Preparing clip..."
+        return (not is_open), video_path, "", message
+
     # if original avi has not been uploaded, ask for it
-    avi_file = "20220914_788_FP_2022-09-14_13-53-27-322_video_0.avi"
-    if avi_file not in os.listdir(TEMP_PATH):
-        message = "Please upload the original video above."
-        return dash.no_update, components.video_upload_box, message
-
-    message = "Preparing clip..."
-    avi_path = os.path.join(TEMP_PATH, avi_file)
-
-    return (not is_open), avi_path, "", message
+    video_path = cache.get("video_path")
+    message = "Please upload the original video (an avi file) above."
+    if video_path:
+        message += f" You may find it at {video_path}."
+    return (not is_open), dash.no_update, components.video_upload_box, message
 
 
 @du.callback(
@@ -479,13 +480,25 @@ def prepare_video(n_clicks, is_open):
     id="video-upload",
 )
 def upload_video(status):
-    avi_path = status.latest_file
-    filename = os.path.basename(avi_path)
-    for temp_file in os.listdir(TEMP_PATH):
-        if temp_file.endswith(".avi"):
-            if temp_file == filename:
-                continue
-            os.remove(os.path.join(TEMP_PATH, temp_file))
+    avi_path = status.latest_file  # a WindowsPath
+    avi_path = str(avi_path)  # need to turn WindowsPath to str for the output
+    filename = cache.get("filename")
+    recent_files_with_video = cache.get("recent_files_with_video")
+    file_video_record = cache.get("file_video_record")
+    file_video_record[filename] = {
+        "video_path": avi_path,
+        "video_name": os.path.basename(avi_path),
+    }
+    if len(recent_files_with_video) > 3:
+        filename_to_remove = recent_files_with_video.pop(0)
+        if filename_to_remove in file_video_record:
+            avi_file_to_remove = file_video_record[filename_to_remove]["video_path"]
+            file_video_record.pop(filename_to_remove)
+            if os.path.isfile(avi_file_to_remove):
+                os.remove(avi_file_to_remove)
+
+    cache.set("recent_files_with_video", recent_files_with_video)
+    cache.set("file_video_record", file_video_record)
 
     return avi_path, "Preparing clip..."
 
@@ -493,21 +506,32 @@ def upload_video(status):
 @app.callback(
     # Output("debug-message", "children"),
     Output("clip-name-store", "data"),
+    Output("video-message", "children", allow_duplicate=True),
     Input("video-path-store", "data"),
     State("box-select-store", "data"),
     prevent_initial_call=True,
 )
 def make_clip(video_path, box_select_range):
-    video_dir = "./app_src/assets/videos/"
-    for file in os.listdir(video_dir):
+    for file in os.listdir(VIDEO_DIR):
         if file.endswith(".mp4"):
-            os.remove(os.path.join(video_dir, file))
+            os.remove(os.path.join(VIDEO_DIR, file))
 
     start, end = box_select_range
-    save_path, clip_name = avi_to_mp4(
-        video_path, start_time=start, end_time=end, save_dir="./app_src/assets/videos/"
-    )
-    return clip_name
+    video_start_time = cache.get("video_start_time")
+    start_time = cache.get("start_time")
+    start = start - start_time + video_start_time
+    end = end - start_time + video_start_time
+    try:
+        save_path, clip_name = avi_to_mp4(
+            video_path,
+            start_time=start,
+            end_time=end,
+            save_dir="./app_src/assets/videos/",
+        )
+    except ValueError as error_message:
+        return dash.no_update, repr(error_message)
+
+    return clip_name, ""
 
 
 @app.callback(

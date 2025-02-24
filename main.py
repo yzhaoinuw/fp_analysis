@@ -28,6 +28,7 @@ if __name__ == "__main__":
 
         PORT = 8050
         Timer(1, partial(open_browser, PORT)).start()
+        # suppress hot reload so that the app doesn't reload every time something's changed in assets/
         app.run_server(
             debug=True, port=PORT, use_reloader=False, dev_tools_hot_reload=False
         )

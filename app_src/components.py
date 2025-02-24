@@ -110,7 +110,7 @@ visualization_div = html.Div(
         ),
         dbc.Modal(
             [
-                dbc.ModalHeader(dbc.ModalTitle("Motion Detected!")),
+                dbc.ModalHeader(dbc.ModalTitle("Video")),
                 dbc.ModalBody(html.Div(id="video-container")),
                 dbc.ModalFooter(html.Div(id="video-message")),
             ],
@@ -215,7 +215,7 @@ vis_upload_box = du.Upload(
 
 video_upload_box_style = {
     "fontSize": "18px",
-    "width": "15%",
+    "width": "100%",
     "height": "auto",
     "minHeight": "auto",
     "lineHeight": "auto",
@@ -233,8 +233,9 @@ video_upload_box = du.Upload(
     text_completed="Completed loading",
     cancel_button=True,
     filetypes=["avi"],
+    max_file_size=2048,
     upload_id="",
-    default_style=upload_box_style,
+    default_style=video_upload_box_style,
 )
 
 

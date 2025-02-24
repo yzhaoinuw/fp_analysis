@@ -29,4 +29,4 @@ def avi_to_mp4(avi_path, start_time, end_time, save_dir="./assets/videos/"):
 
 if __name__ == "__main__":
     avi_path = "C:/Users/yzhao/matlab_projects/sleep_data/20220914_788_FP_unscored/20220914_788_FP_2022-09-14_13-53-27-322_video_0.avi"
-    avi_to_mp4(avi_path, start_time=1000, end_time=1180)
+    avi_to_mp4(avi_path, start_time=1000000, end_time=1000000 + 80)
