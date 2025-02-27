@@ -102,7 +102,7 @@ visualization_div = html.Div(
         ),
         html.Div(
             html.Button(
-                "Check Video Maybe?",
+                "Check Video",
                 id="video-button",
                 style={"display": "none"},
             ),
