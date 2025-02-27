@@ -42,7 +42,10 @@ def plot_spectrogram(eeg, eeg_frequency, window_duration=5, start_time=0, mfft=N
     theta_mask = np.where((frequencies > 4) & (frequencies <= 8))[0]
     delta_power = np.mean(Sx_db[delta_mask, :], axis=0)
     theta_power = np.mean(Sx_db[theta_mask, :], axis=0)
-    theta_delta_ratio = theta_power / delta_power
+    # theta_delta_ratio = theta_power / delta_power
+    theta_delta_ratio = (
+        delta_power / theta_power
+    )  # flip delta and theta because their "magnitude" is negative
     theta_delta_ratio = gaussian_filter1d(theta_delta_ratio, 4)
 
     Sx_db = gaussian_filter(Sx_db, sigma=4)

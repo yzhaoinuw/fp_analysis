@@ -52,7 +52,10 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10, num_cl
         start_time = 0
     else:
         start_time = start_time.item()
-    eeg_end_time = (eeg.size - 1) / eeg_freq + start_time
+    duration = math.ceil(
+        (eeg.size - 1) / eeg_freq
+    )  # need to round duration to an int for later
+    eeg_end_time = duration + start_time
     # Create the time sequences
     time_eeg = np.linspace(start_time, eeg_end_time, eeg.size)
     eeg_end_time = math.ceil(eeg_end_time)
@@ -72,15 +75,15 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10, num_cl
         labels = mat.get("sleep_scores")
         if labels is None or labels.size == 0:
             # if unscored, initialize with nan, set confidence to be zero
-            mat["sleep_scores"] = np.zeros((1, eeg_end_time))
+            mat["sleep_scores"] = np.zeros((1, duration))
             mat["sleep_scores"][:] = np.nan
-            mat["confidence"] = np.zeros((1, eeg_end_time))
+            mat["confidence"] = np.zeros((1, duration))
             labels = mat["sleep_scores"]
         else:  # manually scored, but may contain missing scores
             # make a labels copy and do not modify mat. only need to replace
             # -1 in labels copy with nan for visualization
 
-            # sleep_scores will have the length of eeg_end_time. this is
+            # sleep_scores will have the length of duration. this is
             # guaranteed in the preprocessing process.
             labels = labels.astype(float)
             np.place(
