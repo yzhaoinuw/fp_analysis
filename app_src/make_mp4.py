@@ -10,12 +10,13 @@ import os
 from moviepy import VideoFileClip
 
 
-def avi_to_mp4(avi_path, start_time, end_time, save_dir="./assets/videos/"):
-    avi_name = os.path.basename(avi_path).split(".")[0]
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-    mp4_file = avi_name + ".mp4"
-    save_path = os.path.join(save_dir, mp4_file)
+def avi_to_mp4(avi_path, start_time, end_time, save_path=None, save_dir="./assets/videos/"):
+    if save_path is None:
+        avi_name = os.path.basename(avi_path).split(".")[0]
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+        mp4_file = avi_name + f"_time_range_{start_time}-{end_time}" + ".mp4"
+        save_path = os.path.join(save_dir, mp4_file)
 
     clip = (
         VideoFileClip(avi_path)
@@ -24,7 +25,7 @@ def avi_to_mp4(avi_path, start_time, end_time, save_dir="./assets/videos/"):
     )
     clip.write_videofile(save_path, audio=False, logger=None)
     clip.close()
-    return save_path, mp4_file
+    #return save_path, mp4_file
 
 
 if __name__ == "__main__":

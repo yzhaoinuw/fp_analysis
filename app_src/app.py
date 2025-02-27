@@ -40,11 +40,14 @@ app = Dash(
         dbc.themes.BOOTSTRAP
     ],  # need this for the modal to work properly
 )
-
-VIDEO_DIR = "./app_src/assets/videos/"
+  
 TEMP_PATH = os.path.join(tempfile.gettempdir(), "sleep_scoring_app_data")
 if not os.path.exists(TEMP_PATH):
     os.makedirs(TEMP_PATH)
+    
+VIDEO_DIR = "./app_src/assets/videos/"
+if not os.path.exists(VIDEO_DIR):
+    os.makedirs(VIDEO_DIR)    
 
 components = Components()
 app.layout = components.home_div
@@ -512,21 +515,31 @@ def upload_video(status):
     prevent_initial_call=True,
 )
 def make_clip(video_path, box_select_range):
-    for file in os.listdir(VIDEO_DIR):
-        if file.endswith(".mp4"):
-            os.remove(os.path.join(VIDEO_DIR, file))
+    if not box_select_range:
+        return dash.no_update, ""
 
     start, end = box_select_range
     video_start_time = cache.get("video_start_time")
-    start_time = cache.get("start_time")
-    start = start - start_time + video_start_time
-    end = end - start_time + video_start_time
+    #start_time = cache.get("start_time")
+    start = start + video_start_time
+    end = end + video_start_time
+    video_name = os.path.basename(video_path).split(".")[0]
+    clip_name = video_name + f"_time_range_{start}-{end}" + ".mp4"
+    if os.path.isfile(os.path.join(VIDEO_DIR, clip_name)):
+        return clip_name, ""
+    
+    for file in os.listdir(VIDEO_DIR):
+        if file.endswith(".mp4"):
+            os.remove(os.path.join(VIDEO_DIR, file))
+         
+    save_path = os.path.join(VIDEO_DIR, clip_name)
     try:
-        save_path, clip_name = avi_to_mp4(
+        avi_to_mp4(
             video_path,
             start_time=start,
             end_time=end,
-            save_dir="./app_src/assets/videos/",
+            save_path=save_path,
+            #save_dir=VIDEO_DIR,
         )
     except ValueError as error_message:
         return dash.no_update, repr(error_message)
@@ -542,6 +555,8 @@ def make_clip(video_path, box_select_range):
 )
 def show_clip(clip_name):
     clip_path = os.path.join("/assets/videos/", clip_name)
+    if not os.path.isfile(os.path.join(VIDEO_DIR, clip_name)):
+        return "", "Video not ready yet. Please check again in a second."
     player = dash_player.DashPlayer(
         id="player",
         url=clip_path,
@@ -605,14 +620,12 @@ def read_box_select(box_select, figure):
     start, end = min(selections[0]["x0"], selections[0]["x1"]), max(
         selections[0]["x0"], selections[0]["x1"]
     )
-
-    eeg_start_time = cache.get("start_time")
     eeg_duration = len(figure["data"][-1]["z"][0])
-    eeg_end_time = eeg_start_time + eeg_duration
-
-    if end < eeg_start_time or start > eeg_end_time:
+    if end < 0 or start > eeg_duration:
         return [], patched_figure, "", video_button_style
 
+    eeg_start_time = cache.get("start_time")
+    eeg_end_time = eeg_start_time + eeg_duration
     start_round, end_round = round(start), round(end)
     start_round = max(start_round, eeg_start_time)
     end_round = min(end_round, eeg_end_time)
@@ -638,18 +651,13 @@ def read_box_select(box_select, figure):
     )
 
 
-"""
 @app.callback(
     Output("debug-message", "children"),
-    Input("graph", "relayoutData"),
-    State("graph", "figure"),
-    State("fft-graph", "relayoutData"),
-    State("fft-graph", "figure"),
+    Input("box-select-store", "data"),
     prevent_initial_call=True,
 )
-def debug_fft_fig(relayoutdata, figure, fft_relayoutdata, fft_fig):
-    return str(fft_relayoutdata)
-"""
+def debug_box_select(box_select_range):
+    return box_select_range
 
 
 @app.callback(
