@@ -25,10 +25,11 @@ from scipy.io import loadmat, savemat
 
 from app_src import VERSION, config
 from app_src.make_mp4 import avi_to_mp4
-from app_src.components import Components
+from app_src.components_dev import Components
 from app_src.inference import run_inference
-from app_src.make_figure import make_figure
-from app_src.plot_spectrogram import plot_spectrogram
+from app_src.make_figure_dev import make_figure
+
+# from app_src.plot_spectrogram import plot_spectrogram
 from app_src.postprocessing import get_sleep_segments, get_pred_label_stats
 
 
@@ -45,7 +46,7 @@ TEMP_PATH = os.path.join(tempfile.gettempdir(), "sleep_scoring_app_data")
 if not os.path.exists(TEMP_PATH):
     os.makedirs(TEMP_PATH)
 
-VIDEO_DIR = "./app_src/assets/videos/"
+VIDEO_DIR = "./assets/videos/"
 if not os.path.exists(VIDEO_DIR):
     os.makedirs(VIDEO_DIR)
 
@@ -93,7 +94,6 @@ def reset_cache(cache, filename):
     cache.set("video_name", "")
     cache.set("video_path", "")
     cache.set("modified_sleep_scores", None)
-    cache.set("modified_confidence", None)
     cache.set("annotation_history", deque(maxlen=3))
     cache.set("fig_resampler", None)
 
@@ -172,43 +172,6 @@ clientside_callback(
     State("graph", "relayoutData"),
     State("graph", "figure"),
     prevent_initial_call=True,
-)
-
-# sync_fft_figure
-clientside_callback(
-    """
-    function(relayoutData, figure, fftRelayoutData, fftFigure) {
-        // Ensure the main figure's xaxis4 range exists
-        if (!figure.layout.xaxis4 || !figure.layout.xaxis4.range) {
-            return [fftRelayoutData, fftFigure];
-        }
-
-        // Extract the range
-        var range = figure.layout.xaxis4.range;
-        var fftFigStart = range[0];
-        var fftFigEnd = range[1];
-
-        // Ensure fftRelayoutData is initialized
-        fftRelayoutData = fftRelayoutData || {};
-        fftRelayoutData['xaxis.range[0]'] = fftFigStart;
-        fftRelayoutData['xaxis.range[1]'] = fftFigEnd;
-
-        // Create a new copy of fftFigure to ensure re-render
-        let updatedFftFigure = JSON.parse(JSON.stringify(fftFigure));
-        updatedFftFigure.layout = updatedFftFigure.layout || {};
-        updatedFftFigure.layout.xaxis = updatedFftFigure.layout.xaxis || {};
-        updatedFftFigure.layout.xaxis.range = [fftFigStart, fftFigEnd];
-
-        return [fftRelayoutData, updatedFftFigure];
-    }
-    """,
-    [Output("fft-graph", "relayoutData"), Output("fft-graph", "figure")],
-    [Input("graph", "relayoutData")],
-    [
-        State("graph", "figure"),
-        State("fft-graph", "relayoutData"),
-        State("fft-graph", "figure"),
-    ],
 )
 
 
@@ -366,7 +329,7 @@ def generate_prediction(ready):
         save_inference=True,
     )
     # it is necessary to set cache again here because the output file
-    # which includes prediction and confidence has a new name (old_name + "_sdreamer"),
+    # which includes prediction has a new name (old_name + "_sdreamer"),
     # it is this file that should be used for the subsequent visualization.
     reset_cache(cache, os.path.basename(output_path))
     return (
@@ -404,12 +367,10 @@ def create_visualization(ready):
     if video_name:
         video_name = video_name.item()
         cache.set("video_name", video_name)
-    eeg_frequency = mat.get("eeg_frequency").item()
-    eeg = mat.get("eeg").flatten()
-    fft_fig = plot_spectrogram(eeg, eeg_frequency, start_time=start_time)
+    # eeg_frequency = mat.get("eeg_frequency").item()
+    # eeg = mat.get("eeg").flatten()
     cache.set("fig_resampler", fig)
     components.graph.figure = fig
-    components.fft_graph.figure = fft_fig
     return components.visualization_div
 
 
@@ -421,20 +382,18 @@ def create_visualization(ready):
 def change_sampling_level(sampling_level):
     if sampling_level is None:
         return dash.no_update
-    sampling_level_map = {"x1": 4000, "x2": 8000, "x4": 16000}
+    sampling_level_map = {"x1": 2000, "x2": 4000, "x4": 8000}
     n_samples = sampling_level_map[sampling_level]
     mat_name = cache.get("filename")
     mat = loadmat(os.path.join(TEMP_PATH, mat_name))
 
-    # copy modified (through annotation) sleep scores and confidence over
+    # copy modified (through annotation) sleep scores over
     modified_sleep_scores = cache.get("modified_sleep_scores")
     if modified_sleep_scores is not None:
-        modified_confidence = cache.get("modified_confidence")
         if mat.get("pred_labels") is not None and mat["pred_labels"].size != 0:
             mat["pred_labels"] = modified_sleep_scores.copy()
         else:
             mat["sleep_scores"] = modified_sleep_scores.copy()
-        mat["confidence"] = modified_confidence.copy()
 
     fig = create_fig(mat, mat_name, default_n_shown_samples=n_samples)
     return fig
@@ -691,19 +650,16 @@ def update_sleep_scores(box_select_range, keyboard_press, keyboard_event, figure
         raise PreventUpdate
 
     patched_figure = Patch()
-    prev_labels = figure["data"][-4]["z"][0][start:end]
-    prev_conf = figure["data"][-1]["z"][0][start:end]
-    figure["data"][-4]["z"][0][start:end] = [label] * (end - start)
-    figure["data"][-1]["z"][0][start:end] = [1] * (end - start)  # change conf to 1
+    prev_labels = figure["data"][-1]["z"][0][start:end]
+    figure["data"][-1]["z"][0][start:end] = [label] * (end - start)
 
-    patched_figure["data"][-4]["z"][0] = figure["data"][-4]["z"][0]
-    patched_figure["data"][-3]["z"][0] = figure["data"][-4]["z"][0]
-    patched_figure["data"][-2]["z"][0] = figure["data"][-4]["z"][0]
+    patched_figure["data"][-3]["z"][0] = figure["data"][-1]["z"][0]
+    patched_figure["data"][-2]["z"][0] = figure["data"][-1]["z"][0]
     patched_figure["data"][-1]["z"][0] = figure["data"][-1]["z"][0]
     # remove box select after an update is made
     patched_figure["layout"]["selections"].clear()
 
-    return patched_figure, (start, end, prev_labels, prev_conf)
+    return patched_figure, (start, end, prev_labels)
 
 
 @app.callback(
@@ -714,21 +670,18 @@ def update_sleep_scores(box_select_range, keyboard_press, keyboard_event, figure
 )
 def write_annotation(annotation, figure):
     """write to annotation history, update mat in cache, and make undo button availabe"""
-    start, end, prev_labels, prev_conf = annotation
+    start, end, prev_labels = annotation
     annotation_history = cache.get("annotation_history")
     annotation_history.append(
         (
             start,
             end,
             prev_labels,  # previous prediction
-            prev_conf,  # previous confidence
         )
     )
-    labels = np.array(figure["data"][-2]["z"]).astype(float)
-    confidence = np.array(figure["data"][-1]["z"]).astype(float)
+    labels = np.array(figure["data"][-1]["z"]).astype(float)
     cache.set("annotation_history", annotation_history)
     cache.set("modified_sleep_scores", labels)
-    cache.set("modified_confidence", confidence)
     return {"display": "block"}
 
 
@@ -743,27 +696,21 @@ def write_annotation(annotation, figure):
 def undo_annotation(n_clicks, figure):
     annotation_history = cache.get("annotation_history")
     prev_annotation = annotation_history.pop()
-    (start, end, prev_labels, prev_conf) = prev_annotation
-    prev_labels, prev_conf = np.array(prev_labels), np.array(prev_conf)
+    (start, end, prev_labels) = prev_annotation
+    prev_labels = np.array(prev_labels)
 
     patched_figure = Patch()
     # undo figure
-    figure["data"][-4]["z"][0][start:end] = prev_labels
-    figure["data"][-1]["z"][0][start:end] = prev_conf
+    figure["data"][-1]["z"][0][start:end] = prev_labels
 
-    patched_figure["data"][-4]["z"][0] = figure["data"][-4]["z"][0]
-    patched_figure["data"][-3]["z"][0] = figure["data"][-4]["z"][0]
-    patched_figure["data"][-2]["z"][0] = figure["data"][-4]["z"][0]
+    patched_figure["data"][-3]["z"][0] = figure["data"][-1]["z"][0]
+    patched_figure["data"][-2]["z"][0] = figure["data"][-1]["z"][0]
     patched_figure["data"][-1]["z"][0] = figure["data"][-1]["z"][0]
 
     # undo cache
-    modified_sleep_scores, modified_confidence = cache.get(
-        "modified_sleep_scores"
-    ), cache.get("modified_confidence")
+    modified_sleep_scores = cache.get("modified_sleep_scores")
     modified_sleep_scores[0, start:end] = prev_labels
-    modified_confidence[0, start:end] = prev_conf
     cache.set("modified_sleep_scores", modified_sleep_scores)
-    cache.set("modified_confidence", modified_confidence)
 
     # update annotation_history
     cache.set("annotation_history", annotation_history)
@@ -785,7 +732,6 @@ def save_annotations(n_clicks):
 
     # only need to replace None in sleep_scores assuming pred_labels will never have nan or None
     modified_sleep_scores = cache.get("modified_sleep_scores")
-    modified_confidence = cache.get("modified_confidence")
     labels = None
     if modified_sleep_scores is not None:
         # replace any None or nan in sleep scores to -1 before saving, otherwise results in save error
@@ -802,7 +748,6 @@ def save_annotations(n_clicks):
             mat["pred_labels"] = modified_sleep_scores
         else:
             mat["sleep_scores"] = modified_sleep_scores
-        mat["confidence"] = modified_confidence.copy()
     savemat(temp_mat_path, mat)
 
     # export sleep bout spreadsheet only if the manual scoring is complete

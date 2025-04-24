@@ -5,7 +5,7 @@ Created on Mon Jun 26 15:36:14 2023
 @author: Yue
 
 Notes
-1. A common reason that sleep scores and confidence, both of which are heatmaps,
+1. A common reason that sleep scores, which are a heatmap,
    don't show up is that they have shape of (N,), instead of (1, N). The heatmap
    only works with 2d arrays.
 """
@@ -18,16 +18,17 @@ from plotly.subplots import make_subplots
 from plotly_resampler import FigureResampler
 from plotly_resampler.aggregation import MinMaxLTTB
 
+from get_fft_plots import get_fft_plots
 
 # set up color config
 sleep_score_opacity = 1
 stage_colors = [
     "rgb(124, 124, 251)",  # Wake,
-    "rgb(251, 124, 124)",  # SWS,
+    "rgb(251, 124, 124)",  # NREM,
     "rgb(123, 251, 123)",  # REM,
     "rgb(255, 255, 0)",  # MA yellow
 ]
-stage_names = ["Wake: 1", "SWS: 2", "REM: 3", "MA: 4"]
+stage_names = ["Wake: 1", "NREM: 2", "REM: 3", "MA: 4"]
 colorscale = {
     3: [[0, stage_colors[0]], [0.5, stage_colors[1]], [1, stage_colors[2]]],
     4: [
@@ -41,7 +42,7 @@ range_quantile = 0.9999
 range_padding_percent = 0.2
 
 
-def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10, num_class=3):
+def make_figure(mat, mat_name="", default_n_shown_samples=2000, ne_fs=10, num_class=3):
     # Time span and frequencies
     eeg, emg, ne = mat.get("eeg"), mat.get("emg"), mat.get("ne")
     eeg, emg = eeg.flatten(), emg.flatten()
@@ -77,7 +78,6 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10, num_cl
             # if unscored, initialize with nan, set confidence to be zero
             mat["sleep_scores"] = np.zeros((1, duration))
             mat["sleep_scores"][:] = np.nan
-            mat["confidence"] = np.zeros((1, duration))
             labels = mat["sleep_scores"]
         else:  # manually scored, but may contain missing scores
             # make a labels copy and do not modify mat. only need to replace
@@ -89,17 +89,10 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10, num_cl
             np.place(
                 labels, labels == -1, [np.nan]
             )  # convert -1 to None for heatmap visualization
-            mat["confidence"] = np.ones((1, labels.size))
-            mat["confidence"][np.isnan(labels)] = 0.0
-
-    # if pred_labels exists, then there is confidence
-    confidence = mat.get("confidence")
 
     # convert flat array to 2D array for visualization to work
     if len(labels.shape) == 1:
         labels = np.expand_dims(labels, axis=0)
-    if len(confidence.shape) == 1:
-        confidence = np.expand_dims(confidence, axis=0)
 
     if mat.get("num_class") is not None:
         num_class = mat["num_class"].item()
@@ -111,12 +104,20 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10, num_cl
             shared_xaxes=True,
             vertical_spacing=0.05,
             subplot_titles=(
+                "EEG Spectrogram",
                 "EEG",
                 "EMG",
                 "NE",
-                "Prediction Confidence",
             ),
-            row_heights=[0.3, 0.3, 0.3, 0.1],
+            row_heights=[0.16, 0.28, 0.28, 0.28],
+            specs=[
+                [
+                    {"secondary_y": True, "r": -0.05}
+                ],  # Allow dual y-axes and reduce the padding on the right side
+                [{"r": -0.05}],
+                [{"r": -0.05}],
+                [{"r": -0.05}],
+            ],
         ),
         default_n_shown_samples=default_n_shown_samples,
         default_downsampler=MinMaxLTTB(parallel=True),
@@ -145,7 +146,7 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10, num_cl
             ),
             hf_x=time_ne,
             hf_y=ne,
-            row=3,
+            row=4,
             col=1,
         )
 
@@ -171,31 +172,20 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10, num_cl
         xgap=0.05,  # add small gaps to serve as boundaries / ticks
     )
 
-    conf = go.Heatmap(
-        x0=start_time + 0.5,
-        dx=1,
-        z=confidence,
-        customdata=time / 3600,
-        hovertemplate="<b>time</b>: %{customdata:.2f}h<extra></extra>",
-        colorscale="speed",
-        zmax=1,
-        zmin=0,
-        colorbar=dict(
-            orientation="h",
-            thicknessmode="fraction",  # set the mode of thickness to fraction
-            thickness=0.005,  # the thickness of the colorbar
-            lenmode="fraction",  # set the mode of length to fraction
-            len=0.15,  # the length of the colorbar
-            yanchor="bottom",  # anchor the colorbar at the top
-            y=0.08,  # the y position of the colorbar
-            xanchor="right",  # anchor the colorbar at the left
-            x=0.8,  # the x position of the colorbar
-            tickfont=dict(size=8),
-        ),
-        showscale=True,
-        xgap=0.05,  # add small gaps to serve as boundaries / ticks
+    spectrogram, theta_delta_ratio = get_fft_plots(eeg, eeg_freq, start_time)
+    spectrogram.colorbar = dict(
+        title="Power (dB)",
+        orientation="h",
+        thicknessmode="fraction",  # set the mode of thickness to fraction
+        thickness=0.02,  # the thickness of the colorbar
+        lenmode="fraction",  # set the mode of length to fraction
+        len=0.15,  # the length of the colorbar
+        yanchor="bottom",
+        y=1,  # the y position of the colorbar
+        xanchor="right",  # anchor the colorbar at the left
+        x=0.8,  # the x position of the colorbar
+        tickfont=dict(size=8),
     )
-
     # Add the time series to the figure
     fig.add_trace(
         go.Scattergl(
@@ -207,7 +197,7 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10, num_cl
         ),
         hf_x=time_eeg,
         hf_y=eeg,
-        row=1,
+        row=2,
         col=1,
     )
     fig.add_trace(
@@ -220,7 +210,7 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10, num_cl
         ),
         hf_x=time_eeg,
         hf_y=emg,
-        row=2,
+        row=3,
         col=1,
     )
 
@@ -236,19 +226,19 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10, num_cl
                 name=stage_names[i],
                 showlegend=True,
             ),
-            row=1,
+            row=2,
             col=1,
         )
 
     # add the heatmap last so that their indices can be accessed using last indices
-    fig.add_trace(sleep_scores, row=1, col=1)
+    fig.add_trace(spectrogram, secondary_y=False, row=1, col=1)
+    fig.add_trace(theta_delta_ratio, secondary_y=True, row=1, col=1)
     fig.add_trace(sleep_scores, row=2, col=1)
     fig.add_trace(sleep_scores, row=3, col=1)
-    fig.add_trace(conf, row=4, col=1)
-
+    fig.add_trace(sleep_scores, row=4, col=1)
     fig.update_layout(
         autosize=True,
-        margin=dict(t=20, l=10, r=10, b=20),
+        margin=dict(t=50, l=10, r=5, b=20),
         height=800,
         hovermode="x unified",  # gives crosshair in one subplot
         hoverlabel=dict(bgcolor="rgba(255, 255, 255, 0.6)"),
@@ -257,14 +247,16 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10, num_cl
             font=dict(size=16),
             xanchor="left",
             x=0.03,
-            yanchor="top",
-            yref="container",
+            # yanchor="bottom",
+            # y=0.92,
+            automargin=True,
+            yref="paper",
         ),
-        yaxis4=dict(tickvals=[]),  # suppress y ticks on the heatmap
+        # yaxis4=dict(tickvals=[]),  # suppress y ticks on the heatmap
         xaxis4=dict(tickformat="digits"),
         legend=dict(
             x=0.6,  # adjust these values to position the sleep score legend stage_names
-            y=1.03,
+            y=0.85,
             orientation="h",  # makes legend items horizontal
             bgcolor="rgba(0,0,0,0)",  # transparent legend background
             font=dict(size=10),  # adjust legend text size
@@ -283,7 +275,7 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10, num_cl
         row=4,
         col=1,
         title_text="<b>Time (s)</b>",
-        title_standoff=5,
+        title_standoff=10,
         ticklabelstandoff=5,  # keep some distance between tick label and the minor ticks
         minor=dict(
             tick0=0,
@@ -300,7 +292,7 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10, num_cl
             eeg_range * (1 + range_padding_percent),
         ],
         # fixedrange=True,
-        row=1,
+        row=2,
         col=1,
     )
     fig.update_yaxes(
@@ -309,7 +301,7 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10, num_cl
             emg_range * (1 + range_padding_percent),
         ],
         # fixedrange=True,
-        row=2,
+        row=3,
         col=1,
     )
     fig.update_yaxes(
@@ -317,11 +309,27 @@ def make_figure(mat, mat_name="", default_n_shown_samples=4000, ne_fs=10, num_cl
             ne_range * -(1 + range_padding_percent),
             ne_range * (1 + range_padding_percent),
         ],
-        # fixedrange=True,
-        row=3,
+        fixedrange=True,
+        row=4,
         col=1,
     )
-    fig.update_yaxes(range=[0, 0.5], fixedrange=True, row=4, col=1)
+    fig.update_yaxes(
+        title="Frequency (Hz)",
+        range=[0, 30],
+        fixedrange=True,
+        secondary_y=False,
+        row=1,
+        col=1,
+    )
+    fig.update_yaxes(
+        title="Theta/Delta",
+        overlaying="y",
+        side="right",
+        fixedrange=True,
+        secondary_y=True,
+        row=1,
+        col=1,
+    )
     fig.update_annotations(font_size=14)  # subplot title size
     fig["layout"]["annotations"][-1]["font"]["size"] = 14
 
@@ -335,7 +343,7 @@ if __name__ == "__main__":
 
     io.renderers.default = "browser"
     data_path = "../user_test_files/"
-    mat_file = "20241113_1_263_2_259_24h_test/bin_1.mat"
+    mat_file = "COM5_bin1_gs.mat"
     mat = loadmat(os.path.join(data_path, mat_file))
     # mat_file = "C:/Users/yzhao/python_projects/sleep_scoring/user_test_files/box1_COM18_RZ10_2_1_2024-06-03_09-04-56-902_sdreamer_3class.mat"
     # mat = loadmat(mat_file)

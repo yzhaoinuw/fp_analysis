@@ -58,11 +58,6 @@ graph = dcc.Graph(
     },
 )
 
-fft_graph = dcc.Graph(
-    id="fft-graph",
-    config={"scrollZoom": True, "editable": False, "displayModeBar": True},
-)
-
 visualization_div = html.Div(
     children=[
         html.Div(
@@ -119,17 +114,6 @@ visualization_div = html.Div(
             is_open=False,
             backdrop="static",  # the user must clicks the "x" to exit
             centered=True,
-        ),
-        html.Details(
-            children=[
-                html.Summary("Show/Hide Spectrogram"),
-                html.Div(
-                    children=[fft_graph],
-                    style={"marginTop": "0px", "marginLeft": "0px"},
-                ),
-            ],
-            id="collapse-fft",
-            style={"marginTop": "0px", "marginLeft": "50px"},
         ),
         html.Div(
             children=[graph],
@@ -244,7 +228,6 @@ class Components:
     def __init__(self):
         self.home_div = home_div
         self.graph = graph
-        self.fft_graph = fft_graph
         self.visualization_div = visualization_div
         self.pred_upload_box = pred_upload_box
         self.vis_upload_box = vis_upload_box
