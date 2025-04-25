@@ -24,7 +24,7 @@ sys.path.insert(0, base_path)
 
 if __name__ == "__main__":
     try:
-        from app_src.app import app, open_browser
+        from app_src.app_dev import app, open_browser
 
         PORT = 8050
         Timer(1, partial(open_browser, PORT)).start()

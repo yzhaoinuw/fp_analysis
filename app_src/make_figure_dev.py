@@ -18,7 +18,7 @@ from plotly.subplots import make_subplots
 from plotly_resampler import FigureResampler
 from plotly_resampler.aggregation import MinMaxLTTB
 
-from get_fft_plots import get_fft_plots
+from app_src.get_fft_plots import get_fft_plots
 
 # set up color config
 sleep_score_opacity = 1
