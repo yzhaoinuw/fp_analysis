@@ -606,7 +606,7 @@ def read_box_select(box_select, figure):
     return (
         [start, end],
         patched_figure,
-        "Press 1 for Wake, 2 for SWS, 3 for REM, and 4 for MA, if applicable.",
+        f"You selected [{start}, {end}]. Press 1 for Wake, 2 for NREM, or 3 for REM.",
         video_button_style,
     )
 
@@ -622,6 +622,50 @@ def debug_box_select(box_select, figure):
     #time_end = figure["data"][-1]["z"][0][-1]
     return json.dumps(box_select, indent=2)
 """
+
+
+@app.callback(
+    # Output("debug-message", "children"),
+    Output("box-select-store", "data", allow_duplicate=True),
+    Output("annotation-message", "children", allow_duplicate=True),
+    Output("video-button", "style", allow_duplicate=True),
+    Input("graph", "clickData"),
+    State("graph", "figure"),
+    prevent_initial_call=True,
+)
+def read_click(clickData, figure):
+    video_button_style = {"display": "none"}
+    if clickData is None:
+        "", [], "", video_button_style
+
+    dragmode = figure["layout"]["dragmode"]
+    if dragmode == "pan":
+        raise dash.exceptions.PreventUpdate
+
+    # Grab clicked x value
+    x_click = clickData["points"][0]["x"]
+
+    # Determine current x-axis visible range
+    x_min, x_max = figure["layout"]["xaxis4"]["range"]
+    total_range = x_max - x_min
+
+    # Decide neighborhood size: e.g., 1% of current view range
+    fraction = 0.005  # 1% (adjustable)
+    delta = total_range * fraction
+    eeg_duration = len(figure["data"][-1]["z"][0])
+    eeg_start_time = cache.get("start_time")
+    eeg_end_time = eeg_start_time + eeg_duration
+    x0 = max(math.floor(x_click - delta / 2), eeg_start_time)
+    x1 = min(math.ceil(x_click + delta / 2), eeg_end_time)
+    if x0 > x1:
+        return "", [], "", video_button_style
+
+    return (
+        # f"Precise range: [{x0}, {x1}]",
+        [x0, x1],
+        f"You selected [{x0}, {x1}]. Press 1 for Wake, 2 for NREM, or 3 for REM.",
+        video_button_style,
+    )
 
 
 @app.callback(
