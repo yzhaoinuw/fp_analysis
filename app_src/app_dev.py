@@ -74,7 +74,7 @@ def open_browser(port):
     webbrowser.open_new(f"http://127.0.0.1:{port}/")
 
 
-def create_fig(mat, mat_name, default_n_shown_samples=2000):
+def create_fig(mat, mat_name, default_n_shown_samples=2048):
     fig = make_figure(mat, mat_name, default_n_shown_samples)
     return fig
 
@@ -383,7 +383,7 @@ def create_visualization(ready):
 def change_sampling_level(sampling_level):
     if sampling_level is None:
         return dash.no_update
-    sampling_level_map = {"x1": 2000, "x2": 4000, "x4": 8000}
+    sampling_level_map = {"x1": 2048, "x2": 4096, "x4": 8192}
     n_samples = sampling_level_map[sampling_level]
     mat_name = cache.get("filename")
     mat = loadmat(os.path.join(TEMP_PATH, mat_name))
@@ -706,22 +706,21 @@ def update_sleep_scores(box_select_range, keyboard_press, keyboard_event, figure
 
     label = int(label) - 1
     start, end = box_select_range
+    sleep_scores_heatmap = figure["data"][-1]
+    prev_labels = sleep_scores_heatmap["z"][0][start:end]
+
     # If the annotation does not change anything, don't add to history
-    if (
-        figure["data"][-1]["z"][0][start:end] == np.array([label] * (end - start))
-    ).all():
+    if (prev_labels == np.array([label] * (end - start))).all():
         raise PreventUpdate
 
+    sleep_scores_heatmap["z"][0][start:end] = [label] * (end - start)
     patched_figure = Patch()
-    prev_labels = figure["data"][-1]["z"][0][start:end]
-    figure["data"][-1]["z"][0][start:end] = [label] * (end - start)
+    patched_figure["data"][-3]["z"][0] = sleep_scores_heatmap["z"][0]
+    patched_figure["data"][-2]["z"][0] = sleep_scores_heatmap["z"][0]
+    patched_figure["data"][-1]["z"][0] = sleep_scores_heatmap["z"][0]
 
-    patched_figure["data"][-3]["z"][0] = figure["data"][-1]["z"][0]
-    patched_figure["data"][-2]["z"][0] = figure["data"][-1]["z"][0]
-    patched_figure["data"][-1]["z"][0] = figure["data"][-1]["z"][0]
     # remove box select after an update is made
     patched_figure["layout"]["selections"].clear()
-
     return patched_figure, (start, end, prev_labels)
 
 
@@ -761,14 +760,14 @@ def undo_annotation(n_clicks, figure):
     prev_annotation = annotation_history.pop()
     (start, end, prev_labels) = prev_annotation
     prev_labels = np.array(prev_labels)
+    sleep_scores_heatmap = figure["data"][-1]
 
-    patched_figure = Patch()
     # undo figure
-    figure["data"][-1]["z"][0][start:end] = prev_labels
-
-    patched_figure["data"][-3]["z"][0] = figure["data"][-1]["z"][0]
-    patched_figure["data"][-2]["z"][0] = figure["data"][-1]["z"][0]
-    patched_figure["data"][-1]["z"][0] = figure["data"][-1]["z"][0]
+    sleep_scores_heatmap["z"][0][start:end] = prev_labels
+    patched_figure = Patch()
+    patched_figure["data"][-3]["z"][0] = sleep_scores_heatmap["z"][0]
+    patched_figure["data"][-2]["z"][0] = sleep_scores_heatmap["z"][0]
+    patched_figure["data"][-1]["z"][0] = sleep_scores_heatmap["z"][0]
 
     # undo cache
     modified_sleep_scores = cache.get("modified_sleep_scores")

@@ -43,7 +43,7 @@ heatmap_width = 40
 range_padding_percent = 0.2
 
 
-def make_figure(mat, mat_name="", default_n_shown_samples=2000, ne_fs=10, num_class=3):
+def make_figure(mat, mat_name="", default_n_shown_samples=2048, ne_fs=10, num_class=3):
     # Time span and frequencies
     eeg, emg, ne = mat.get("eeg"), mat.get("emg"), mat.get("ne")
     eeg, emg = eeg.flatten(), emg.flatten()
