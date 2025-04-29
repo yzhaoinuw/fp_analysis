@@ -39,6 +39,7 @@ colorscale = {
     ],
 }
 range_quantile = 0.9999
+heatmap_width = 40
 range_padding_percent = 0.2
 
 
@@ -60,7 +61,7 @@ def make_figure(mat, mat_name="", default_n_shown_samples=2000, ne_fs=10, num_cl
     # Create the time sequences
     time_eeg = np.linspace(start_time, eeg_end_time, eeg.size)
     eeg_end_time = math.ceil(eeg_end_time)
-    time = np.expand_dims(np.arange(start_time + 1, eeg_end_time + 1), 0)
+    # time = np.expand_dims(np.arange(start_time + 1, eeg_end_time + 1), 0)
     eeg_lower_range, eeg_upper_range = np.nanquantile(
         eeg, 1 - range_quantile
     ), np.nanquantile(eeg, range_quantile)
@@ -70,29 +71,34 @@ def make_figure(mat, mat_name="", default_n_shown_samples=2000, ne_fs=10, num_cl
     eeg_range = max(abs(eeg_lower_range), abs(eeg_upper_range))
     emg_range = max(abs(emg_lower_range), abs(emg_upper_range))
 
-    labels = mat.get("pred_labels")
+    # scored fully or partially or unscored
+    labels = mat.get("sleep_scores")
     if labels is None or labels.size == 0:
-        # either scored manually or unscored
-        labels = mat.get("sleep_scores")
-        if labels is None or labels.size == 0:
-            # if unscored, initialize with nan, set confidence to be zero
-            mat["sleep_scores"] = np.zeros((1, duration))
-            mat["sleep_scores"][:] = np.nan
-            labels = mat["sleep_scores"]
-        else:  # manually scored, but may contain missing scores
-            # make a labels copy and do not modify mat. only need to replace
-            # -1 in labels copy with nan for visualization
+        # if unscored, initialize with nan
+        mat["sleep_scores"] = np.zeros((1, duration))
+        mat["sleep_scores"][:] = np.nan
+        labels = mat["sleep_scores"]
+    else:  # manually scored, but may contain missing scores
+        # make a labels copy and do not modify mat. only need to replace
+        # -1 in labels copy with nan for visualization
 
-            # sleep_scores will have the length of duration. this is
-            # guaranteed in the preprocessing process.
-            labels = labels.astype(float)
-            np.place(
-                labels, labels == -1, [np.nan]
-            )  # convert -1 to None for heatmap visualization
+        # sleep_scores will have the length of duration. this is
+        # guaranteed in the preprocessing process.
+        labels = labels.astype(float)
+        np.place(
+            labels, labels == -1, [np.nan]
+        )  # convert -1 to None for heatmap visualization
 
     # convert flat array to 2D array for visualization to work
     if len(labels.shape) == 1:
         labels = np.expand_dims(labels, axis=0)
+
+    # pad if necessary
+    pad_len = duration - labels.size
+    if pad_len > 0:
+        labels = np.pad(
+            labels, ((0, 0), (0, pad_len)), "constant", constant_values=np.nan
+        )
 
     if mat.get("num_class") is not None:
         num_class = mat["num_class"].item()
@@ -123,38 +129,6 @@ def make_figure(mat, mat_name="", default_n_shown_samples=2000, ne_fs=10, num_cl
         default_downsampler=MinMaxLTTB(parallel=True),
     )
 
-    ne_lower_range, ne_upper_range = 0, 0
-    if ne is not None and ne.size > 1:
-        ne = ne.flatten()
-        ne_freq = ne_freq.item()
-        ne_end_time = (ne.size - 1) / ne_freq + start_time
-
-        # Create the time sequences
-        time_ne = np.linspace(start_time, ne_end_time, ne.size)
-        # ne_end_time = math.ceil(ne_end_time)
-        ne_lower_range, ne_upper_range = np.nanquantile(
-            ne, 1 - range_quantile
-        ), np.nanquantile(ne, range_quantile)
-        fig.add_trace(
-            go.Scattergl(
-                line=dict(width=1),
-                marker=dict(size=2, color="black"),
-                showlegend=False,
-                mode="lines+markers",
-                hovertemplate="<b>time</b>: %{x:.2f}"
-                + "<br><b>y</b>: %{y}<extra></extra>",
-            ),
-            hf_x=time_ne,
-            hf_y=ne,
-            row=4,
-            col=1,
-        )
-
-    ne_range = max(abs(ne_lower_range), abs(ne_upper_range))
-    heatmap_width = max(
-        20, 2 * (1 + range_padding_percent) * max([eeg_range, emg_range, ne_range])
-    )
-
     # Create a heatmap for stages
     sleep_scores = go.Heatmap(
         x0=start_time + 0.5,
@@ -162,6 +136,7 @@ def make_figure(mat, mat_name="", default_n_shown_samples=2000, ne_fs=10, num_cl
         y0=0,
         dy=heatmap_width,  # assuming that the max abs value of eeg, emg, or ne is no more than 10
         z=labels,
+        name="Sleep Scores",
         hoverinfo="none",
         colorscale=colorscale[num_class],
         showscale=False,
@@ -189,6 +164,7 @@ def make_figure(mat, mat_name="", default_n_shown_samples=2000, ne_fs=10, num_cl
     # Add the time series to the figure
     fig.add_trace(
         go.Scattergl(
+            name="EEG",
             line=dict(width=1),
             marker=dict(size=2, color="black"),
             showlegend=False,
@@ -202,6 +178,7 @@ def make_figure(mat, mat_name="", default_n_shown_samples=2000, ne_fs=10, num_cl
     )
     fig.add_trace(
         go.Scattergl(
+            name="EMG",
             line=dict(width=1),
             marker=dict(size=2, color="black"),
             showlegend=False,
@@ -219,16 +196,46 @@ def make_figure(mat, mat_name="", default_n_shown_samples=2000, ne_fs=10, num_cl
             go.Scatter(
                 x=[-100],
                 y=[0.2],
+                name=stage_names[i],
                 mode="markers",
                 marker=dict(
                     size=8, color=color, symbol="square", opacity=sleep_score_opacity
                 ),
-                name=stage_names[i],
                 showlegend=True,
             ),
             row=2,
             col=1,
         )
+
+    ne_lower_range, ne_upper_range = 0, 0
+    if ne is not None and ne.size > 1:
+        ne = ne.flatten()
+        ne_freq = ne_freq.item()
+        ne_end_time = (ne.size - 1) / ne_freq + start_time
+
+        # Create the time sequences
+        time_ne = np.linspace(start_time, ne_end_time, ne.size)
+        # ne_end_time = math.ceil(ne_end_time)
+        ne_lower_range, ne_upper_range = np.nanquantile(
+            ne, 1 - range_quantile
+        ), np.nanquantile(ne, range_quantile)
+        fig.add_trace(
+            go.Scattergl(
+                name="NE",
+                line=dict(width=1),
+                marker=dict(size=2, color="black"),
+                showlegend=False,
+                mode="lines+markers",
+                hovertemplate="<b>time</b>: %{x:.2f}"
+                + "<br><b>y</b>: %{y}<extra></extra>",
+            ),
+            hf_x=time_ne,
+            hf_y=ne,
+            row=4,
+            col=1,
+        )
+
+    ne_range = max(abs(ne_lower_range), abs(ne_upper_range))
 
     # add the heatmap last so that their indices can be accessed using last indices
     fig.add_trace(spectrogram, secondary_y=False, row=1, col=1)
@@ -343,7 +350,7 @@ if __name__ == "__main__":
 
     io.renderers.default = "browser"
     data_path = "../user_test_files/"
-    mat_file = "COM5_bin1_gs.mat"
+    mat_file = "788_bin1_gs.mat"
     mat = loadmat(os.path.join(data_path, mat_file))
     # mat_file = "C:/Users/yzhao/python_projects/sleep_scoring/user_test_files/box1_COM18_RZ10_2_1_2024-06-03_09-04-56-902_sdreamer_3class.mat"
     # mat = loadmat(mat_file)

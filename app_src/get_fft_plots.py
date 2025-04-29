@@ -54,6 +54,7 @@ def get_fft_plots(
         x=time,
         y=frequencies,
         z=Sx_db,
+        name="Spectrogram",
         hoverinfo="none",
         colorscale="viridis",
         showlegend=False,
@@ -62,8 +63,8 @@ def get_fft_plots(
     theta_delta_ratio = go.Scatter(
         x=time,
         y=theta_delta_ratio,
-        mode="lines",
         name="Theta/Delta",
+        mode="lines",
         customdata=time / 3600,
         hovertemplate="<b>time</b>: %{customdata:.2f}h<extra></extra>",
         showlegend=False,

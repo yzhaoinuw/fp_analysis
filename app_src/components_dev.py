@@ -117,7 +117,7 @@ visualization_div = html.Div(
         ),
         html.Div(
             children=[graph],
-            style={"marginTop": "1px", "marginLeft": "20px", "marginRight": "28px"},
+            style={"marginTop": "1px", "marginLeft": "20px", "marginRight": "15px"},
         ),
         html.Div(
             style={"display": "flex"},

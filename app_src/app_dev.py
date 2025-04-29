@@ -74,7 +74,7 @@ def open_browser(port):
     webbrowser.open_new(f"http://127.0.0.1:{port}/")
 
 
-def create_fig(mat, mat_name, default_n_shown_samples=4000):
+def create_fig(mat, mat_name, default_n_shown_samples=2000):
     fig = make_figure(mat, mat_name, default_n_shown_samples)
     return fig
 
@@ -90,6 +90,7 @@ def reset_cache(cache, filename):
     cache.set("recent_files_with_video", recent_files_with_video)
     cache.set("file_video_record", file_video_record)
     cache.set("start_time", 0)
+    cache.set("end_time", 0)
     cache.set("video_start_time", 0)
     cache.set("video_name", "")
     cache.set("video_path", "")
@@ -347,20 +348,20 @@ def create_visualization(ready):
     mat_name = cache.get("filename")
     mat = loadmat(os.path.join(TEMP_PATH, mat_name))
     fig = create_fig(mat, mat_name)
-    start_time = mat.get("start_time")
+    # start_time = mat.get("start_time")
     video_start_time = mat.get("video_start_time")
     video_path = mat.get("video_path", [])
     video_name = mat.get("video_name", [])
-    if start_time is not None:
-        start_time = start_time.item()
-        cache.set("start_time", start_time)
-    else:
-        start_time = 0
+    # if start_time is not None:
+    #    start_time = start_time.item()
 
+    time_ax = fig["data"][0]["x"]
+    eeg_start_time, eeg_end_time = time_ax[0], time_ax[-1]
+    cache.set("start_time", eeg_start_time)
+    cache.set("end_time", eeg_end_time)
     if video_start_time is not None:
         video_start_time = video_start_time.item()
         cache.set("video_start_time", video_start_time)
-
     if video_path:
         video_path = video_path.item()
         cache.set("video_path", video_path)
@@ -390,10 +391,7 @@ def change_sampling_level(sampling_level):
     # copy modified (through annotation) sleep scores over
     modified_sleep_scores = cache.get("modified_sleep_scores")
     if modified_sleep_scores is not None:
-        if mat.get("pred_labels") is not None and mat["pred_labels"].size != 0:
-            mat["pred_labels"] = modified_sleep_scores.copy()
-        else:
-            mat["sleep_scores"] = modified_sleep_scores.copy()
+        mat["sleep_scores"] = modified_sleep_scores.copy()
 
     fig = create_fig(mat, mat_name, default_n_shown_samples=n_samples)
     return fig
@@ -552,19 +550,28 @@ def update_fig(relayoutdata):
 
 
 @app.callback(
+    # Output("debug-message", "children"),
     Output("box-select-store", "data"),
     Output("graph", "figure", allow_duplicate=True),
     Output("annotation-message", "children", allow_duplicate=True),
     Output("video-button", "style"),
     Input("graph", "selectedData"),
     State("graph", "figure"),
+    State("graph", "clickData"),
     prevent_initial_call=True,
 )
-def read_box_select(box_select, figure):
+def read_box_select(box_select, figure, clickData):
     video_button_style = {"display": "none"}
     selections = figure["layout"].get("selections")
-    if not selections:
+
+    # when selections is None, it means there's not box select in the graph
+    if selections is None:
         return [], dash.no_update, "", video_button_style
+
+    # when selections is an empty list, it implies that it was popped by a click select
+    # a click select triggers read_box_select as it modified selectedData, so do nothing here
+    if len(selections) == 0:
+        raise PreventUpdate()
 
     patched_figure = Patch()
     # allow only at most one select box in all subplots
@@ -579,9 +586,8 @@ def read_box_select(box_select, figure):
     start, end = min(selections[0]["x0"], selections[0]["x1"]), max(
         selections[0]["x0"], selections[0]["x1"]
     )
-    eeg_duration = len(figure["data"][-1]["z"][0])
     eeg_start_time = cache.get("start_time")
-    eeg_end_time = eeg_start_time + eeg_duration
+    eeg_end_time = cache.get("end_time")
 
     if end < eeg_start_time or start > eeg_end_time:
         return [], patched_figure, "", video_button_style
@@ -627,20 +633,27 @@ def debug_box_select(box_select, figure):
 @app.callback(
     # Output("debug-message", "children"),
     Output("box-select-store", "data", allow_duplicate=True),
+    Output("graph", "figure", allow_duplicate=True),
     Output("annotation-message", "children", allow_duplicate=True),
     Output("video-button", "style", allow_duplicate=True),
     Input("graph", "clickData"),
     State("graph", "figure"),
     prevent_initial_call=True,
 )
-def read_click(clickData, figure):
+def read_click_select(clickData, figure):
     video_button_style = {"display": "none"}
-    if clickData is None:
-        "", [], "", video_button_style
-
     dragmode = figure["layout"]["dragmode"]
-    if dragmode == "pan":
-        raise dash.exceptions.PreventUpdate
+    if clickData is None or dragmode == "pan":
+        return [], dash.no_update, "", video_button_style
+
+    # remove the select box if present
+    selections = figure["layout"].get("selections", [])
+    if len(selections) > 0:
+        selections.pop(0)
+        patched_figure = Patch()
+        patched_figure["layout"]["selections"] = selections
+    else:
+        patched_figure = dash.no_update
 
     # Grab clicked x value
     x_click = clickData["points"][0]["x"]
@@ -652,17 +665,23 @@ def read_click(clickData, figure):
     # Decide neighborhood size: e.g., 1% of current view range
     fraction = 0.005  # 1% (adjustable)
     delta = total_range * fraction
-    eeg_duration = len(figure["data"][-1]["z"][0])
+    # eeg_duration = len(figure["data"][-1]["z"][0])
     eeg_start_time = cache.get("start_time")
-    eeg_end_time = eeg_start_time + eeg_duration
+    eeg_end_time = cache.get("end_time")
+    # eeg_end_time = eeg_start_time + eeg_duration
     x0 = max(math.floor(x_click - delta / 2), eeg_start_time)
     x1 = min(math.ceil(x_click + delta / 2), eeg_end_time)
     if x0 > x1:
-        return "", [], "", video_button_style
+        return (
+            [],
+            patched_figure,
+            f"Out of range. Please select from {eeg_start_time} to {eeg_end_time}.",
+            video_button_style,
+        )
 
     return (
-        # f"Precise range: [{x0}, {x1}]",
         [x0, x1],
+        patched_figure,
         f"You selected [{x0}, {x1}]. Press 1 for Wake, 2 for NREM, or 3 for REM.",
         video_button_style,
     )
@@ -689,7 +708,7 @@ def update_sleep_scores(box_select_range, keyboard_press, keyboard_event, figure
     start, end = box_select_range
     # If the annotation does not change anything, don't add to history
     if (
-        figure["data"][-2]["z"][0][start:end] == np.array([label] * (end - start))
+        figure["data"][-1]["z"][0][start:end] == np.array([label] * (end - start))
     ).all():
         raise PreventUpdate
 
@@ -774,7 +793,7 @@ def save_annotations(n_clicks):
     temp_mat_path = os.path.join(TEMP_PATH, mat_filename)
     mat = loadmat(temp_mat_path)
 
-    # only need to replace None in sleep_scores assuming pred_labels will never have nan or None
+    # replace None in sleep_scores
     modified_sleep_scores = cache.get("modified_sleep_scores")
     labels = None
     if modified_sleep_scores is not None:
@@ -788,18 +807,12 @@ def save_annotations(n_clicks):
             modified_sleep_scores, nan=-1
         )  # convert np.nan to -1 for scipy's savemat
 
-        if mat.get("pred_labels") is not None and mat["pred_labels"].size != 0:
-            mat["pred_labels"] = modified_sleep_scores
-        else:
-            mat["sleep_scores"] = modified_sleep_scores
+        mat["sleep_scores"] = modified_sleep_scores
     savemat(temp_mat_path, mat)
 
     # export sleep bout spreadsheet only if the manual scoring is complete
     if mat.get("sleep_scores") is not None and -1 not in mat["sleep_scores"]:
         labels = mat["sleep_scores"].flatten()
-
-    if mat.get("pred_labels") is not None and mat["pred_labels"].size != 0:
-        labels = mat["pred_labels"].flatten()
 
     if labels is not None:
         labels = labels.astype(int)
