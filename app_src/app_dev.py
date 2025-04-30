@@ -29,7 +29,6 @@ from app_src.components_dev import Components
 from app_src.inference import run_inference
 from app_src.make_figure_dev import make_figure
 
-# from app_src.plot_spectrogram import plot_spectrogram
 from app_src.postprocessing import get_sleep_segments, get_pred_label_stats
 
 
@@ -54,8 +53,7 @@ components = Components()
 app.layout = components.home_div
 du = components.configure_du(app, TEMP_PATH)
 
-# Notes
-# np.nan is converted to None when reading from cache
+# Note: np.nan is converted to None when reading from cache
 cache = Cache(
     app.server,
     config={
@@ -106,7 +104,7 @@ app.clientside_callback(
     """
     function(keyboard_nevents, keyboard_event, figure) {
         if (!keyboard_event || !figure) {
-            return dash_clientside.no_update;
+            return [dash_clientside.no_update, dash_clientside.no_update, dash_clientside.no_update];
         }
 
         var key = keyboard_event.key;
@@ -116,21 +114,19 @@ app.clientside_callback(
             if (figure.layout.dragmode === "pan") {
                 updatedFigure.layout.dragmode = "select"
             } else if (figure.layout.dragmode === "select") {
-                var selections = figure.layout.selections;
-                if (selections) {
-                    if (selections.length > 0) {
-                        updatedFigure.layout.selections = [];  // Remove the first selection (equivalent to pop(0) in Python)
-                    }
-                }
+                updatedFigure.layout.selections = null;
+                updatedFigure.layout.shapes = null;
                 updatedFigure.layout.dragmode = "pan"
             }
-            return updatedFigure;
+            return [updatedFigure, "", {"display": "none"}];
         }
 
-        return dash_clientside.no_update;
+        return [dash_clientside.no_update, dash_clientside.no_update, dash_clientside.no_update];
     }
     """,
     Output("graph", "figure"),
+    Output("annotation-message", "children"),
+    Output("video-button", "style"),
     Input("keyboard", "n_events"),
     State("keyboard", "event"),
     State("graph", "figure"),
@@ -464,7 +460,6 @@ def upload_video(status):
 
 
 @app.callback(
-    # Output("debug-message", "children"),
     Output("clip-name-store", "data"),
     Output("video-message", "children", allow_duplicate=True),
     Input("video-path-store", "data"),
@@ -554,7 +549,7 @@ def update_fig(relayoutdata):
     Output("box-select-store", "data"),
     Output("graph", "figure", allow_duplicate=True),
     Output("annotation-message", "children", allow_duplicate=True),
-    Output("video-button", "style"),
+    Output("video-button", "style", allow_duplicate=True),
     Input("graph", "selectedData"),
     State("graph", "figure"),
     State("graph", "clickData"),
@@ -566,21 +561,17 @@ def read_box_select(box_select, figure, clickData):
 
     # when selections is None, it means there's not box select in the graph
     if selections is None:
-        return [], dash.no_update, "", video_button_style
-
-    # when selections is an empty list, it implies that it was popped by a click select
-    # a click select triggers read_box_select as it modified selectedData, so do nothing here
-    if len(selections) == 0:
         raise PreventUpdate()
 
-    patched_figure = Patch()
     # allow only at most one select box in all subplots
     if len(selections) > 1:
         selections.pop(0)
 
+    patched_figure = Patch()
     patched_figure["layout"][
         "selections"
     ] = selections  # patial property update: https://dash.plotly.com/partial-properties#update
+    patched_figure["layout"]["shapes"] = None  # remove click select box
 
     # take the min as start and max as end so that how the box is drawn doesn't matter
     start, end = min(selections[0]["x0"], selections[0]["x1"]), max(
@@ -590,7 +581,12 @@ def read_box_select(box_select, figure, clickData):
     eeg_end_time = cache.get("end_time")
 
     if end < eeg_start_time or start > eeg_end_time:
-        return [], patched_figure, "", video_button_style
+        return (
+            [],
+            patched_figure,
+            f"Out of range. Please select from {eeg_start_time} to {eeg_end_time}.",
+            video_button_style,
+        )
 
     start_round, end_round = round(start), round(end)
     start_round = max(start_round, eeg_start_time)
@@ -631,7 +627,7 @@ def debug_box_select(box_select, figure):
 
 
 @app.callback(
-    # Output("debug-message", "children"),
+    # Output("debug-message", "children", allow_duplicate=True),
     Output("box-select-store", "data", allow_duplicate=True),
     Output("graph", "figure", allow_duplicate=True),
     Output("annotation-message", "children", allow_duplicate=True),
@@ -640,20 +636,16 @@ def debug_box_select(box_select, figure):
     State("graph", "figure"),
     prevent_initial_call=True,
 )
-def read_click_select(clickData, figure):
+def read_click_select(clickData, figure):  # triggered only  if clicked within x-range
+    patched_figure = Patch()
+    patched_figure["layout"]["shapes"] = None
     video_button_style = {"display": "none"}
     dragmode = figure["layout"]["dragmode"]
     if clickData is None or dragmode == "pan":
-        return [], dash.no_update, "", video_button_style
+        return [], patched_figure, "", video_button_style
 
     # remove the select box if present
-    selections = figure["layout"].get("selections", [])
-    if len(selections) > 0:
-        selections.pop(0)
-        patched_figure = Patch()
-        patched_figure["layout"]["selections"] = selections
-    else:
-        patched_figure = dash.no_update
+    patched_figure["layout"]["selections"] = None
 
     # Grab clicked x value
     x_click = clickData["points"][0]["x"]
@@ -663,26 +655,40 @@ def read_click_select(clickData, figure):
     total_range = x_max - x_min
 
     # Decide neighborhood size: e.g., 1% of current view range
-    fraction = 0.005  # 1% (adjustable)
+    fraction = 0.005  # 0.5% (adjustable)
     delta = total_range * fraction
-    # eeg_duration = len(figure["data"][-1]["z"][0])
     eeg_start_time = cache.get("start_time")
     eeg_end_time = cache.get("end_time")
-    # eeg_end_time = eeg_start_time + eeg_duration
-    x0 = max(math.floor(x_click - delta / 2), eeg_start_time)
-    x1 = min(math.ceil(x_click + delta / 2), eeg_end_time)
-    if x0 > x1:
-        return (
-            [],
-            patched_figure,
-            f"Out of range. Please select from {eeg_start_time} to {eeg_end_time}.",
-            video_button_style,
-        )
+    x0, x1 = math.floor(x_click - delta / 2), math.ceil(x_click + delta / 2)
+    curve_index = clickData["points"][0]["curveNumber"]
+    trace = figure["data"][curve_index]
+    xref = trace.get("xaxis", "x4")  # x4 is the shared x-axis
+    yref = trace.get("yaxis", "y5")  # spectrogram has dual y-axis
 
+    if yref == "y2":  # use the left y-axis to avoid interfering with theta/delta curve
+        yref = "y1"
+
+    select_box = {
+        "type": "rect",
+        "xref": xref,
+        "yref": yref,
+        "x0": x0,
+        "x1": x1,
+        "y0": -20,
+        "y1": 20,
+        "line": {"width": 1, "dash": "dot"},
+    }
+
+    patched_figure["layout"]["shapes"] = [select_box]
+    start = max(x0, eeg_start_time)
+    end = min(x1, eeg_end_time)
+
+    if 1 <= end - start <= 300:
+        video_button_style = {"display": "block"}
     return (
-        [x0, x1],
+        [start, end],
         patched_figure,
-        f"You selected [{x0}, {x1}]. Press 1 for Wake, 2 for NREM, or 3 for REM.",
+        f"You selected [{start}, {end}]. Press 1 for Wake, 2 for NREM, or 3 for REM.",
         video_button_style,
     )
 
@@ -697,7 +703,11 @@ def read_click_select(clickData, figure):
     prevent_initial_call=True,
 )
 def update_sleep_scores(box_select_range, keyboard_press, keyboard_event, figure):
-    if not (ctx.triggered_id == "keyboard" and box_select_range):
+    if not (
+        ctx.triggered_id == "keyboard"
+        and box_select_range
+        and figure["layout"]["dragmode"] == "select"
+    ):
         raise PreventUpdate
 
     label = keyboard_event.get("key")
@@ -719,8 +729,9 @@ def update_sleep_scores(box_select_range, keyboard_press, keyboard_event, figure
     patched_figure["data"][-2]["z"][0] = sleep_scores_heatmap["z"][0]
     patched_figure["data"][-1]["z"][0] = sleep_scores_heatmap["z"][0]
 
-    # remove box select after an update is made
-    patched_figure["layout"]["selections"].clear()
+    # remove box or click select after an update is made
+    patched_figure["layout"]["selections"] = None
+    patched_figure["layout"]["shapes"] = None
     return patched_figure, (start, end, prev_labels)
 
 
@@ -748,7 +759,6 @@ def write_annotation(annotation, figure):
 
 
 @app.callback(
-    # Output("debug-message", "children"),
     Output("graph", "figure", allow_duplicate=True),
     Output("undo-button", "style", allow_duplicate=True),
     Input("undo-button", "n_clicks"),

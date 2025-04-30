@@ -80,9 +80,11 @@ visualization_div = html.Div(
                 html.Div(
                     children=[
                         dcc.Dropdown(
-                            ["x1", "x2", "x4"],
-                            "x1",
+                            options=["x1", "x2", "x4"],
+                            value="x1",
                             id="n-sample-dropdown",
+                            searchable=False,
+                            clearable=False,
                         )
                     ],
                     style={
