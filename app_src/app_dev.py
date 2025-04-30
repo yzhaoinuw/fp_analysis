@@ -95,6 +95,7 @@ def reset_cache(cache, filename):
     cache.set("modified_sleep_scores", None)
     cache.set("annotation_history", deque(maxlen=3))
     cache.set("fig_resampler", None)
+    cache.set("net_annotation_count", 0)  # annotations made minus undos made
 
 
 # %% client side callbacks below
@@ -202,24 +203,6 @@ clientside_callback(
 )
 
 # %% server side callbacks below
-
-
-@app.callback(
-    Output("upload-container", "children", allow_duplicate=True),
-    Output("model-choice-container", "style"),
-    Input("task-selection", "value"),
-    Input("model-choice", "value"),
-    prevent_initial_call=True,
-)
-def show_upload_box(task, model_choice):
-    # if task or model choice changes, give a new upload box so that
-    # the upload of the same file (but running with different model) is allowed
-    if task is None:
-        raise PreventUpdate
-    if task == "pred":
-        return components.pred_upload_box, {"display": "block"}
-    else:
-        return components.vis_upload_box, {"display": "none"}
 
 
 @du.callback(
@@ -696,6 +679,8 @@ def read_click_select(clickData, figure):  # triggered only  if clicked within x
 @app.callback(
     Output("graph", "figure", allow_duplicate=True),
     Output("annotation-store", "data"),
+    Output("annotation-message", "children", allow_duplicate=True),
+    Output("video-button", "style", allow_duplicate=True),
     Input("box-select-store", "data"),
     Input("keyboard", "n_events"),  # a keyboard press
     State("keyboard", "event"),
@@ -732,10 +717,11 @@ def update_sleep_scores(box_select_range, keyboard_press, keyboard_event, figure
     # remove box or click select after an update is made
     patched_figure["layout"]["selections"] = None
     patched_figure["layout"]["shapes"] = None
-    return patched_figure, (start, end, prev_labels)
+    return patched_figure, (start, end, prev_labels), "", {"display": "none"}
 
 
 @app.callback(
+    Output("save-button", "style"),
     Output("undo-button", "style"),
     Input("annotation-store", "data"),
     State("graph", "figure"),
@@ -755,17 +741,29 @@ def write_annotation(annotation, figure):
     labels = np.array(figure["data"][-1]["z"]).astype(float)
     cache.set("annotation_history", annotation_history)
     cache.set("modified_sleep_scores", labels)
-    return {"display": "block"}
+
+    # check whether need to show save button or not
+    save_button_style = dash.no_update
+    net_annotation_count = cache.get("net_annotation_count")
+    net_annotation_count += 1
+    cache.set("net_annotation_count", net_annotation_count)
+    if net_annotation_count > 0:
+        save_button_style = {"display": "block"}
+
+    return save_button_style, {"display": "block"}
 
 
 @app.callback(
     Output("graph", "figure", allow_duplicate=True),
+    Output("save-button", "style", allow_duplicate=True),
     Output("undo-button", "style", allow_duplicate=True),
     Input("undo-button", "n_clicks"),
     State("graph", "figure"),
     prevent_initial_call=True,
 )
 def undo_annotation(n_clicks, figure):
+    net_annotation_count = cache.get("net_annotation_count")
+    net_annotation_count -= 1
     annotation_history = cache.get("annotation_history")
     prev_annotation = annotation_history.pop()
     (start, end, prev_labels) = prev_annotation
@@ -786,9 +784,16 @@ def undo_annotation(n_clicks, figure):
 
     # update annotation_history
     cache.set("annotation_history", annotation_history)
+    cache.set("net_annotation_count", net_annotation_count)
+
+    # check whether need to take away save and undo button or not
+    save_button_style, undo_button_style = dash.no_update, dash.no_update
+    if net_annotation_count == 0:
+        save_button_style = {"display": "none"}
     if not annotation_history:
-        return patched_figure, {"display": "none"}
-    return patched_figure, {"display": "block"}
+        undo_button_style = {"display": "none"}
+
+    return patched_figure, save_button_style, undo_button_style
 
 
 @app.callback(
