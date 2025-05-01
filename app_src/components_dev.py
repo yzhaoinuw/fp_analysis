@@ -26,16 +26,6 @@ upload_box_style = {
 }
 
 # set up dash uploader
-pred_upload_box = du.Upload(
-    id="pred-data-upload",
-    text="Click here to select File",
-    text_completed="Completed loading",
-    cancel_button=True,
-    filetypes=["mat"],
-    upload_id="",
-    default_style=upload_box_style,
-)
-
 vis_upload_box = du.Upload(
     id="vis-data-upload",
     text="Click here to select File",
@@ -101,19 +91,21 @@ visualization_div = html.Div(
                 "marginLeft": "10px",
                 "marginRight": "10px",
                 "marginBottom": "0px",
+                "justifyContent": "space-between",
+                "alignItems": "center",
             },
             children=[
                 html.Div(
-                    ["Sampling Level"],
                     style={
-                        "display": "inline-block",
-                        "marginRight": "5px",
+                        "display": "flex",
                         "marginLeft": "10px",
+                        "gap": "10px",
                         "lineHeight": "40px",
                     },
-                ),
-                html.Div(
                     children=[
+                        html.Div(
+                            ["Sampling Level"],
+                        ),
                         dcc.Dropdown(
                             options=["x1", "x2", "x4"],
                             value="x1",
@@ -121,22 +113,17 @@ visualization_div = html.Div(
                             searchable=False,
                             clearable=False,
                         ),
+                        html.Button(
+                            "Check Video",
+                            id="video-button",
+                            style={"display": "none"},
+                        ),
                     ],
-                    style={
-                        "width": "50px",
-                        "height": "auto",
-                        "textAlign": "left",
-                        "marginLeft": "5px",
-                        "display": "inline-block",
-                    },
                 ),
-                html.Div(
-                    html.Button(
-                        "Check Video",
-                        id="video-button",
-                        style={"display": "none"},
-                    ),
-                    style={"marginLeft": "20px"},
+                html.Button(
+                    "Generate Predictions",
+                    id="pred-button",
+                    style={"margin-right": "15px"},
                 ),
             ],
         ),
@@ -210,7 +197,6 @@ class Components:
         self.home_div = home_div
         self.graph = graph
         self.visualization_div = visualization_div
-        self.pred_upload_box = pred_upload_box
         self.vis_upload_box = vis_upload_box
         self.video_upload_box = video_upload_box
 

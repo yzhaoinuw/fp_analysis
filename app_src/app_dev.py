@@ -204,14 +204,13 @@ clientside_callback(
 
 # %% server side callbacks below
 
-
-@du.callback(
-    output=[
-        Output("data-upload-message", "children", allow_duplicate=True),
-        Output("prediction-ready-store", "data"),
-        Output("upload-container", "children", allow_duplicate=True),
-    ],
-    id="pred-data-upload",
+"""
+@app.callback(
+    Output("data-upload-message", "children", allow_duplicate=True),
+    Output("prediction-ready-store", "data"),
+    Output("upload-container", "children", allow_duplicate=True),
+    Input("pred-button", "n_clicks"),
+    prevent_initial_call=True,
 )
 def read_mat_pred(status):
     message = "File validated."
@@ -260,38 +259,6 @@ def read_mat_pred(status):
     )
     return (html.Div([message]), True, components.pred_upload_box)
 
-
-@du.callback(
-    output=[
-        Output("data-upload-message", "children", allow_duplicate=True),
-        Output("visualization-ready-store", "data", allow_duplicate=True),
-        Output("upload-container", "children", allow_duplicate=True),
-    ],
-    id="vis-data-upload",
-)
-def read_mat_vis(status):
-    # clean TEMP_PATH regularly by deleting temp files written there
-    mat_file = status.latest_file
-    filename = os.path.basename(mat_file)
-    for temp_file in os.listdir(TEMP_PATH):
-        if temp_file.endswith(".mat") or temp_file.endswith(".xlsx"):
-            if temp_file == filename:
-                continue
-            os.remove(os.path.join(TEMP_PATH, temp_file))
-
-    reset_cache(cache, filename)
-
-    return (
-        html.Div(
-            [
-                "File validated. Creating visualizations... This may take up to 30 seconds."
-            ]
-        ),
-        True,
-        components.vis_upload_box,
-    )
-
-
 @app.callback(
     Output("data-upload-message", "children", allow_duplicate=True),
     Output("visualization-ready-store", "data", allow_duplicate=True),
@@ -316,6 +283,32 @@ def generate_prediction(ready):
         html.Div(["The prediction has been generated successfully."]),
         True,
     )
+"""
+
+
+@du.callback(
+    output=[
+        Output("data-upload-message", "children", allow_duplicate=True),
+        Output("visualization-ready-store", "data", allow_duplicate=True),
+        Output("upload-container", "children", allow_duplicate=True),
+    ],
+    id="vis-data-upload",
+)
+def read_mat_vis(status):
+    # clean TEMP_PATH regularly by deleting temp files written there
+    mat_file = status.latest_file
+    filename = os.path.basename(mat_file)
+    for temp_file in os.listdir(TEMP_PATH):
+        if temp_file.endswith(".mat") or temp_file.endswith(".xlsx"):
+            if temp_file == filename:
+                continue
+            os.remove(os.path.join(TEMP_PATH, temp_file))
+
+    reset_cache(cache, filename)
+    message = (
+        "File uploaded. Creating visualizations... This may take up to 30 seconds."
+    )
+    return message, True, components.vis_upload_box
 
 
 @app.callback(
@@ -326,14 +319,22 @@ def generate_prediction(ready):
 def create_visualization(ready):
     mat_name = cache.get("filename")
     mat = loadmat(os.path.join(TEMP_PATH, mat_name))
+    eeg, emg = mat.get("eeg"), mat.get("emg")
+    message = "Please double check the file selected."
+    validated = True
+    if emg is None:
+        validated = False
+        message = " ".join(["EMG data is missing.", message])
+    if eeg is None:
+        validated = False
+        message = " ".join(["EEG data is missing.", message])
+    if not validated:
+        return message
+
     fig = create_fig(mat, mat_name)
-    # start_time = mat.get("start_time")
     video_start_time = mat.get("video_start_time")
     video_path = mat.get("video_path", [])
     video_name = mat.get("video_name", [])
-    # if start_time is not None:
-    #    start_time = start_time.item()
-
     time_ax = fig["data"][0]["x"]
     eeg_start_time, eeg_end_time = time_ax[0], time_ax[-1]
     cache.set("start_time", eeg_start_time)
