@@ -20,9 +20,10 @@ upload_box_style = {
     "borderWidth": "1px",
     "borderStyle": "none",
     "textAlign": "center",
-    "margin": "5px",  # spacing between the upload box and the div it's in
+    # "margin": "5px",  # spacing between the upload box and the div it's in
     "borderRadius": "10px",  # rounded corner
     "backgroundColor": "lightgrey",
+    "padding": "0px",
 }
 
 # set up dash uploader
@@ -65,7 +66,7 @@ home_div = html.Div(
     [
         html.Div(
             id="upload-container",
-            style={"marginLeft": "10px", "marginTop": "10px"},
+            style={"marginLeft": "15px", "marginTop": "15px"},
             children=[vis_upload_box],
         ),
         html.Div(id="data-upload-message", style={"marginLeft": "10px"}),
@@ -89,10 +90,14 @@ visualization_div = html.Div(
             style={
                 "display": "flex",
                 "marginLeft": "10px",
-                "marginRight": "10px",
                 "marginBottom": "0px",
-                "justifyContent": "space-between",
+                "justifyContent": "flex-start",
+                "width": "100%",
                 "alignItems": "center",
+                "flexWrap": "nowrap",  # prevent wrap during transition
+                "whiteSpace": "nowrap",
+                "paddingRight": "30px",
+                "boxSizing": "border-box",
             },
             children=[
                 html.Div(
@@ -101,6 +106,8 @@ visualization_div = html.Div(
                         "marginLeft": "10px",
                         "gap": "10px",
                         "lineHeight": "40px",
+                        "minWidth": 0,  # allow shrinking!
+                        "overflow": "hidden",
                     },
                     children=[
                         html.Div(
@@ -116,16 +123,28 @@ visualization_div = html.Div(
                         html.Button(
                             "Check Video",
                             id="video-button",
-                            style={"display": "none"},
+                            style={"visibility": "hidden"},
                         ),
                     ],
                 ),
                 html.Button(
                     "Generate Predictions",
                     id="pred-button",
-                    style={"margin-right": "15px"},
+                    style={"marginLeft": "auto"},
                 ),
             ],
+        ),
+        dbc.Modal(
+            [
+                dbc.ModalHeader(dbc.ModalTitle("Prediction")),
+                dbc.ModalBody(html.Div(id="pred-container")),
+                dbc.ModalFooter(html.Div(id="pred-message")),
+            ],
+            id="pred-modal",
+            size="lg",
+            is_open=False,
+            backdrop="static",  # the user must clicks the "x" to exit
+            centered=True,
         ),
         dbc.Modal(
             [

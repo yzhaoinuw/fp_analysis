@@ -119,7 +119,7 @@ app.clientside_callback(
                 updatedFigure.layout.shapes = null;
                 updatedFigure.layout.dragmode = "pan"
             }
-            return [updatedFigure, "", {"display": "none"}];
+            return [updatedFigure, "", {"visibility": "hidden"}];
         }
 
         return [dash_clientside.no_update, dash_clientside.no_update, dash_clientside.no_update];
@@ -127,7 +127,7 @@ app.clientside_callback(
     """,
     Output("graph", "figure"),
     Output("annotation-message", "children"),
-    Output("video-button", "style"),
+    Output("video-button", "visibility"),
     Input("keyboard", "n_events"),
     State("keyboard", "event"),
     State("graph", "figure"),
@@ -204,61 +204,36 @@ clientside_callback(
 
 # %% server side callbacks below
 
-"""
+
 @app.callback(
-    Output("data-upload-message", "children", allow_duplicate=True),
+    Output("pred-modal", "is_open"),
+    Output("pred-container", "children", allow_duplicate=True),
+    # Output("pred-message", "children", allow_duplicate=True),
     Output("prediction-ready-store", "data"),
-    Output("upload-container", "children", allow_duplicate=True),
     Input("pred-button", "n_clicks"),
+    State("pred-modal", "is_open"),
     prevent_initial_call=True,
 )
-def read_mat_pred(status):
-    message = "File validated."
-    mat_file = status.latest_file
-    filename = os.path.basename(mat_file)
-    # clean TEMP_PATH regularly by deleting temp files written there
-
-    for temp_file in os.listdir(TEMP_PATH):
-        if temp_file.endswith(".mat") or temp_file.endswith(".xlsx"):
-            if temp_file == filename:
-                continue
-            os.remove(os.path.join(TEMP_PATH, temp_file))
-
-    mat = loadmat(mat_file)
-    eeg = mat.get("eeg")
-    if eeg is None:
-        return (
-            html.Div(["EEG data is missing. Please double check the file selected."]),
-            dash.no_update,
-            components.pred_upload_box,
-        )
-
-    emg = mat.get("emg")
-    if emg is None:
-        return (
-            html.Div(["EMG data is missing. Please double check the file selected."]),
-            dash.no_update,
-            components.pred_upload_box,
-        )
-
-    reset_cache(cache, filename)
+def read_mat_pred(n_clicks, is_open):
+    message = ""
+    mat_name = cache.get("filename")
+    mat = loadmat(os.path.join(TEMP_PATH, mat_name))
     eeg_freq = mat["eeg_frequency"].item()
     if round(eeg_freq) != 512:
-        message += " " + (
+        message += (
             f"EEG/EMG data has a sampling frequency of {eeg_freq} Hz. "
             "Will resample to 512 Hz."
         )
 
     ne = mat.get("ne")
     if ne is None:
-        message += " " + "NE data not detected."
+        message += " NE data not detected."
 
-    message += (
-        " "
-        + "Generating predictions... This may take up to 3 minutes. Check Terminal for the progress."
-    )
-    return (html.Div([message]), True, components.pred_upload_box)
+    message += " Generating predictions... This may take up to 3 minutes. Check Terminal for the progress."
+    return ((not is_open), message, True)
 
+
+"""
 @app.callback(
     Output("data-upload-message", "children", allow_duplicate=True),
     Output("visualization-ready-store", "data", allow_duplicate=True),
@@ -348,8 +323,7 @@ def create_visualization(ready):
     if video_name:
         video_name = video_name.item()
         cache.set("video_name", video_name)
-    # eeg_frequency = mat.get("eeg_frequency").item()
-    # eeg = mat.get("eeg").flatten()
+
     cache.set("fig_resampler", fig)
     components.graph.figure = fig
     return components.visualization_div
@@ -533,14 +507,14 @@ def update_fig(relayoutdata):
     Output("box-select-store", "data"),
     Output("graph", "figure", allow_duplicate=True),
     Output("annotation-message", "children", allow_duplicate=True),
-    Output("video-button", "style", allow_duplicate=True),
+    Output("video-button", "visibility", allow_duplicate=True),
     Input("graph", "selectedData"),
     State("graph", "figure"),
     State("graph", "clickData"),
     prevent_initial_call=True,
 )
 def read_box_select(box_select, figure, clickData):
-    video_button_style = {"display": "none"}
+    video_button_style = {"visibility": "hidden"}
     selections = figure["layout"].get("selections")
 
     # when selections is None, it means there's not box select in the graph
@@ -587,7 +561,7 @@ def read_box_select(box_select, figure, clickData):
 
     start, end = start_round - eeg_start_time, end_round - eeg_start_time
     if 1 <= end - start <= 300:
-        video_button_style = {"display": "block"}
+        video_button_style = {"visibility": "visible"}
 
     return (
         [start, end],
@@ -615,7 +589,7 @@ def debug_box_select(box_select, figure):
     Output("box-select-store", "data", allow_duplicate=True),
     Output("graph", "figure", allow_duplicate=True),
     Output("annotation-message", "children", allow_duplicate=True),
-    Output("video-button", "style", allow_duplicate=True),
+    Output("video-button", "visibility", allow_duplicate=True),
     Input("graph", "clickData"),
     State("graph", "figure"),
     prevent_initial_call=True,
@@ -623,7 +597,7 @@ def debug_box_select(box_select, figure):
 def read_click_select(clickData, figure):  # triggered only  if clicked within x-range
     patched_figure = Patch()
     patched_figure["layout"]["shapes"] = None
-    video_button_style = {"display": "none"}
+    video_button_style = {"visibility": "hidden"}
     dragmode = figure["layout"]["dragmode"]
     if clickData is None or dragmode == "pan":
         return [], patched_figure, "", video_button_style
@@ -668,7 +642,7 @@ def read_click_select(clickData, figure):  # triggered only  if clicked within x
     end = min(x1, eeg_end_time)
 
     if 1 <= end - start <= 300:
-        video_button_style = {"display": "block"}
+        video_button_style = {"visibility": "visible"}
     return (
         [start, end],
         patched_figure,
@@ -681,7 +655,7 @@ def read_click_select(clickData, figure):  # triggered only  if clicked within x
     Output("graph", "figure", allow_duplicate=True),
     Output("annotation-store", "data"),
     Output("annotation-message", "children", allow_duplicate=True),
-    Output("video-button", "style", allow_duplicate=True),
+    Output("video-button", "visibility", allow_duplicate=True),
     Input("box-select-store", "data"),
     Input("keyboard", "n_events"),  # a keyboard press
     State("keyboard", "event"),
@@ -718,7 +692,7 @@ def update_sleep_scores(box_select_range, keyboard_press, keyboard_event, figure
     # remove box or click select after an update is made
     patched_figure["layout"]["selections"] = None
     patched_figure["layout"]["shapes"] = None
-    return patched_figure, (start, end, prev_labels), "", {"display": "none"}
+    return patched_figure, (start, end, prev_labels), "", {"visibility": "hidden"}
 
 
 @app.callback(
