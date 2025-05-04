@@ -10,7 +10,7 @@ from scipy.io import loadmat, savemat
 
 import app_src.run_inference_ne as run_inference_ne
 import app_src.run_inference_sdreamer as run_inference_sdreamer
-from app_src.postprocessing import postprocess_pred_labels
+from app_src.postprocessing import postprocess_sleep_scores
 
 
 def run_inference(
@@ -31,12 +31,12 @@ def run_inference(
     else:
         predictions, confidence = run_inference_sdreamer.infer(mat, model_path)
 
-    mat["pred_labels"] = predictions
+    mat["sleep_scores"] = predictions
     mat["confidence"] = confidence
     if postprocess:
         post_tag = "_post"
-        predictions = postprocess_pred_labels(mat)
-        mat["pred_labels"] = predictions
+        predictions = postprocess_sleep_scores(mat)
+        mat["sleep_scores"] = predictions
 
     if output_path is not None:
         output_path = (
@@ -49,7 +49,7 @@ def run_inference(
 
 if __name__ == "__main__":
     data_path = "../user_test_files/"
-    mat_file = os.path.join(data_path, "20241113_1_263_2_259_24h_test/bin_1.mat")
+    mat_file = os.path.join(data_path, "F268_FP-Data.mat")
     mat = loadmat(mat_file)
     mat, output_path = run_inference(
         mat, model_path="../models/sdreamer/checkpoints/", postprocess=False

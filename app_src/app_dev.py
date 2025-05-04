@@ -16,7 +16,7 @@ import dash_player
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 from dash.dependencies import Input, Output, State
-from dash import Dash, dcc, html, ctx, clientside_callback, Patch
+from dash import Dash, dcc, ctx, clientside_callback, Patch
 
 import numpy as np
 import pandas as pd
@@ -105,7 +105,7 @@ app.clientside_callback(
     """
     function(keyboard_nevents, keyboard_event, figure) {
         if (!keyboard_event || !figure) {
-            return [dash_clientside.no_update, dash_clientside.no_update, dash_clientside.no_update];
+            return [dash_clientside.no_update, dash_clientside.no_update, dash_clientside.no_update, dash_clientside.no_update];
         }
 
         var key = keyboard_event.key;
@@ -114,20 +114,23 @@ app.clientside_callback(
             let updatedFigure = JSON.parse(JSON.stringify(figure));
             if (figure.layout.dragmode === "pan") {
                 updatedFigure.layout.dragmode = "select"
+                predVisibility = {"visibility": "visible"}
             } else if (figure.layout.dragmode === "select") {
                 updatedFigure.layout.selections = null;
                 updatedFigure.layout.shapes = null;
                 updatedFigure.layout.dragmode = "pan"
+                predVisibility = {"visibility": "hidden"}
             }
-            return [updatedFigure, "", {"visibility": "hidden"}];
+            return [updatedFigure, "", {"visibility": "hidden"}, predVisibility];
         }
 
-        return [dash_clientside.no_update, dash_clientside.no_update, dash_clientside.no_update];
+        return [dash_clientside.no_update, dash_clientside.no_update, dash_clientside.no_update, dash_clientside.no_update];
     }
     """,
     Output("graph", "figure"),
     Output("annotation-message", "children"),
-    Output("video-button", "visibility"),
+    Output("video-button", "style"),
+    Output("pred-button", "style"),
     Input("keyboard", "n_events"),
     State("keyboard", "event"),
     State("graph", "figure"),
@@ -206,15 +209,30 @@ clientside_callback(
 
 
 @app.callback(
-    Output("pred-modal", "is_open"),
-    Output("pred-container", "children", allow_duplicate=True),
-    # Output("pred-message", "children", allow_duplicate=True),
-    Output("prediction-ready-store", "data"),
+    Output("pred-modal-confirm", "is_open"),
     Input("pred-button", "n_clicks"),
-    State("pred-modal", "is_open"),
+    State("pred-modal-confirm", "is_open"),
+    prevent_initial_call=True,
+)
+def show_confirm_pred_modal(n_clicks, is_open):
+    if n_clicks is None or n_clicks == 0:  # i.e., None or 0
+        raise dash.exceptions.PreventUpdate
+
+    return not is_open
+
+
+@app.callback(
+    Output("pred-modal-confirm", "is_open", allow_duplicate=True),
+    Output("data-upload-message", "children"),
+    Output("prediction-ready-store", "data"),
+    Input("pred-confirm-button", "n_clicks"),
+    State("pred-modal-confirm", "is_open"),
     prevent_initial_call=True,
 )
 def read_mat_pred(n_clicks, is_open):
+    if n_clicks is None or n_clicks == 0:  # i.e., None or 0
+        raise dash.exceptions.PreventUpdate
+
     message = ""
     mat_name = cache.get("filename")
     mat = loadmat(os.path.join(TEMP_PATH, mat_name))
@@ -233,32 +251,30 @@ def read_mat_pred(n_clicks, is_open):
     return ((not is_open), message, True)
 
 
-"""
 @app.callback(
     Output("data-upload-message", "children", allow_duplicate=True),
-    Output("visualization-ready-store", "data", allow_duplicate=True),
+    Output("visualization-ready-store", "data"),
+    Output("save-button", "style"),
     Input("prediction-ready-store", "data"),
     prevent_initial_call=True,
 )
-def generate_prediction(ready):
+def generate_prediction(n_clicks):
+    mat_name = cache.get("filename")
+    mat = loadmat(os.path.join(TEMP_PATH, mat_name))
     filename = cache.get("filename")
     temp_mat_path = os.path.join(TEMP_PATH, filename)
-    mat = loadmat(temp_mat_path)
     mat, output_path = run_inference(
         mat,
         postprocess=config["postprocess"],
         output_path=temp_mat_path,
         save_inference=True,
     )
+
     # it is necessary to set cache again here because the output file
     # which includes prediction has a new name (old_name + "_sdreamer"),
     # it is this file that should be used for the subsequent visualization.
     reset_cache(cache, os.path.basename(output_path))
-    return (
-        html.Div(["The prediction has been generated successfully."]),
-        True,
-    )
-"""
+    return "The prediction has been generated.", True, {"visibility": "visible"}
 
 
 @du.callback(
@@ -507,7 +523,7 @@ def update_fig(relayoutdata):
     Output("box-select-store", "data"),
     Output("graph", "figure", allow_duplicate=True),
     Output("annotation-message", "children", allow_duplicate=True),
-    Output("video-button", "visibility", allow_duplicate=True),
+    Output("video-button", "style", allow_duplicate=True),
     Input("graph", "selectedData"),
     State("graph", "figure"),
     State("graph", "clickData"),
@@ -589,7 +605,7 @@ def debug_box_select(box_select, figure):
     Output("box-select-store", "data", allow_duplicate=True),
     Output("graph", "figure", allow_duplicate=True),
     Output("annotation-message", "children", allow_duplicate=True),
-    Output("video-button", "visibility", allow_duplicate=True),
+    Output("video-button", "style", allow_duplicate=True),
     Input("graph", "clickData"),
     State("graph", "figure"),
     prevent_initial_call=True,
@@ -655,7 +671,7 @@ def read_click_select(clickData, figure):  # triggered only  if clicked within x
     Output("graph", "figure", allow_duplicate=True),
     Output("annotation-store", "data"),
     Output("annotation-message", "children", allow_duplicate=True),
-    Output("video-button", "visibility", allow_duplicate=True),
+    Output("video-button", "style", allow_duplicate=True),
     Input("box-select-store", "data"),
     Input("keyboard", "n_events"),  # a keyboard press
     State("keyboard", "event"),
@@ -696,7 +712,7 @@ def update_sleep_scores(box_select_range, keyboard_press, keyboard_event, figure
 
 
 @app.callback(
-    Output("save-button", "style"),
+    Output("save-button", "style", allow_duplicate=True),
     Output("undo-button", "style"),
     Input("annotation-store", "data"),
     State("graph", "figure"),
@@ -704,6 +720,9 @@ def update_sleep_scores(box_select_range, keyboard_press, keyboard_event, figure
 )
 def write_annotation(annotation, figure):
     """write to annotation history, update mat in cache, and make undo button availabe"""
+    if annotation is None:
+        raise PreventUpdate()
+
     start, end, prev_labels = annotation
     annotation_history = cache.get("annotation_history")
     annotation_history.append(
@@ -723,9 +742,9 @@ def write_annotation(annotation, figure):
     net_annotation_count += 1
     cache.set("net_annotation_count", net_annotation_count)
     if net_annotation_count > 0:
-        save_button_style = {"display": "block"}
+        save_button_style = {"visibility": "visible"}
 
-    return save_button_style, {"display": "block"}
+    return save_button_style, {"visibility": "visible"}
 
 
 @app.callback(
@@ -764,9 +783,9 @@ def undo_annotation(n_clicks, figure):
     # check whether need to take away save and undo button or not
     save_button_style, undo_button_style = dash.no_update, dash.no_update
     if net_annotation_count == 0:
-        save_button_style = {"display": "none"}
+        save_button_style = {"visibility": "hidden"}
     if not annotation_history:
-        undo_button_style = {"display": "none"}
+        undo_button_style = {"visibility": "hidden"}
 
     return patched_figure, save_button_style, undo_button_style
 
