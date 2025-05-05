@@ -255,6 +255,7 @@ def read_mat_pred(n_clicks, is_open):
     Output("data-upload-message", "children", allow_duplicate=True),
     Output("visualization-ready-store", "data"),
     Output("save-button", "style"),
+    Output("annotation-message", "children", allow_duplicate=True),
     Input("prediction-ready-store", "data"),
     prevent_initial_call=True,
 )
@@ -274,7 +275,7 @@ def generate_prediction(n_clicks):
     # which includes prediction has a new name (old_name + "_sdreamer"),
     # it is this file that should be used for the subsequent visualization.
     reset_cache(cache, os.path.basename(output_path))
-    return "The prediction has been generated.", True, {"visibility": "visible"}
+    return "The prediction has been generated.", "pred", {"visibility": "visible"}, ""
 
 
 @du.callback(
@@ -282,6 +283,8 @@ def generate_prediction(n_clicks):
         Output("data-upload-message", "children", allow_duplicate=True),
         Output("visualization-ready-store", "data", allow_duplicate=True),
         Output("upload-container", "children", allow_duplicate=True),
+        Output("save-button", "style", allow_duplicate=True),
+        Output("annotation-message", "children", allow_duplicate=True),
     ],
     id="vis-data-upload",
 )
@@ -299,7 +302,7 @@ def read_mat_vis(status):
     message = (
         "File uploaded. Creating visualizations... This may take up to 30 seconds."
     )
-    return message, True, components.vis_upload_box
+    return message, "vis", components.vis_upload_box, {"visibility": "hidden"}, ""
 
 
 @app.callback(

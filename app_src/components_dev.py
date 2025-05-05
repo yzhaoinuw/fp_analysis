@@ -166,7 +166,9 @@ utility_div = html.Div(
         html.Div(
             [
                 html.Button(
-                    "Generate Predictions", id="pred-button", style={"display": "none"}
+                    "Generate Predictions",
+                    id="pred-button",
+                    style={"visibility": "hidden"},
                 )
             ],
             style={"marginLeft": "auto"},  # keep the button to the right edge
@@ -192,29 +194,6 @@ video_modal = dbc.Modal(
     is_open=False,
     backdrop="static",  # the user must clicks the "x" to exit
     centered=True,
-)
-
-save_div = html.Div(
-    style={
-        "display": "flex",
-        "marginRight": "10px",
-        "marginLeft": "10px",
-        "marginBottom": "10px",
-    },
-    children=[
-        html.Button(
-            "Save Annotations",
-            id="save-button",
-            style={"display": "none"},
-        ),
-        dcc.Download(id="download-annotations"),
-        dcc.Download(id="download-spreadsheet"),
-        html.Button(
-            "Undo Annotation",
-            id="undo-button",
-            style={"display": "none"},
-        ),
-    ],
 )
 
 backend_div = html.Div(
