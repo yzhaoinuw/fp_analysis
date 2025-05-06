@@ -9,6 +9,7 @@ import os
 import math
 import tempfile
 import webbrowser
+from pathlib import Path
 from collections import deque
 
 import dash
@@ -24,7 +25,7 @@ from flask_caching import Cache
 from scipy.io import loadmat, savemat
 
 from app_src import VERSION, config
-from app_src.make_mp4 import avi_to_mp4
+from app_src.make_mp4 import make_mp4_clip
 from app_src.components_dev import Components
 from app_src.inference import run_inference
 from app_src.make_figure_dev import make_figure
@@ -45,7 +46,8 @@ TEMP_PATH = os.path.join(tempfile.gettempdir(), "sleep_scoring_app_data")
 if not os.path.exists(TEMP_PATH):
     os.makedirs(TEMP_PATH)
 
-VIDEO_DIR = "./assets/videos/"
+# VIDEO_DIR = "./assets/videos/"
+VIDEO_DIR = Path(__file__).parent / "assets" / "videos"
 if not os.path.exists(VIDEO_DIR):
     os.makedirs(VIDEO_DIR)
 
@@ -225,6 +227,7 @@ def show_confirm_pred_modal(n_clicks, is_open):
     Output("pred-modal-confirm", "is_open", allow_duplicate=True),
     Output("data-upload-message", "children"),
     Output("prediction-ready-store", "data"),
+    Output("annotation-message", "children", allow_duplicate=True),
     Input("pred-confirm-button", "n_clicks"),
     State("pred-modal-confirm", "is_open"),
     prevent_initial_call=True,
@@ -248,14 +251,13 @@ def read_mat_pred(n_clicks, is_open):
         message += " NE data not detected."
 
     message += " Generating predictions... This may take up to 3 minutes. Check Terminal for the progress."
-    return ((not is_open), message, True)
+    return ((not is_open), message, True, "")
 
 
 @app.callback(
     Output("data-upload-message", "children", allow_duplicate=True),
     Output("visualization-ready-store", "data"),
     Output("save-button", "style"),
-    Output("annotation-message", "children", allow_duplicate=True),
     Input("prediction-ready-store", "data"),
     prevent_initial_call=True,
 )
@@ -275,7 +277,7 @@ def generate_prediction(n_clicks):
     # which includes prediction has a new name (old_name + "_sdreamer"),
     # it is this file that should be used for the subsequent visualization.
     reset_cache(cache, os.path.basename(output_path))
-    return "The prediction has been generated.", "pred", {"visibility": "visible"}, ""
+    return "The prediction has been generated.", "pred", {"visibility": "visible"}
 
 
 @du.callback(
@@ -463,7 +465,7 @@ def make_clip(video_path, box_select_range):
 
     save_path = os.path.join(VIDEO_DIR, clip_name)
     try:
-        avi_to_mp4(
+        make_mp4_clip(
             video_path,
             start_time=start,
             end_time=end,
