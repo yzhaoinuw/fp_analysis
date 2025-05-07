@@ -456,14 +456,14 @@ def make_clip(video_path, box_select_range):
     end = end + video_start_time
     video_name = os.path.basename(video_path).split(".")[0]
     clip_name = video_name + f"_time_range_{start}-{end}" + ".mp4"
-    if os.path.isfile(os.path.join(VIDEO_DIR, clip_name)):
+    save_path = os.path.join(VIDEO_DIR, clip_name)
+    if os.path.isfile(save_path):
         return clip_name, ""
 
     for file in os.listdir(VIDEO_DIR):
         if file.endswith(".mp4"):
             os.remove(os.path.join(VIDEO_DIR, file))
 
-    save_path = os.path.join(VIDEO_DIR, clip_name)
     try:
         make_mp4_clip(
             video_path,
@@ -485,9 +485,9 @@ def make_clip(video_path, box_select_range):
     prevent_initial_call=True,
 )
 def show_clip(clip_name):
-    clip_path = os.path.join("/assets/videos/", clip_name)
     if not os.path.isfile(os.path.join(VIDEO_DIR, clip_name)):
         return "", "Video not ready yet. Please check again in a second."
+    clip_path = os.path.join("/assets/videos/", clip_name)
     player = dash_player.DashPlayer(
         id="player",
         url=clip_path,

@@ -34,8 +34,9 @@ def make_mp4_clip(
         video_path,  # input file
         "-t",
         str(duration),  # clip duration
-        "-c",
-        "copy",  # copy all streams (no re-encode)
+        # "-c", "copy",  # copy all streams (no re-encode)
+        "-c:v",
+        "libx264",  # re-encode video to H.264
         "-movflags",
         "+faststart",  # for better MP4 playback start
         "-f",
