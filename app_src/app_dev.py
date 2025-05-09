@@ -80,6 +80,12 @@ def create_fig(mat, mat_name, default_n_shown_samples=2048):
 
 
 def reset_cache(cache, filename):
+    prev_filename = cache.get("filename")
+
+    # attempt for salvaging unsaved annotations
+    if prev_filename is None or prev_filename.split("_sdreamer")[0] != filename:
+        cache.set("modified_sleep_scores", None)
+
     cache.set("filename", filename)
     recent_files_with_video = cache.get("recent_files_with_video")
     if recent_files_with_video is None:
@@ -94,7 +100,6 @@ def reset_cache(cache, filename):
     cache.set("video_start_time", 0)
     cache.set("video_name", "")
     cache.set("video_path", "")
-    cache.set("modified_sleep_scores", None)
     cache.set("annotation_history", deque(maxlen=3))
     cache.set("fig_resampler", None)
     cache.set("net_annotation_count", 0)  # annotations made minus undos made
@@ -315,6 +320,12 @@ def read_mat_vis(status):
 def create_visualization(ready):
     mat_name = cache.get("filename")
     mat = loadmat(os.path.join(TEMP_PATH, mat_name))
+
+    # salvage unsaved annotations
+    modified_sleep_scores = cache.get("modified_sleep_scores")
+    if modified_sleep_scores is not None:
+        mat["sleep_scores"] = modified_sleep_scores
+
     eeg, emg = mat.get("eeg"), mat.get("emg")
     message = "Please double check the file selected."
     validated = True
