@@ -119,6 +119,7 @@ home_div = html.Div(
         ),
         dcc.Store(id="prediction-ready-store"),
         dcc.Store(id="visualization-ready-store"),
+        dcc.Store(id="net-annotation-count-store"),
         dcc.Download(id="prediction-download-store"),
         pred_modal_confirm,
     ]

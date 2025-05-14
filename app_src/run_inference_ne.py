@@ -5,7 +5,6 @@ Created on Wed Nov 13 19:02:18 2024
 @author: yzhao
 """
 
-import glob
 import argparse
 
 import torch
@@ -120,15 +119,33 @@ def build_args(**kwargs):
 
 # %%
 def infer(data, model_path, batch_size=32):
+    """
+    Parameters
+    ----------
+    data : TYPE
+        DESCRIPTION.
+    model_path : pathlib Path object
+        DESCRIPTION.
+    batch_size : TYPE, optional
+        DESCRIPTION. The default is 32.
+
+    Returns
+    -------
+    all_pred : TYPE
+        DESCRIPTION.
+    all_prob : TYPE
+        DESCRIPTION.
+
+    """
     args = build_args()
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = n2nBaseLineNE.Model(args)
     model = model.to(device)
-    state_dicts = glob.glob(model_path + "*ne_256.pt")
+    state_dicts = list(model_path.glob("*ne_256.pt"))
     if state_dicts:
         state_dict_path = state_dicts[0]
     else:
-        state_dict_path = glob.glob(model_path + "*.pt")[0]
+        state_dict_path = list(model_path.glob("*.pt"))[0]
     state_dict = torch.load(state_dict_path, map_location=device, weights_only=True)
     model.load_state_dict(state_dict, strict=False)
     n_sequences = config["n_sequences"]
@@ -182,16 +199,16 @@ def infer(data, model_path, batch_size=32):
 
 # %%
 if __name__ == "__main__":
+    from pathlib import Path
     from scipy.io import loadmat
 
-    model_path = (
+    model_path = Path(
         "C:/Users/yzhao/python_projects/sleep_scoring/models/sdreamer/checkpoints/"
     )
-    mat_file = "C:/Users/yzhao/python_projects/sleep_scoring/user_test_files/20241113_1_263_2_259_24h_test/bin_1.mat"
-    data = loadmat(mat_file)
-    all_pred, all_prob = infer(data, model_path)
-    sleep_scores = data.get("sleep_scores")
+    mat_file = "C:/Users/yzhao/python_projects/sleep_scoring/user_test_files/115_gs.mat"
+    mat = loadmat(mat_file, squeeze_me=True)
+    all_pred, all_prob = infer(mat, model_path)
+    sleep_scores = mat.get("sleep_scores")
     if sleep_scores is not None:
-        sleep_scores = data["sleep_scores"].flatten()
         clip_len = min(len(all_pred), len(sleep_scores))
         acc = np.sum(all_pred[:clip_len] == sleep_scores[:clip_len]) / clip_len

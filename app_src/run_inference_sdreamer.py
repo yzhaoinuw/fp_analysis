@@ -5,8 +5,8 @@ Created on Fri May 17 12:17:16 2024
 @author: yzhao
 """
 
-import glob
 import argparse
+from pathlib import Path
 
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -108,7 +108,7 @@ def infer(data, model_path, batch_size=32):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = n2nSeqNewMoE2.Model(args)
     model = model.to(device)
-    state_dict_path = glob.glob(model_path + "*augment_10.pt")[0]
+    state_dict_path = list(model_path.glob("*augment_10.pt"))[0]
     state_dict = torch.load(state_dict_path, map_location=device, weights_only=True)
     model.load_state_dict(state_dict)
 
@@ -168,7 +168,7 @@ def infer(data, model_path, batch_size=32):
 if __name__ == "__main__":
     from scipy.io import loadmat
 
-    model_path = "../models/sdreamer/checkpoints/"
-    mat_file = "../user_test_files/box1_COM18_RZ10_2_1_2024-06-03_09-04-56-902.mat"
-    data = loadmat(mat_file)
+    model_path = Path("../models/sdreamer/checkpoints/")
+    mat_file = "../user_test_files/115_gs.mat"
+    data = loadmat(mat_file, squeeze_me=True)
     all_pred, all_prob = infer(data, model_path)

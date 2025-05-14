@@ -6,6 +6,7 @@ Created on Sun Oct 29 22:09:21 2023
 """
 
 import os
+from pathlib import Path
 from scipy.io import loadmat, savemat
 
 import app_src.run_inference_ne as run_inference_ne
@@ -13,9 +14,12 @@ import app_src.run_inference_sdreamer as run_inference_sdreamer
 from app_src.postprocessing import postprocess_sleep_scores
 
 
+MODEL_PATH = Path(__file__).parents[1] / "models" / "sdreamer" / "checkpoints"
+
+
 def run_inference(
     mat,
-    model_path="./models/sdreamer/checkpoints/",
+    model_path=MODEL_PATH,
     num_class=3,
     postprocess=False,
     output_path=None,
@@ -25,6 +29,7 @@ def run_inference(
     ne = mat.get("ne")
     ne_tag = ""
     post_tag = ""
+    # print(model_path)
     if ne is not None and len(ne) != 0:
         ne_tag = "_ne"
         predictions, confidence = run_inference_ne.infer(mat, model_path)
@@ -50,7 +55,5 @@ def run_inference(
 if __name__ == "__main__":
     data_path = "../user_test_files/"
     mat_file = os.path.join(data_path, "F268_FP-Data.mat")
-    mat = loadmat(mat_file)
-    mat, output_path = run_inference(
-        mat, model_path="../models/sdreamer/checkpoints/", postprocess=False
-    )
+    mat = loadmat(mat_file, squeeze_me=True)
+    mat, output_path = run_inference(mat, postprocess=False)

@@ -21,87 +21,88 @@ from plotly_resampler.aggregation import MinMaxLTTB
 from app_src.get_fft_plots import get_fft_plots
 
 # set up color config
-sleep_score_opacity = 1
-stage_colors = [
+SLEEP_SCORE_OPACITY = 1
+STAGE_COLORS = [
     "rgb(124, 124, 251)",  # Wake,
     "rgb(251, 124, 124)",  # NREM,
     "rgb(123, 251, 123)",  # REM,
     "rgb(255, 255, 0)",  # MA yellow
 ]
-stage_names = ["Wake: 1", "NREM: 2", "REM: 3", "MA: 4"]
-colorscale = {
-    3: [[0, stage_colors[0]], [0.5, stage_colors[1]], [1, stage_colors[2]]],
+STAGE_NAMES = ["Wake: 1", "NREM: 2", "REM: 3", "MA: 4"]
+COLORSCALE = {
+    3: [[0, STAGE_COLORS[0]], [0.5, STAGE_COLORS[1]], [1, STAGE_COLORS[2]]],
     4: [
-        [0, stage_colors[0]],
-        [1 / 3, stage_colors[1]],
-        [2 / 3, stage_colors[2]],
-        [1, stage_colors[3]],
+        [0, STAGE_COLORS[0]],
+        [1 / 3, STAGE_COLORS[1]],
+        [2 / 3, STAGE_COLORS[2]],
+        [1, STAGE_COLORS[3]],
     ],
 }
-range_quantile = 0.9999
-heatmap_width = 40
-range_padding_percent = 0.2
+RANGE_QUANTILE = 0.9999
+HEATMAP_WIDTH = 40
+RANGE_PADDING_PERCENT = 0.2
 
 
-def make_figure(mat, mat_name="", default_n_shown_samples=2048, ne_fs=10, num_class=3):
-    # Time span and frequencies
-    eeg, emg, ne = mat.get("eeg"), mat.get("emg"), mat.get("ne")
-    eeg, emg = eeg.flatten(), emg.flatten()
-    eeg_freq, ne_freq = mat.get("eeg_frequency"), mat.get("ne_frequency")
-    eeg_freq = eeg_freq.item()
-    start_time = mat.get("start_time")
-    if start_time is None:
-        start_time = 0
-    else:
-        start_time = start_time.item()
+def get_padded_sleep_scores(mat) -> np.ndarray:
+    """Make a sleep score array the same size as the duration."""
+    eeg = mat.get("eeg")
+    eeg_freq = mat.get("eeg_frequency")
     duration = math.ceil(
         (eeg.size - 1) / eeg_freq
     )  # need to round duration to an int for later
+    sleep_scores = mat.get("sleep_scores", np.array([]))
+    if sleep_scores.size == 0:
+        # if unscored, initialize with nan
+        sleep_scores = np.zeros(duration)
+        sleep_scores[:] = np.nan
+    else:
+        # manually scored, but may contain missing scores
+        sleep_scores = sleep_scores.astype(float)
+
+        # sleep_scores need to have the length of duration. pad if necessary
+        pad_len = duration - sleep_scores.size
+        if pad_len > 0:
+            sleep_scores = np.pad(
+                sleep_scores, (0, pad_len), "constant", constant_values=np.nan
+            )
+    return sleep_scores
+
+
+def make_figure(mat, plot_name="", default_n_shown_samples=2048, num_class=3):
+    # Time span and frequencies
+    eeg, emg, ne = mat.get("eeg"), mat.get("emg"), mat.get("ne")
+    eeg_freq, ne_freq = mat.get("eeg_frequency"), mat.get("ne_frequency")
+    start_time = mat.get("start_time")
+    if mat.get("num_class") is not None:
+        num_class = mat["num_class"]
+    if start_time is None:
+        start_time = 0
+
+    duration = math.ceil(
+        (eeg.size - 1) / eeg_freq
+    )  # need to round duration to an int for later
+
+    # scored fully or partially or unscored
+    sleep_scores = get_padded_sleep_scores(mat)
     eeg_end_time = duration + start_time
     # Create the time sequences
     time_eeg = np.linspace(start_time, eeg_end_time, eeg.size)
-    eeg_end_time = math.ceil(eeg_end_time)
-    # time = np.expand_dims(np.arange(start_time + 1, eeg_end_time + 1), 0)
+    eeg_end_time = math.ceil(time_eeg[-1])
     eeg_lower_range, eeg_upper_range = np.nanquantile(
-        eeg, 1 - range_quantile
-    ), np.nanquantile(eeg, range_quantile)
+        eeg, 1 - RANGE_QUANTILE
+    ), np.nanquantile(eeg, RANGE_QUANTILE)
     emg_lower_range, emg_upper_range = np.nanquantile(
-        emg, 1 - range_quantile
-    ), np.nanquantile(emg, range_quantile)
+        emg, 1 - RANGE_QUANTILE
+    ), np.nanquantile(emg, RANGE_QUANTILE)
     eeg_range = max(abs(eeg_lower_range), abs(eeg_upper_range))
     emg_range = max(abs(emg_lower_range), abs(emg_upper_range))
-
-    # scored fully or partially or unscored
-    labels = mat.get("sleep_scores")
-    if labels is None or labels.size == 0:
-        # if unscored, initialize with nan
-        mat["sleep_scores"] = np.zeros((1, duration))
-        mat["sleep_scores"][:] = np.nan
-        labels = mat["sleep_scores"]
-    else:  # manually scored, but may contain missing scores
-        # make a labels copy and do not modify mat. only need to replace
-        # -1 in labels copy with nan for visualization
-
-        # sleep_scores will have the length of duration. this is
-        # guaranteed in the preprocessing process.
-        labels = labels.astype(float)
-        np.place(
-            labels, labels == -1, [np.nan]
-        )  # convert -1 to None for heatmap visualization
+    np.place(
+        sleep_scores, sleep_scores == -1, [np.nan]
+    )  # convert -1 to None for heatmap visualization
 
     # convert flat array to 2D array for visualization to work
-    if len(labels.shape) == 1:
-        labels = np.expand_dims(labels, axis=0)
-
-    # pad if necessary
-    pad_len = duration - labels.size
-    if pad_len > 0:
-        labels = np.pad(
-            labels, ((0, 0), (0, pad_len)), "constant", constant_values=np.nan
-        )
-
-    if mat.get("num_class") is not None:
-        num_class = mat["num_class"].item()
+    if len(sleep_scores.shape) == 1:
+        sleep_scores = np.expand_dims(sleep_scores, axis=0)
 
     fig = FigureResampler(
         make_subplots(
@@ -134,13 +135,13 @@ def make_figure(mat, mat_name="", default_n_shown_samples=2048, ne_fs=10, num_cl
         x0=start_time + 0.5,
         dx=1,
         y0=0,
-        dy=heatmap_width,  # assuming that the max abs value of eeg, emg, or ne is no more than 10
-        z=labels,
+        dy=HEATMAP_WIDTH,  # assuming that the max abs value of eeg, emg, or ne is no more than 10
+        z=sleep_scores,
         name="Sleep Scores",
         hoverinfo="none",
-        colorscale=colorscale[num_class],
+        colorscale=COLORSCALE[num_class],
         showscale=False,
-        opacity=sleep_score_opacity,
+        opacity=SLEEP_SCORE_OPACITY,
         zmax=num_class - 1,
         zmin=0,
         showlegend=False,
@@ -191,15 +192,15 @@ def make_figure(mat, mat_name="", default_n_shown_samples=2048, ne_fs=10, num_cl
         col=1,
     )
 
-    for i, color in enumerate(stage_colors[:num_class]):
+    for i, color in enumerate(STAGE_COLORS[:num_class]):
         fig.add_trace(
             go.Scatter(
                 x=[-100],
                 y=[0.2],
-                name=stage_names[i],
+                name=STAGE_NAMES[i],
                 mode="markers",
                 marker=dict(
-                    size=8, color=color, symbol="square", opacity=sleep_score_opacity
+                    size=8, color=color, symbol="square", opacity=SLEEP_SCORE_OPACITY
                 ),
                 showlegend=True,
             ),
@@ -209,16 +210,16 @@ def make_figure(mat, mat_name="", default_n_shown_samples=2048, ne_fs=10, num_cl
 
     ne_lower_range, ne_upper_range = 0, 0
     if ne is not None and ne.size > 1:
-        ne = ne.flatten()
-        ne_freq = ne_freq.item()
+        # ne = ne.flatten()
+        # ne_freq = ne_freq.item()
         ne_end_time = (ne.size - 1) / ne_freq + start_time
 
         # Create the time sequences
         time_ne = np.linspace(start_time, ne_end_time, ne.size)
         # ne_end_time = math.ceil(ne_end_time)
         ne_lower_range, ne_upper_range = np.nanquantile(
-            ne, 1 - range_quantile
-        ), np.nanquantile(ne, range_quantile)
+            ne, 1 - RANGE_QUANTILE
+        ), np.nanquantile(ne, RANGE_QUANTILE)
         fig.add_trace(
             go.Scattergl(
                 name="NE",
@@ -250,7 +251,7 @@ def make_figure(mat, mat_name="", default_n_shown_samples=2048, ne_fs=10, num_cl
         hovermode="x unified",  # gives crosshair in one subplot
         hoverlabel=dict(bgcolor="rgba(255, 255, 255, 0.6)"),
         title=dict(
-            text=mat_name,
+            text=plot_name,
             font=dict(size=16),
             xanchor="left",
             x=0.03,
@@ -262,7 +263,7 @@ def make_figure(mat, mat_name="", default_n_shown_samples=2048, ne_fs=10, num_cl
         # yaxis4=dict(tickvals=[]),  # suppress y ticks on the heatmap
         xaxis4=dict(tickformat="digits"),
         legend=dict(
-            x=0.6,  # adjust these values to position the sleep score legend stage_names
+            x=0.6,  # adjust these values to position the sleep score legend STAGE_NAMES
             y=0.85,
             orientation="h",  # makes legend items horizontal
             bgcolor="rgba(0,0,0,0)",  # transparent legend background
@@ -295,8 +296,8 @@ def make_figure(mat, mat_name="", default_n_shown_samples=2048, ne_fs=10, num_cl
     )
     fig.update_yaxes(
         range=[
-            eeg_range * -(1 + range_padding_percent),
-            eeg_range * (1 + range_padding_percent),
+            eeg_range * -(1 + RANGE_PADDING_PERCENT),
+            eeg_range * (1 + RANGE_PADDING_PERCENT),
         ],
         # fixedrange=True,
         row=2,
@@ -304,8 +305,8 @@ def make_figure(mat, mat_name="", default_n_shown_samples=2048, ne_fs=10, num_cl
     )
     fig.update_yaxes(
         range=[
-            emg_range * -(1 + range_padding_percent),
-            emg_range * (1 + range_padding_percent),
+            emg_range * -(1 + RANGE_PADDING_PERCENT),
+            emg_range * (1 + RANGE_PADDING_PERCENT),
         ],
         # fixedrange=True,
         row=3,
@@ -313,8 +314,8 @@ def make_figure(mat, mat_name="", default_n_shown_samples=2048, ne_fs=10, num_cl
     )
     fig.update_yaxes(
         range=[
-            ne_range * -(1 + range_padding_percent),
-            ne_range * (1 + range_padding_percent),
+            ne_range * -(1 + RANGE_PADDING_PERCENT),
+            ne_range * (1 + RANGE_PADDING_PERCENT),
         ],
         fixedrange=True,
         row=4,
@@ -350,10 +351,10 @@ if __name__ == "__main__":
 
     io.renderers.default = "browser"
     data_path = "../user_test_files/"
-    mat_file = "788_bin1_gs.mat"
-    mat = loadmat(os.path.join(data_path, mat_file))
+    mat_file = "115_gs.mat"
+    mat = loadmat(os.path.join(data_path, mat_file), squeeze_me=True)
     # mat_file = "C:/Users/yzhao/python_projects/sleep_scoring/user_test_files/box1_COM18_RZ10_2_1_2024-06-03_09-04-56-902_sdreamer_3class.mat"
     # mat = loadmat(mat_file)
     mat_name = os.path.basename(mat_file)
-    fig = make_figure(mat, mat_name=mat_name)
+    fig = make_figure(mat, plot_name=mat_name)
     fig.show_dash(config={"scrollZoom": True})

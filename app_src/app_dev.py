@@ -7,6 +7,8 @@ Created on Fri Oct 20 15:45:29 2023
 
 import os
 import math
+
+# import time
 import tempfile
 import webbrowser
 from pathlib import Path
@@ -28,7 +30,7 @@ from app_src import VERSION, config
 from app_src.make_mp4 import make_mp4_clip
 from app_src.components_dev import Components
 from app_src.inference import run_inference
-from app_src.make_figure_dev import make_figure
+from app_src.make_figure_dev import get_padded_sleep_scores, make_figure
 
 from app_src.postprocessing import get_sleep_segments, get_pred_label_stats
 
@@ -47,7 +49,7 @@ if not os.path.exists(TEMP_PATH):
     os.makedirs(TEMP_PATH)
 
 # VIDEO_DIR = "./assets/videos/"
-VIDEO_DIR = Path(__file__).parent / "assets" / "videos"
+VIDEO_DIR = str(Path(__file__).parent / "assets" / "videos")
 if not os.path.exists(VIDEO_DIR):
     os.makedirs(VIDEO_DIR)
 
@@ -84,7 +86,7 @@ def reset_cache(cache, filename):
 
     # attempt for salvaging unsaved annotations
     if prev_filename is None or prev_filename.split("_sdreamer")[0] != filename:
-        cache.set("modified_sleep_scores", None)
+        cache.set("sleep_scores_history", deque(maxlen=4))
 
     cache.set("filename", filename)
     recent_files_with_video = cache.get("recent_files_with_video")
@@ -100,9 +102,7 @@ def reset_cache(cache, filename):
     cache.set("video_start_time", 0)
     cache.set("video_name", "")
     cache.set("video_path", "")
-    cache.set("annotation_history", deque(maxlen=3))
     cache.set("fig_resampler", None)
-    cache.set("net_annotation_count", 0)  # annotations made minus undos made
 
 
 # %% client side callbacks below
@@ -243,8 +243,8 @@ def read_mat_pred(n_clicks, is_open):
 
     message = ""
     mat_name = cache.get("filename")
-    mat = loadmat(os.path.join(TEMP_PATH, mat_name))
-    eeg_freq = mat["eeg_frequency"].item()
+    mat = loadmat(os.path.join(TEMP_PATH, mat_name), squeeze_me=True)
+    eeg_freq = mat["eeg_frequency"]
     if round(eeg_freq) != 512:
         message += (
             f"EEG/EMG data has a sampling frequency of {eeg_freq} Hz. "
@@ -262,13 +262,14 @@ def read_mat_pred(n_clicks, is_open):
 @app.callback(
     Output("data-upload-message", "children", allow_duplicate=True),
     Output("visualization-ready-store", "data"),
-    Output("save-button", "style"),
+    Output("net-annotation-count-store", "data"),
     Input("prediction-ready-store", "data"),
+    State("net-annotation-count-store", "data"),
     prevent_initial_call=True,
 )
-def generate_prediction(n_clicks):
+def generate_prediction(n_clicks, net_annotation_count):
     mat_name = cache.get("filename")
-    mat = loadmat(os.path.join(TEMP_PATH, mat_name))
+    mat = loadmat(os.path.join(TEMP_PATH, mat_name), squeeze_me=True)
     filename = cache.get("filename")
     temp_mat_path = os.path.join(TEMP_PATH, filename)
     mat, output_path = run_inference(
@@ -277,12 +278,12 @@ def generate_prediction(n_clicks):
         output_path=temp_mat_path,
         save_inference=True,
     )
-
+    net_annotation_count += 1
     # it is necessary to set cache again here because the output file
     # which includes prediction has a new name (old_name + "_sdreamer"),
     # it is this file that should be used for the subsequent visualization.
     reset_cache(cache, os.path.basename(output_path))
-    return "The prediction has been generated.", "pred", {"visibility": "visible"}
+    return "The prediction has been generated.", "pred", net_annotation_count
 
 
 @du.callback(
@@ -290,7 +291,7 @@ def generate_prediction(n_clicks):
         Output("data-upload-message", "children", allow_duplicate=True),
         Output("visualization-ready-store", "data", allow_duplicate=True),
         Output("upload-container", "children", allow_duplicate=True),
-        Output("save-button", "style", allow_duplicate=True),
+        Output("net-annotation-count-store", "data", allow_duplicate=True),
         Output("annotation-message", "children", allow_duplicate=True),
     ],
     id="vis-data-upload",
@@ -309,24 +310,20 @@ def read_mat_vis(status):
     message = (
         "File uploaded. Creating visualizations... This may take up to 30 seconds."
     )
-    return message, "vis", components.vis_upload_box, {"visibility": "hidden"}, ""
+    return message, "vis", components.vis_upload_box, 0, ""
 
 
 @app.callback(
     Output("data-upload-message", "children", allow_duplicate=True),
+    # Output("debug-message", "children"),
     Input("visualization-ready-store", "data"),
     prevent_initial_call=True,
 )
 def create_visualization(ready):
     mat_name = cache.get("filename")
-    mat = loadmat(os.path.join(TEMP_PATH, mat_name))
-
-    # salvage unsaved annotations
-    modified_sleep_scores = cache.get("modified_sleep_scores")
-    if modified_sleep_scores is not None:
-        mat["sleep_scores"] = modified_sleep_scores
-
+    mat = loadmat(os.path.join(TEMP_PATH, mat_name), squeeze_me=True)
     eeg, emg = mat.get("eeg"), mat.get("emg")
+
     message = "Please double check the file selected."
     validated = True
     if emg is None:
@@ -338,25 +335,33 @@ def create_visualization(ready):
     if not validated:
         return message
 
+    # salvage unsaved annotations
+    sleep_scores_history = cache.get("sleep_scores_history")
+    if sleep_scores_history:
+        mat["sleep_scores"] = sleep_scores_history[-1]
+    else:
+        sleep_scores = get_padded_sleep_scores(mat)
+        sleep_scores_history.append(sleep_scores)
+
     fig = create_fig(mat, mat_name)
     video_start_time = mat.get("video_start_time")
-    video_path = mat.get("video_path", [])
-    video_name = mat.get("video_name", [])
+    video_path = mat.get("video_path", np.array([]))
+    video_name = mat.get("video_name", np.array([]))
     time_ax = fig["data"][0]["x"]
     eeg_start_time, eeg_end_time = time_ax[0], time_ax[-1]
     cache.set("start_time", eeg_start_time)
     cache.set("end_time", eeg_end_time)
     if video_start_time is not None:
-        video_start_time = video_start_time.item()
         cache.set("video_start_time", video_start_time)
-    if video_path:
+    if video_path.size != 0:
         video_path = video_path.item()
         cache.set("video_path", video_path)
-    if video_name:
+    if video_name.size != 0:
         video_name = video_name.item()
         cache.set("video_name", video_name)
 
     cache.set("fig_resampler", fig)
+    cache.set("sleep_scores_history", sleep_scores_history)
     components.graph.figure = fig
     return components.visualization_div
 
@@ -372,12 +377,12 @@ def change_sampling_level(sampling_level):
     sampling_level_map = {"x1": 2048, "x2": 4096, "x4": 8192}
     n_samples = sampling_level_map[sampling_level]
     mat_name = cache.get("filename")
-    mat = loadmat(os.path.join(TEMP_PATH, mat_name))
+    mat = loadmat(os.path.join(TEMP_PATH, mat_name), squeeze_me=True)
 
     # copy modified (through annotation) sleep scores over
-    modified_sleep_scores = cache.get("modified_sleep_scores")
-    if modified_sleep_scores is not None:
-        mat["sleep_scores"] = modified_sleep_scores.copy()
+    sleep_scores_history = cache.get("sleep_scores_history")
+    if sleep_scores_history:
+        mat["sleep_scores"] = sleep_scores_history[-1]
 
     fig = create_fig(mat, mat_name, default_n_shown_samples=n_samples)
     return fig
@@ -467,13 +472,13 @@ def make_clip(video_path, box_select_range):
     end = end + video_start_time
     video_name = os.path.basename(video_path).split(".")[0]
     clip_name = video_name + f"_time_range_{start}-{end}" + ".mp4"
-    save_path = os.path.join(VIDEO_DIR, clip_name)
-    if os.path.isfile(save_path):
+    save_path = VIDEO_DIR / clip_name
+    if save_path.is_file():
         return clip_name, ""
 
-    for file in os.listdir(VIDEO_DIR):
-        if file.endswith(".mp4"):
-            os.remove(os.path.join(VIDEO_DIR, file))
+    for file in VIDEO_DIR.iterdir():
+        if file.is_file() and file.suffix == ".mp4":
+            file.unlink()
 
     try:
         make_mp4_clip(
@@ -481,7 +486,6 @@ def make_clip(video_path, box_select_range):
             start_time=start,
             end_time=end,
             save_path=save_path,
-            # save_dir=VIDEO_DIR,
         )
     except ValueError as error_message:
         return dash.no_update, repr(error_message)
@@ -496,7 +500,7 @@ def make_clip(video_path, box_select_range):
     prevent_initial_call=True,
 )
 def show_clip(clip_name):
-    if not os.path.isfile(os.path.join(VIDEO_DIR, clip_name)):
+    if not (VIDEO_DIR / clip_name).is_file():
         return "", "Video not ready yet. Please check again in a second."
     clip_path = os.path.join("/assets/videos/", clip_name)
     player = dash_player.DashPlayer(
@@ -685,16 +689,21 @@ def read_click_select(clickData, figure):  # triggered only  if clicked within x
 
 @app.callback(
     Output("graph", "figure", allow_duplicate=True),
-    Output("annotation-store", "data"),
+    # Output("annotation-store", "data"),
     Output("annotation-message", "children", allow_duplicate=True),
     Output("video-button", "style", allow_duplicate=True),
+    Output("net-annotation-count-store", "data", allow_duplicate=True),
     Input("box-select-store", "data"),
     Input("keyboard", "n_events"),  # a keyboard press
     State("keyboard", "event"),
     State("graph", "figure"),
+    State("net-annotation-count-store", "data"),
     prevent_initial_call=True,
 )
-def update_sleep_scores(box_select_range, keyboard_press, keyboard_event, figure):
+def update_sleep_scores(
+    box_select_range, keyboard_press, keyboard_event, figure, net_annotation_count
+):
+    """update sleep scores in fig and annotation history"""
     if not (
         ctx.triggered_id == "keyboard"
         and box_select_range
@@ -708,102 +717,75 @@ def update_sleep_scores(box_select_range, keyboard_press, keyboard_event, figure
 
     label = int(label) - 1
     start, end = box_select_range
-    sleep_scores_heatmap = figure["data"][-1]
-    prev_labels = sleep_scores_heatmap["z"][0][start:end]
-
+    sleep_scores_history = cache.get("sleep_scores_history")
+    current_sleep_scores = sleep_scores_history[-1]  # np array
+    new_sleep_scores = current_sleep_scores.copy()
+    new_sleep_scores[start:end] = np.array([label] * (end - start))
     # If the annotation does not change anything, don't add to history
-    if (prev_labels == np.array([label] * (end - start))).all():
+    if (new_sleep_scores == current_sleep_scores).all():
         raise PreventUpdate
 
-    sleep_scores_heatmap["z"][0][start:end] = [label] * (end - start)
+    sleep_scores_history.append(new_sleep_scores.astype(float))
+    cache.set("sleep_scores_history", sleep_scores_history)
+    net_annotation_count += 1
+
     patched_figure = Patch()
-    patched_figure["data"][-3]["z"][0] = sleep_scores_heatmap["z"][0]
-    patched_figure["data"][-2]["z"][0] = sleep_scores_heatmap["z"][0]
-    patched_figure["data"][-1]["z"][0] = sleep_scores_heatmap["z"][0]
+    patched_figure["data"][-3]["z"][0] = new_sleep_scores
+    patched_figure["data"][-2]["z"][0] = new_sleep_scores
+    patched_figure["data"][-1]["z"][0] = new_sleep_scores
 
     # remove box or click select after an update is made
     patched_figure["layout"]["selections"] = None
     patched_figure["layout"]["shapes"] = None
-    return patched_figure, (start, end, prev_labels), "", {"visibility": "hidden"}
-
-
-@app.callback(
-    Output("save-button", "style", allow_duplicate=True),
-    Output("undo-button", "style"),
-    Input("annotation-store", "data"),
-    State("graph", "figure"),
-    prevent_initial_call=True,
-)
-def write_annotation(annotation, figure):
-    """write to annotation history, update mat in cache, and make undo button availabe"""
-    if annotation is None:
-        raise PreventUpdate()
-
-    start, end, prev_labels = annotation
-    annotation_history = cache.get("annotation_history")
-    annotation_history.append(
-        (
-            start,
-            end,
-            prev_labels,  # previous prediction
-        )
-    )
-    labels = np.array(figure["data"][-1]["z"]).astype(float)
-    cache.set("annotation_history", annotation_history)
-    cache.set("modified_sleep_scores", labels)
-
-    # check whether need to show save button or not
-    save_button_style = dash.no_update
-    net_annotation_count = cache.get("net_annotation_count")
-    net_annotation_count += 1
-    cache.set("net_annotation_count", net_annotation_count)
-    if net_annotation_count > 0:
-        save_button_style = {"visibility": "visible"}
-
-    return save_button_style, {"visibility": "visible"}
+    return patched_figure, "", {"visibility": "hidden"}, net_annotation_count
 
 
 @app.callback(
     Output("graph", "figure", allow_duplicate=True),
-    Output("save-button", "style", allow_duplicate=True),
-    Output("undo-button", "style", allow_duplicate=True),
+    Output("net-annotation-count-store", "data", allow_duplicate=True),
     Input("undo-button", "n_clicks"),
     State("graph", "figure"),
+    State("net-annotation-count-store", "data"),
     prevent_initial_call=True,
 )
-def undo_annotation(n_clicks, figure):
-    net_annotation_count = cache.get("net_annotation_count")
-    net_annotation_count -= 1
-    annotation_history = cache.get("annotation_history")
-    prev_annotation = annotation_history.pop()
-    (start, end, prev_labels) = prev_annotation
-    prev_labels = np.array(prev_labels)
-    sleep_scores_heatmap = figure["data"][-1]
+def undo_annotation(n_clicks, figure, net_annotation_count):
+    sleep_scores_history = cache.get("sleep_scores_history")
+    if len(sleep_scores_history) <= 1:
+        raise PreventUpdate()
 
-    # undo figure
-    sleep_scores_heatmap["z"][0][start:end] = prev_labels
-    patched_figure = Patch()
-    patched_figure["data"][-3]["z"][0] = sleep_scores_heatmap["z"][0]
-    patched_figure["data"][-2]["z"][0] = sleep_scores_heatmap["z"][0]
-    patched_figure["data"][-1]["z"][0] = sleep_scores_heatmap["z"][0]
+    net_annotation_count -= 1
+    sleep_scores_history.pop()  # pop current one, then get the last one
 
     # undo cache
-    modified_sleep_scores = cache.get("modified_sleep_scores")
-    modified_sleep_scores[0, start:end] = prev_labels
-    cache.set("modified_sleep_scores", modified_sleep_scores)
+    cache.set("sleep_scores_history", sleep_scores_history)
+    prev_sleep_scores = sleep_scores_history[-1]
 
-    # update annotation_history
-    cache.set("annotation_history", annotation_history)
-    cache.set("net_annotation_count", net_annotation_count)
+    # undo figure
+    patched_figure = Patch()
+    patched_figure["data"][-3]["z"][0] = prev_sleep_scores
+    patched_figure["data"][-2]["z"][0] = prev_sleep_scores
+    patched_figure["data"][-1]["z"][0] = prev_sleep_scores
+    return patched_figure, net_annotation_count
 
-    # check whether need to take away save and undo button or not
-    save_button_style, undo_button_style = dash.no_update, dash.no_update
-    if net_annotation_count == 0:
-        save_button_style = {"visibility": "hidden"}
-    if not annotation_history:
-        undo_button_style = {"visibility": "hidden"}
 
-    return patched_figure, save_button_style, undo_button_style
+@app.callback(
+    Output("save-button", "style"),
+    Output("undo-button", "style"),
+    Output("debug-message", "children"),
+    Input("net-annotation-count-store", "data"),
+    # State("net-annotation-count-store", "data"),
+    prevent_initial_call=True,
+)
+def show_hide_save_undo_button(net_annotation_count):
+    # time.sleep(10)
+    sleep_scores_history = cache.get("sleep_scores_history")
+    save_button_style = {"visibility": "hidden"}
+    undo_button_style = {"visibility": "hidden"}
+    if net_annotation_count > 0:
+        save_button_style = {"visibility": "visible"}
+    if len(sleep_scores_history) > 1:
+        undo_button_style = {"visibility": "visible"}
+    return save_button_style, undo_button_style, len(sleep_scores_history)
 
 
 @app.callback(
@@ -815,28 +797,28 @@ def undo_annotation(n_clicks, figure):
 def save_annotations(n_clicks):
     mat_filename = cache.get("filename")
     temp_mat_path = os.path.join(TEMP_PATH, mat_filename)
-    mat = loadmat(temp_mat_path)
+    mat = loadmat(temp_mat_path, squeeze_me=True)
 
     # replace None in sleep_scores
-    modified_sleep_scores = cache.get("modified_sleep_scores")
+    sleep_scores_history = cache.get("sleep_scores_history")
     labels = None
-    if modified_sleep_scores is not None:
+    if sleep_scores_history:
         # replace any None or nan in sleep scores to -1 before saving, otherwise results in save error
         # make a copy first because we don't want to convert any nan in the cache
-        modified_sleep_scores = modified_sleep_scores.copy()
+        updated_sleep_scores = sleep_scores_history[-1]
         np.place(
-            modified_sleep_scores, modified_sleep_scores == None, [-1]
+            updated_sleep_scores, updated_sleep_scores == None, [-1]
         )  # convert None to -1 for scipy's savemat
-        modified_sleep_scores = np.nan_to_num(
-            modified_sleep_scores, nan=-1
+        updated_sleep_scores = np.nan_to_num(
+            updated_sleep_scores, nan=-1
         )  # convert np.nan to -1 for scipy's savemat
 
-        mat["sleep_scores"] = modified_sleep_scores
+        mat["sleep_scores"] = updated_sleep_scores
     savemat(temp_mat_path, mat)
 
     # export sleep bout spreadsheet only if the manual scoring is complete
     if mat.get("sleep_scores") is not None and -1 not in mat["sleep_scores"]:
-        labels = mat["sleep_scores"].flatten()
+        labels = mat["sleep_scores"]
 
     if labels is not None:
         labels = labels.astype(int)

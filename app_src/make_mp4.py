@@ -5,16 +5,52 @@ Created on Fri Feb 14 00:11:39 2025
 @author: yzhao
 """
 
-import os
+import subprocess
+from pathlib import Path
 
 # from moviepy import VideoFileClip
-
-import subprocess
 from imageio_ffmpeg import get_ffmpeg_exe
 
 
 def make_mp4_clip(
-    video_path, start_time, end_time, save_path=None, save_dir="./assets/videos/"
+    video_path, start_time, end_time, save_path=None, save_dir=Path("./assets/videos/")
+):
+    video_path = Path(video_path)
+    save_dir = Path(save_dir)
+    duration = end_time - start_time
+
+    if save_path is None:
+        video_name = video_path.stem  # filename without extension
+        save_dir.mkdir(parents=True, exist_ok=True)  # make dir if needed
+        mp4_file = f"{video_name}_time_range_{start_time}-{end_time}.mp4"
+        save_path = save_dir / mp4_file
+    else:
+        save_path = Path(save_path)
+
+    ff = get_ffmpeg_exe()
+    cmd = [
+        ff,
+        "-y",
+        "-ss",
+        str(start_time),
+        "-i",
+        str(video_path),
+        "-t",
+        str(duration),
+        "-c:v",
+        "libx264",
+        "-movflags",
+        "+faststart",
+        "-f",
+        "mp4",
+        str(save_path),
+    ]
+    subprocess.run(cmd, check=True)
+
+
+"""
+def make_mp4_clip(
+    video_path, start_time, end_time, save_path=None, save_dir=Path("./assets/videos/")
 ):
     duration = end_time - start_time
     if save_path is None:
@@ -46,7 +82,6 @@ def make_mp4_clip(
     subprocess.run(cmd, check=True)
 
 
-"""
 def avi_to_mp4(
     avi_path, start_time, end_time, save_path=None, save_dir="./assets/videos/"
 ):
