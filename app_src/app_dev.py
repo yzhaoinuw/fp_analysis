@@ -26,10 +26,9 @@ import pandas as pd
 from flask_caching import Cache
 from scipy.io import loadmat, savemat
 
-from app_src import VERSION, config
+from app_src import VERSION
 from app_src.make_mp4 import make_mp4_clip
 from app_src.components_dev import Components
-from app_src.inference import run_inference
 from app_src.make_figure_dev import get_padded_sleep_scores, make_figure
 
 from app_src.postprocessing import get_sleep_segments, get_pred_label_stats
@@ -37,21 +36,20 @@ from app_src.postprocessing import get_sleep_segments, get_pred_label_stats
 
 app = Dash(
     __name__,
-    title=f"Sleep Scoring App {VERSION}",
+    title=f"FP Visualization App {VERSION}",
     suppress_callback_exceptions=True,
     external_stylesheets=[
         dbc.themes.BOOTSTRAP
     ],  # need this for the modal to work properly
 )
 
-TEMP_PATH = os.path.join(tempfile.gettempdir(), "sleep_scoring_app_data")
+TEMP_PATH = os.path.join(tempfile.gettempdir(), "fp_visualization_app_data")
 if not os.path.exists(TEMP_PATH):
     os.makedirs(TEMP_PATH)
 
 # VIDEO_DIR = "./assets/videos/"
-VIDEO_DIR = str(Path(__file__).parent / "assets" / "videos")
-if not os.path.exists(VIDEO_DIR):
-    os.makedirs(VIDEO_DIR)
+VIDEO_DIR = Path(__file__).parent / "assets" / "videos"
+VIDEO_DIR.mkdir(parents=True, exist_ok=True)
 
 components = Components()
 app.layout = components.home_div
@@ -85,7 +83,7 @@ def reset_cache(cache, filename):
     prev_filename = cache.get("filename")
 
     # attempt for salvaging unsaved annotations
-    if prev_filename is None or prev_filename.split("_sdreamer")[0] != filename:
+    if prev_filename is None:
         cache.set("sleep_scores_history", deque(maxlen=4))
 
     cache.set("filename", filename)
@@ -112,7 +110,7 @@ app.clientside_callback(
     """
     function(keyboard_nevents, keyboard_event, figure) {
         if (!keyboard_event || !figure) {
-            return [dash_clientside.no_update, dash_clientside.no_update, dash_clientside.no_update, dash_clientside.no_update];
+            return [dash_clientside.no_update, dash_clientside.no_update, dash_clientside.no_update];
         }
 
         var key = keyboard_event.key;
@@ -121,23 +119,21 @@ app.clientside_callback(
             let updatedFigure = JSON.parse(JSON.stringify(figure));
             if (figure.layout.dragmode === "pan") {
                 updatedFigure.layout.dragmode = "select"
-                predVisibility = {"visibility": "visible"}
             } else if (figure.layout.dragmode === "select") {
                 updatedFigure.layout.selections = null;
                 updatedFigure.layout.shapes = null;
                 updatedFigure.layout.dragmode = "pan"
-                predVisibility = {"visibility": "hidden"}
             }
-            return [updatedFigure, "", {"visibility": "hidden"}, predVisibility];
+            return [updatedFigure, "", {"visibility": "hidden"}];
         }
 
-        return [dash_clientside.no_update, dash_clientside.no_update, dash_clientside.no_update, dash_clientside.no_update];
+        return [dash_clientside.no_update, dash_clientside.no_update, dash_clientside.no_update];
     }
     """,
     Output("graph", "figure"),
     Output("annotation-message", "children"),
     Output("video-button", "style"),
-    Output("pred-button", "style"),
+    # Output("pred-button", "style"),
     Input("keyboard", "n_events"),
     State("keyboard", "event"),
     State("graph", "figure"),
@@ -146,13 +142,14 @@ app.clientside_callback(
 # pan_figures
 clientside_callback(
     """
-    function(keyboard_nevents, keyboard_event, relayoutdata, figure) {
+    function(keyboard_nevents, keyboard_event, relayoutdata, figure, num_signals) {
         if (!keyboard_event || !figure) {
             return [dash_clientside.no_update, dash_clientside.no_update];
         }
 
         var key = keyboard_event.key;
-        var xaxisRange = figure.layout.xaxis4.range;
+        var axisK = 'xaxis' + num_signals;
+        var xaxisRange = figure.layout[axisK].range;
         var x0 = xaxisRange[0];
         var x1 = xaxisRange[1];
         var newRange;
@@ -164,9 +161,9 @@ clientside_callback(
         }
 
         if (newRange) {
-            relayoutdata['xaxis4.range[0]'] = newRange[0];
-            relayoutdata['xaxis4.range[1]'] = newRange[1];
-            figure.layout.xaxis4.range = newRange;
+            relayoutdata[axisK + '.range[0]'] = newRange[0];
+            relayoutdata[axisK + '.range[1]'] = newRange[1];
+            figure.layout[axisK].range = newRange;
             return [figure, relayoutdata];
         }
 
@@ -179,6 +176,7 @@ clientside_callback(
     State("keyboard", "event"),
     State("graph", "relayoutData"),
     State("graph", "figure"),
+    State("num-signals-store", "data"),
     prevent_initial_call=True,
 )
 
@@ -215,77 +213,6 @@ clientside_callback(
 # %% server side callbacks below
 
 
-@app.callback(
-    Output("pred-modal-confirm", "is_open"),
-    Input("pred-button", "n_clicks"),
-    State("pred-modal-confirm", "is_open"),
-    prevent_initial_call=True,
-)
-def show_confirm_pred_modal(n_clicks, is_open):
-    if n_clicks is None or n_clicks == 0:  # i.e., None or 0
-        raise dash.exceptions.PreventUpdate
-
-    return not is_open
-
-
-@app.callback(
-    Output("pred-modal-confirm", "is_open", allow_duplicate=True),
-    Output("data-upload-message", "children"),
-    Output("prediction-ready-store", "data"),
-    Output("annotation-message", "children", allow_duplicate=True),
-    Input("pred-confirm-button", "n_clicks"),
-    State("pred-modal-confirm", "is_open"),
-    prevent_initial_call=True,
-)
-def read_mat_pred(n_clicks, is_open):
-    if n_clicks is None or n_clicks == 0:  # i.e., None or 0
-        raise dash.exceptions.PreventUpdate
-
-    message = ""
-    mat_name = cache.get("filename")
-    mat = loadmat(os.path.join(TEMP_PATH, mat_name), squeeze_me=True)
-    eeg_freq = mat["eeg_frequency"]
-    if round(eeg_freq) != 512:
-        message += (
-            f"EEG/EMG data has a sampling frequency of {eeg_freq} Hz. "
-            "Will resample to 512 Hz."
-        )
-
-    ne = mat.get("ne")
-    if ne is None:
-        message += " NE data not detected."
-
-    message += " Generating predictions... This may take up to 3 minutes. Check Terminal for the progress."
-    return ((not is_open), message, True, "")
-
-
-@app.callback(
-    Output("data-upload-message", "children", allow_duplicate=True),
-    Output("visualization-ready-store", "data"),
-    Output("net-annotation-count-store", "data"),
-    Input("prediction-ready-store", "data"),
-    State("net-annotation-count-store", "data"),
-    prevent_initial_call=True,
-)
-def generate_prediction(n_clicks, net_annotation_count):
-    mat_name = cache.get("filename")
-    mat = loadmat(os.path.join(TEMP_PATH, mat_name), squeeze_me=True)
-    filename = cache.get("filename")
-    temp_mat_path = os.path.join(TEMP_PATH, filename)
-    mat, output_path = run_inference(
-        mat,
-        postprocess=config["postprocess"],
-        output_path=temp_mat_path,
-        save_inference=True,
-    )
-    net_annotation_count += 1
-    # it is necessary to set cache again here because the output file
-    # which includes prediction has a new name (old_name + "_sdreamer"),
-    # it is this file that should be used for the subsequent visualization.
-    reset_cache(cache, os.path.basename(output_path))
-    return "The prediction has been generated.", "pred", net_annotation_count
-
-
 @du.callback(
     output=[
         Output("data-upload-message", "children", allow_duplicate=True),
@@ -315,32 +242,39 @@ def read_mat_vis(status):
 
 @app.callback(
     Output("data-upload-message", "children", allow_duplicate=True),
-    # Output("debug-message", "children"),
+    Output("num-signals-store", "data"),
     Input("visualization-ready-store", "data"),
     prevent_initial_call=True,
 )
 def create_visualization(ready):
     mat_name = cache.get("filename")
     mat = loadmat(os.path.join(TEMP_PATH, mat_name), squeeze_me=True)
-    eeg, emg = mat.get("eeg"), mat.get("emg")
+    fp_signal_names = mat["fp_signal_names"]
+    num_signals = len(fp_signal_names)
 
     message = "Please double check the file selected."
-    validated = True
-    if emg is None:
-        validated = False
-        message = " ".join(["EMG data is missing.", message])
-    if eeg is None:
-        validated = False
-        message = " ".join(["EEG data is missing.", message])
-    if not validated:
-        return message
+    if num_signals == 0:
+        message = " ".join(["No FP signal found.", message])
+        return message, dash.no_update
+
+    fp_signals = [mat[signal_name] for signal_name in fp_signal_names]
+    signal_lengths = [len(fp_signals[k]) for k in range(num_signals)]
+    if not all(length == signal_lengths[0] for length in signal_lengths):
+        message = " ".join(["Not all FP signals are of the same length.", message])
+        return message, dash.no_update
 
     # salvage unsaved annotations
     sleep_scores_history = cache.get("sleep_scores_history")
     if sleep_scores_history:
         mat["sleep_scores"] = sleep_scores_history[-1]
     else:
-        sleep_scores = get_padded_sleep_scores(mat)
+        signal_length = signal_lengths[0]
+        fp_freq = mat.get("fp_frequency")
+        duration = math.ceil(
+            (signal_length - 1) / fp_freq
+        )  # need to round duration to an int for later
+        sleep_scores = mat.get("sleep_scores", np.array([]))
+        sleep_scores = get_padded_sleep_scores(sleep_scores, duration)
         sleep_scores_history.append(sleep_scores)
 
     fig = create_fig(mat, mat_name)
@@ -363,7 +297,7 @@ def create_visualization(ready):
     cache.set("fig_resampler", fig)
     cache.set("sleep_scores_history", sleep_scores_history)
     components.graph.figure = fig
-    return components.visualization_div
+    return components.visualization_div, num_signals
 
 
 @app.callback(
@@ -517,10 +451,11 @@ def show_clip(clip_name):
 @app.callback(
     Output("graph", "figure", allow_duplicate=True),
     Input("graph", "relayoutData"),
+    State("num-signals-store", "data"),
     prevent_initial_call=True,
     memoize=True,
 )
-def update_fig(relayoutdata):
+def update_fig(relayoutdata, num_signals):
     fig = cache.get("fig_resampler")
     if fig is None:
         return dash.no_update
@@ -529,12 +464,13 @@ def update_fig(relayoutdata):
     # reset axes button because it only gives xaxis4.range. It seems
     # updating fig_resampler requires xaxis4.range[0] and xaxis4.range[1]
     if (
-        relayoutdata.get("xaxis4.range") is not None
-        and relayoutdata.get("xaxis4.range[0]") is None
+        relayoutdata.get(f"xaxis{num_signals}.range") is not None
+        and relayoutdata.get(f"xaxis{num_signals}.range[0]") is None
     ):
-        relayoutdata["xaxis4.range[0]"], relayoutdata["xaxis4.range[1]"] = relayoutdata[
-            "xaxis4.range"
-        ]
+        (
+            relayoutdata[f"xaxis{num_signals}.range[0]"],
+            relayoutdata[f"xaxis{num_signals}.range[1]"],
+        ) = relayoutdata[f"xaxis{num_signals}.range"]
     return fig.construct_update_data_patch(relayoutdata)
 
 
@@ -628,9 +564,12 @@ def debug_box_select(box_select, figure):
     Output("video-button", "style", allow_duplicate=True),
     Input("graph", "clickData"),
     State("graph", "figure"),
+    State("num-signals-store", "data"),
     prevent_initial_call=True,
 )
-def read_click_select(clickData, figure):  # triggered only  if clicked within x-range
+def read_click_select(
+    clickData, figure, num_signals
+):  # triggered only  if clicked within x-range
     patched_figure = Patch()
     patched_figure["layout"]["shapes"] = None
     video_button_style = {"visibility": "hidden"}
@@ -645,7 +584,7 @@ def read_click_select(clickData, figure):  # triggered only  if clicked within x
     x_click = clickData["points"][0]["x"]
 
     # Determine current x-axis visible range
-    x_min, x_max = figure["layout"]["xaxis4"]["range"]
+    x_min, x_max = figure["layout"][f"xaxis{num_signals}"]["range"]
     total_range = x_max - x_min
 
     # Decide neighborhood size: e.g., 1% of current view range
@@ -656,11 +595,8 @@ def read_click_select(clickData, figure):  # triggered only  if clicked within x
     x0, x1 = math.floor(x_click - delta / 2), math.ceil(x_click + delta / 2)
     curve_index = clickData["points"][0]["curveNumber"]
     trace = figure["data"][curve_index]
-    xref = trace.get("xaxis", "x4")  # x4 is the shared x-axis
-    yref = trace.get("yaxis", "y5")  # spectrogram has dual y-axis
-
-    if yref == "y2":  # use the left y-axis to avoid interfering with theta/delta curve
-        yref = "y1"
+    xref = trace.get("xaxis", f"x{num_signals}")  # x4 is the shared x-axis
+    yref = trace.get("yaxis", f"y{num_signals}")  # spectrogram has dual y-axis
 
     select_box = {
         "type": "rect",
@@ -698,10 +634,16 @@ def read_click_select(clickData, figure):  # triggered only  if clicked within x
     State("keyboard", "event"),
     State("graph", "figure"),
     State("net-annotation-count-store", "data"),
+    State("num-signals-store", "data"),
     prevent_initial_call=True,
 )
 def update_sleep_scores(
-    box_select_range, keyboard_press, keyboard_event, figure, net_annotation_count
+    box_select_range,
+    keyboard_press,
+    keyboard_event,
+    figure,
+    net_annotation_count,
+    num_signals,
 ):
     """update sleep scores in fig and annotation history"""
     if not (
@@ -730,9 +672,8 @@ def update_sleep_scores(
     net_annotation_count += 1
 
     patched_figure = Patch()
-    patched_figure["data"][-3]["z"][0] = new_sleep_scores
-    patched_figure["data"][-2]["z"][0] = new_sleep_scores
-    patched_figure["data"][-1]["z"][0] = new_sleep_scores
+    for k in range(1, num_signals + 1):
+        patched_figure["data"][-k]["z"][0] = new_sleep_scores
 
     # remove box or click select after an update is made
     patched_figure["layout"]["selections"] = None

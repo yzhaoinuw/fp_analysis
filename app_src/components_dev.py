@@ -64,21 +64,6 @@ video_upload_box = du.Upload(
     default_style=video_upload_box_style,
 )
 
-pred_modal_confirm = dbc.Modal(
-    [
-        dbc.ModalHeader(dbc.ModalTitle("Prediction")),
-        dbc.ModalBody(
-            "Generating predictions will overwrite all the current sleep scores. Are you sure?"
-        ),
-        dbc.ModalFooter(html.Button("Yes", id="pred-confirm-button")),
-    ],
-    id="pred-modal-confirm",
-    size="lg",
-    is_open=False,
-    # backdrop="static",  # the user must clicks the "x" to exit
-    centered=True,
-)
-
 save_div = html.Div(
     style={
         "display": "flex",
@@ -117,11 +102,9 @@ home_div = html.Div(
                 html.Div(id="debug-message"),
             ],
         ),
-        dcc.Store(id="prediction-ready-store"),
         dcc.Store(id="visualization-ready-store"),
         dcc.Store(id="net-annotation-count-store"),
-        dcc.Download(id="prediction-download-store"),
-        pred_modal_confirm,
+        dcc.Store(id="num-signals-store"),
     ]
 )
 
@@ -163,16 +146,6 @@ utility_div = html.Div(
                     ]
                 ),
             ],
-        ),
-        html.Div(
-            [
-                html.Button(
-                    "Generate Predictions",
-                    id="pred-button",
-                    style={"visibility": "hidden"},
-                )
-            ],
-            style={"marginLeft": "auto"},  # keep the button to the right edge
         ),
     ],
 )
