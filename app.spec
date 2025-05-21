@@ -17,7 +17,7 @@ datas=[
     ('C:\\Users\\yzhao\\python_projects\\sleep_scoring\\app_src\\assets', 'assets'),
     ('C:\\Users\\yzhao\\miniconda3\\envs\\sleep_scoring_dist\\lib\\site-packages\\scipy', 'scipy'),
 ]
-datas += collect_data_files('timm', include_py_files=True)
+#datas += collect_data_files('timm', include_py_files=True)
 
 a = Analysis(
     ['main.py'],
@@ -62,5 +62,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name=f'sleep_scoring_app_{VERSION}',
+    name=f'fp_visualization_app_{VERSION}',
 )

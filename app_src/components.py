@@ -196,7 +196,7 @@ visualization_div = html.Div(
         video_modal,
         html.Div(
             children=[graph],
-            style={"marginTop": "1px", "marginLeft": "20px", "marginRight": "15px"},
+            style={"marginTop": "1px", "marginLeft": "20px", "marginRight": "20px"},
         ),
         backend_div,
     ],

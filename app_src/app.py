@@ -28,8 +28,8 @@ from scipy.io import loadmat, savemat
 
 from app_src import VERSION
 from app_src.make_mp4 import make_mp4_clip
-from app_src.components_dev import Components
-from app_src.make_figure_dev import get_padded_sleep_scores, make_figure
+from app_src.components import Components
+from app_src.make_figure import get_padded_sleep_scores, make_figure
 
 from app_src.postprocessing import get_sleep_segments, get_pred_label_stats
 
@@ -83,7 +83,7 @@ def reset_cache(cache, filename):
     prev_filename = cache.get("filename")
 
     # attempt for salvaging unsaved annotations
-    if prev_filename is None:
+    if prev_filename is None or prev_filename != filename:
         cache.set("sleep_scores_history", deque(maxlen=4))
 
     cache.set("filename", filename)
@@ -275,6 +275,7 @@ def create_visualization(ready):
         )  # need to round duration to an int for later
         sleep_scores = mat.get("sleep_scores", np.array([]))
         sleep_scores = get_padded_sleep_scores(sleep_scores, duration)
+        np.place(sleep_scores, sleep_scores == -1, [np.nan])
         sleep_scores_history.append(sleep_scores)
 
     fig = create_fig(mat, mat_name)
@@ -625,7 +626,6 @@ def read_click_select(
 
 @app.callback(
     Output("graph", "figure", allow_duplicate=True),
-    # Output("annotation-store", "data"),
     Output("annotation-message", "children", allow_duplicate=True),
     Output("video-button", "style", allow_duplicate=True),
     Output("net-annotation-count-store", "data", allow_duplicate=True),
@@ -712,7 +712,7 @@ def undo_annotation(n_clicks, figure, net_annotation_count):
 @app.callback(
     Output("save-button", "style"),
     Output("undo-button", "style"),
-    Output("debug-message", "children"),
+    # Output("debug-message", "children"),
     Input("net-annotation-count-store", "data"),
     # State("net-annotation-count-store", "data"),
     prevent_initial_call=True,
@@ -724,9 +724,9 @@ def show_hide_save_undo_button(net_annotation_count):
     undo_button_style = {"visibility": "hidden"}
     if net_annotation_count > 0:
         save_button_style = {"visibility": "visible"}
-    if len(sleep_scores_history) > 1:
-        undo_button_style = {"visibility": "visible"}
-    return save_button_style, undo_button_style, len(sleep_scores_history)
+        if len(sleep_scores_history) > 1:
+            undo_button_style = {"visibility": "visible"}
+    return save_button_style, undo_button_style
 
 
 @app.callback(
