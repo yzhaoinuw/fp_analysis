@@ -20,54 +20,55 @@ from plotly_resampler.aggregation import MinMaxLTTB
 
 
 # set up color config
-SLEEP_SCORE_OPACITY = 1
-STAGE_COLORS = [
-    "rgb(124, 124, 251)",  # Wake,
-    "rgb(251, 124, 124)",  # NREM,
-    "rgb(123, 251, 123)",  # REM,
-    "rgb(255, 255, 0)",  # MA yellow
+PERIOD_LABEL_OPACITY = 1
+
+LABEL_COLORS = [
+    "rgb(31, 119, 180)",  # blue
+    "rgb(255, 127, 14)",  # orange
+    "rgb(44, 160, 44)",  # green
+    "rgb(214, 39, 40)",  # red
+    "rgb(148, 103, 189)",  # purple
+    "rgb(140, 86, 75)",  # brown
+    "rgb(227, 119, 194)",  # pink
+    "rgb(127, 127, 127)",  # gray
+    "rgb(188, 189, 34)",  # olive
+    "rgb(23, 190, 207)",  # cyan
 ]
-STAGE_NAMES = ["Wake: 1", "NREM: 2", "REM: 3", "MA: 4"]
-COLORSCALE = {
-    3: [[0, STAGE_COLORS[0]], [0.5, STAGE_COLORS[1]], [1, STAGE_COLORS[2]]],
-    4: [
-        [0, STAGE_COLORS[0]],
-        [1 / 3, STAGE_COLORS[1]],
-        [2 / 3, STAGE_COLORS[2]],
-        [1, STAGE_COLORS[3]],
-    ],
-}
+
+
+def get_colorscale(num_class):
+    colorscale = [[i * 1 / (num_class - 1), LABEL_COLORS[i]] for i in range(num_class)]
+    return colorscale
+
+
 RANGE_QUANTILE = 0.99
 HEATMAP_WIDTH = 40
 RANGE_PADDING_PERCENT = 0.2
 
 
-def get_padded_period_labels(period_labels: np.ndarray, duration: int) -> np.ndarray:
+def get_padded_labels(labels: np.ndarray, duration: int) -> np.ndarray:
     """Make a period laebl array the same size as the duration."""
 
-    if period_labels.size == 0:
+    if labels.size == 0:
         # if unscored, initialize with nan
-        period_labels = np.zeros(duration)
-        period_labels[:] = np.nan
+        labels = np.zeros(duration)
+        labels[:] = np.nan
     else:
         # manually scored, but may contain missing scores
-        period_labels = period_labels.astype(float)
+        labels = labels.astype(float)
 
-        # period_labels need to have the length of duration. pad if necessary
-        pad_len = duration - period_labels.size
+        # labels need to have the length of duration. pad if necessary
+        pad_len = duration - labels.size
         if pad_len > 0:
-            period_labels = np.pad(
-                period_labels, (0, pad_len), "constant", constant_values=np.nan
-            )
-    return period_labels
+            labels = np.pad(labels, (0, pad_len), "constant", constant_values=np.nan)
+    return labels
 
 
 def make_figure(
     mat,
     plot_name="",
-    period_labels=np.array([]),
+    label_dict={},
     default_n_shown_samples=2048,
-    num_class=3,
 ):
     # Time span and frequencies
     fp_signal_names = mat["fp_signal_names"]
@@ -81,22 +82,24 @@ def make_figure(
     fp_signals = np.vstack(fp_signals)
     fp_freq = mat.get("fp_frequency")
     start_time = mat.get("start_time", 0)
-    if mat.get("num_class") is not None:
-        num_class = mat["num_class"]
 
     duration = math.ceil(
         (signal_length - 1) / fp_freq
     )  # need to round duration to an int for later
 
+    if label_dict:
+        label_names = label_dict["label_names"]
+        labels = label_dict["labels"]
     # scored fully or partially or unscored
-    period_labels = get_padded_period_labels(period_labels, duration)
+    labels = get_padded_labels(labels, duration)
     np.place(
-        period_labels, period_labels == -1, [np.nan]
+        labels, labels == -1, [np.nan]
     )  # convert -1 to None for heatmap visualization
 
+    num_class = len(np.unique(labels[~np.isnan(labels)]))
     # convert flat array to 2D array for visualization to work
-    if len(period_labels.shape) == 1:
-        period_labels = np.expand_dims(period_labels, axis=0)
+    if len(labels.shape) == 1:
+        labels = np.expand_dims(labels, axis=0)
 
     signal_end_time = duration + start_time
 
@@ -123,20 +126,20 @@ def make_figure(
         default_n_shown_samples=default_n_shown_samples,
         default_downsampler=MinMaxLTTB(parallel=True),
     )
-
+    colorscale = get_colorscale(num_class)
     # Create a heatmap for stages
-    period_labels = go.Heatmap(
+    labels = go.Heatmap(
         x0=start_time + 0.5,
         dx=1,
         y0=0,
         dy=HEATMAP_WIDTH,  # assuming that the max abs value of eeg, emg, or ne is no more than 10
-        z=period_labels,
+        z=labels,
         name="Period Labels",
         hoverinfo="none",
-        colorscale=COLORSCALE[num_class],
+        colorscale=colorscale,
         showscale=False,
-        opacity=SLEEP_SCORE_OPACITY,
-        zmax=num_class - 1,
+        opacity=PERIOD_LABEL_OPACITY,
+        zmax=max(num_class - 1, 0),
         zmin=0,
         showlegend=False,
         xgap=0.05,  # add small gaps to serve as boundaries / ticks
@@ -160,15 +163,15 @@ def make_figure(
             col=1,
         )
 
-    for i, color in enumerate(STAGE_COLORS[:num_class]):
+    for i, color in enumerate(LABEL_COLORS[:num_class]):
         fig.add_trace(
             go.Scatter(
                 x=[-100],
                 y=[0.2],
-                name=STAGE_NAMES[i],
+                name=label_names[i],
                 mode="markers",
                 marker=dict(
-                    size=8, color=color, symbol="square", opacity=SLEEP_SCORE_OPACITY
+                    size=8, color=color, symbol="square", opacity=PERIOD_LABEL_OPACITY
                 ),
                 showlegend=True,
             ),
@@ -178,7 +181,7 @@ def make_figure(
 
     # add the heatmap last so that their indices can be accessed using last indices
     for k in range(num_signals):
-        fig.add_trace(period_labels, row=k + 1, col=1)
+        fig.add_trace(labels, row=k + 1, col=1)
         fig.update_xaxes(
             range=[start_time, end_time], tickformat="digits", row=k + 1, col=1
         )
@@ -210,7 +213,7 @@ def make_figure(
         # yaxis4=dict(tickvals=[]),  # suppress y ticks on the heatmap
         # xaxis4=dict(tickformat="digits"),
         legend=dict(
-            x=0.6,  # adjust these values to position the sleep score legend STAGE_NAMES
+            x=0.6,  # adjust these values to position the sleep score legend biosignal_names
             y=1.03,
             yref="paper",
             orientation="h",  # makes legend items horizontal
@@ -251,10 +254,26 @@ if __name__ == "__main__":
     import plotly.io as io
     from scipy.io import loadmat
 
+    from event_analysis import make_perievent_labels
+
     io.renderers.default = "browser"
-    data_path = "../data/"
-    mat_file = "F268.mat"
-    mat = loadmat(os.path.join(data_path, mat_file), squeeze_me=True)
-    mat_name = os.path.basename(mat_file)
-    fig = make_figure(mat, plot_name=mat_name)
+    DATA_PATH = "../data/"
+    fp_name = "F268"
+    fp_file = os.path.join(DATA_PATH, f"{fp_name}.mat")
+    fp_data = loadmat(fp_file, squeeze_me=True)
+    # biosignal_names = fp_data["fp_signal_names"]
+    biosignal_name = "NE2m"
+    biosignal = fp_data[biosignal_name]
+
+    event_file = os.path.join(DATA_PATH, "Transitions_F268.xlsx")
+    fp_freq = fp_data["fp_frequency"]
+    nsec_before = 60
+    nsec_after = 60
+    duration = int(np.ceil(len(biosignal) / fp_freq))
+    min_time = nsec_before
+    max_time = duration - nsec_after
+    perievent_label_dict = make_perievent_labels(
+        event_file, duration, nsec_before=nsec_before, nsec_after=nsec_after
+    )
+    fig = make_figure(fp_data, plot_name=fp_name, label_dict=perievent_label_dict)
     fig.show_dash(config={"scrollZoom": True})

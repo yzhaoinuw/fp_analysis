@@ -54,15 +54,18 @@ def make_perievent_labels(event_file, duration, nsec_before=60, nsec_after=60):
     min_time = nsec_before
     max_time = duration - nsec_after
     event_time_dict = read_events(event_file, min_time, max_time)
-    perievent_labels = np.zeros(duration).astype(int)
-    for i, event in enumerate(sorted(event_time_dict.keys()), 1):
+    event_names = []
+    perievent_labels = np.zeros(duration)
+    perievent_labels[:] = np.nan
+    for i, event in enumerate(sorted(event_time_dict.keys())):
+        event_names.append(event)
         event_time = event_time_dict[event]
         perievent_windows = make_perievent_windows(
             event_time, nsec_before=nsec_before, nsec_after=nsec_after
         )
         perievent_time = perievent_windows.flatten()
         perievent_labels[perievent_time] = i
-    return perievent_labels
+    return {"label_names": event_names, "labels": perievent_labels}
 
 
 def plot_perievent_signals(event, perievent_signals, nsec_before=60, nsec_after=60):
@@ -161,11 +164,12 @@ if __name__ == "__main__":
     duration = int(np.ceil(len(biosignal) / fp_freq))
     min_time = nsec_before
     max_time = duration - nsec_after
-    # perievent_labels = make_perievent_labels(event_file, min_time, max_time, nsec_before=2, nsec_after=2)
+    # perievent_labels = make_perievent_labels(event_file, duration, nsec_before=2, nsec_after=2)
     event_time_dict = read_events(event_file, min_time, max_time)
-    perievent_labels = np.zeros(duration).astype(int)
+    perievent_labels = np.zeros(duration)
+    perievent_labels[:] = np.nan
     perievent_indices_dict = {}
-    for i, event in enumerate(sorted(event_time_dict.keys()), 1):
+    for i, event in enumerate(sorted(event_time_dict.keys())):
         event_time = event_time_dict[event]
         perievent_windows = make_perievent_windows(
             event_time, nsec_before=nsec_before, nsec_after=nsec_after
@@ -174,7 +178,7 @@ if __name__ == "__main__":
         perievent_time = perievent_windows.flatten()
         perievent_labels[perievent_time] = i
 
-    event = "sws_wake"
+    event = "REM_MA"
     perievent_indices = perievent_indices_dict[event]
     perievent_signals = biosignal[perievent_indices]
     plot_perievent_signals(event, perievent_signals)
