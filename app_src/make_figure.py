@@ -42,27 +42,33 @@ HEATMAP_WIDTH = 40
 RANGE_PADDING_PERCENT = 0.2
 
 
-def get_padded_sleep_scores(sleep_scores: np.ndarray, duration: int) -> np.ndarray:
-    """Make a sleep score array the same size as the duration."""
+def get_padded_period_labels(period_labels: np.ndarray, duration: int) -> np.ndarray:
+    """Make a period laebl array the same size as the duration."""
 
-    if sleep_scores.size == 0:
+    if period_labels.size == 0:
         # if unscored, initialize with nan
-        sleep_scores = np.zeros(duration)
-        sleep_scores[:] = np.nan
+        period_labels = np.zeros(duration)
+        period_labels[:] = np.nan
     else:
         # manually scored, but may contain missing scores
-        sleep_scores = sleep_scores.astype(float)
+        period_labels = period_labels.astype(float)
 
-        # sleep_scores need to have the length of duration. pad if necessary
-        pad_len = duration - sleep_scores.size
+        # period_labels need to have the length of duration. pad if necessary
+        pad_len = duration - period_labels.size
         if pad_len > 0:
-            sleep_scores = np.pad(
-                sleep_scores, (0, pad_len), "constant", constant_values=np.nan
+            period_labels = np.pad(
+                period_labels, (0, pad_len), "constant", constant_values=np.nan
             )
-    return sleep_scores
+    return period_labels
 
 
-def make_figure(mat, plot_name="", default_n_shown_samples=2048, num_class=3):
+def make_figure(
+    mat,
+    plot_name="",
+    period_labels=np.array([]),
+    default_n_shown_samples=2048,
+    num_class=3,
+):
     # Time span and frequencies
     fp_signal_names = mat["fp_signal_names"]
     num_signals = len(fp_signal_names)
@@ -71,7 +77,6 @@ def make_figure(mat, plot_name="", default_n_shown_samples=2048, num_class=3):
     signal_lengths = [len(fp_signals[k]) for k in range(num_signals)]
     assert all(length == signal_lengths[0] for length in signal_lengths)
 
-    sleep_scores = mat.get("sleep_scores", np.array([]))
     signal_length = signal_lengths[0]
     fp_signals = np.vstack(fp_signals)
     fp_freq = mat.get("fp_frequency")
@@ -84,14 +89,14 @@ def make_figure(mat, plot_name="", default_n_shown_samples=2048, num_class=3):
     )  # need to round duration to an int for later
 
     # scored fully or partially or unscored
-    sleep_scores = get_padded_sleep_scores(sleep_scores, duration)
+    period_labels = get_padded_period_labels(period_labels, duration)
     np.place(
-        sleep_scores, sleep_scores == -1, [np.nan]
+        period_labels, period_labels == -1, [np.nan]
     )  # convert -1 to None for heatmap visualization
 
     # convert flat array to 2D array for visualization to work
-    if len(sleep_scores.shape) == 1:
-        sleep_scores = np.expand_dims(sleep_scores, axis=0)
+    if len(period_labels.shape) == 1:
+        period_labels = np.expand_dims(period_labels, axis=0)
 
     signal_end_time = duration + start_time
 
@@ -120,13 +125,13 @@ def make_figure(mat, plot_name="", default_n_shown_samples=2048, num_class=3):
     )
 
     # Create a heatmap for stages
-    sleep_scores = go.Heatmap(
+    period_labels = go.Heatmap(
         x0=start_time + 0.5,
         dx=1,
         y0=0,
         dy=HEATMAP_WIDTH,  # assuming that the max abs value of eeg, emg, or ne is no more than 10
-        z=sleep_scores,
-        name="Sleep Scores",
+        z=period_labels,
+        name="Period Labels",
         hoverinfo="none",
         colorscale=COLORSCALE[num_class],
         showscale=False,
@@ -173,7 +178,7 @@ def make_figure(mat, plot_name="", default_n_shown_samples=2048, num_class=3):
 
     # add the heatmap last so that their indices can be accessed using last indices
     for k in range(num_signals):
-        fig.add_trace(sleep_scores, row=k + 1, col=1)
+        fig.add_trace(period_labels, row=k + 1, col=1)
         fig.update_xaxes(
             range=[start_time, end_time], tickformat="digits", row=k + 1, col=1
         )
@@ -248,10 +253,8 @@ if __name__ == "__main__":
 
     io.renderers.default = "browser"
     data_path = "../data/"
-    mat_file = "M7 (1).mat"
+    mat_file = "F268.mat"
     mat = loadmat(os.path.join(data_path, mat_file), squeeze_me=True)
-    # mat_file = "C:/Users/yzhao/python_projects/sleep_scoring/user_test_files/box1_COM18_RZ10_2_1_2024-06-03_09-04-56-902_sdreamer_3class.mat"
-    # mat = loadmat(mat_file)
     mat_name = os.path.basename(mat_file)
     fig = make_figure(mat, plot_name=mat_name)
     fig.show_dash(config={"scrollZoom": True})

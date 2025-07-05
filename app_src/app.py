@@ -29,7 +29,8 @@ from scipy.io import loadmat, savemat
 from app_src import VERSION
 from app_src.make_mp4 import make_mp4_clip
 from app_src.components import Components
-from app_src.make_figure import get_padded_sleep_scores, make_figure
+from app_src.event_analysis import make_perievent_labels
+from app_src.make_figure import get_padded_period_labels, make_figure
 
 from app_src.postprocessing import get_sleep_segments, get_pred_label_stats
 
@@ -74,8 +75,13 @@ def open_browser(port):
     webbrowser.open_new(f"http://127.0.0.1:{port}/")
 
 
-def create_fig(mat, mat_name, default_n_shown_samples=2048):
-    fig = make_figure(mat, mat_name, default_n_shown_samples)
+def create_fig(mat, mat_name, period_labels=np.array([]), default_n_shown_samples=2048):
+    fig = make_figure(
+        mat,
+        mat_name,
+        period_labels=period_labels,
+        default_n_shown_samples=default_n_shown_samples,
+    )
     return fig
 
 
@@ -83,8 +89,8 @@ def reset_cache(cache, filename):
     prev_filename = cache.get("filename")
 
     # attempt for salvaging unsaved annotations
-    if prev_filename is None or prev_filename != filename:
-        cache.set("sleep_scores_history", deque(maxlen=4))
+    # if prev_filename is None or prev_filename != filename:
+    cache.set("period_labels_history", deque(maxlen=4))
 
     cache.set("filename", filename)
     recent_files_with_video = cache.get("recent_files_with_video")
@@ -93,6 +99,7 @@ def reset_cache(cache, filename):
     file_video_record = cache.get("file_video_record")
     if file_video_record is None:
         file_video_record = {}
+    cache.set("annotation_filename", "")
     cache.set("recent_files_with_video", recent_files_with_video)
     cache.set("file_video_record", file_video_record)
     cache.set("start_time", 0)
@@ -223,7 +230,7 @@ clientside_callback(
     ],
     id="vis-data-upload",
 )
-def read_mat_vis(status):
+def read_mat(status):
     # clean TEMP_PATH regularly by deleting temp files written there
     mat_file = status.latest_file
     filename = os.path.basename(mat_file)
@@ -238,6 +245,58 @@ def read_mat_vis(status):
         "File uploaded. Creating visualizations... This may take up to 30 seconds."
     )
     return message, "vis", components.vis_upload_box, 0, ""
+
+
+@app.callback(
+    Output("video-modal", "is_open", allow_duplicate=True),
+    Output("video-container", "children", allow_duplicate=True),
+    Output("video-message", "children", allow_duplicate=True),
+    Input("load-annotations-button", "n_clicks"),
+    State("video-modal", "is_open"),
+    prevent_initial_call=True,
+)
+def prepare_annotation(n_clicks, is_open):
+    message = "Please upload the annotation spreadsheet (an xlsx file) above."
+    return (not is_open), components.annotation_upload_box, message
+
+
+@du.callback(
+    output=[
+        Output("video-message", "children", allow_duplicate=True),
+        Output("annotation-uploaded-store", "data"),
+    ],
+    id="annotation-upload",
+)
+def upload_annotation(status):
+    annotation_file = status.latest_file
+    annotation_filename = os.path.basename(annotation_file)
+    cache.set("annotation_filename", annotation_filename)
+    message = "File uploaded. It may take up to 30 seconds to update the visualizations. You can close this window now."
+    return message, "uploaded"
+
+
+@app.callback(
+    Output("graph", "figure", allow_duplicate=True),
+    Input("annotation-uploaded-store", "data"),
+    prevent_initial_call=True,
+)
+def import_annotation_file(uploaded):
+    annotation_filename = cache.get("annotation_filename")
+    mat_name = cache.get("filename")
+    mat = loadmat(os.path.join(TEMP_PATH, mat_name), squeeze_me=True)
+    biosignal_name = "NE2m"
+    biosignal = mat[biosignal_name]
+
+    annotation_file = os.path.join(TEMP_PATH, annotation_filename)
+    fp_freq = mat["fp_frequency"]
+    nsec_before = 60
+    nsec_after = 60
+    duration = int(np.ceil(len(biosignal) / fp_freq))
+    perievent_labels = make_perievent_labels(
+        annotation_file, duration, nsec_before=nsec_before, nsec_after=nsec_after
+    )
+    fig = create_fig(mat, mat_name, period_labels=perievent_labels)
+    return fig
 
 
 @app.callback(
@@ -264,19 +323,19 @@ def create_visualization(ready):
         return message, dash.no_update
 
     # salvage unsaved annotations
-    sleep_scores_history = cache.get("sleep_scores_history")
-    if sleep_scores_history:
-        mat["sleep_scores"] = sleep_scores_history[-1]
+    period_labels_history = cache.get("period_labels_history")
+    if period_labels_history:
+        mat["period_labels"] = period_labels_history[-1]
     else:
         signal_length = signal_lengths[0]
         fp_freq = mat.get("fp_frequency")
         duration = math.ceil(
             (signal_length - 1) / fp_freq
         )  # need to round duration to an int for later
-        sleep_scores = mat.get("sleep_scores", np.array([]))
-        sleep_scores = get_padded_sleep_scores(sleep_scores, duration)
-        np.place(sleep_scores, sleep_scores == -1, [np.nan])
-        sleep_scores_history.append(sleep_scores)
+        period_labels = mat.get("period_labels", np.array([]))
+        period_labels = get_padded_period_labels(period_labels, duration)
+        np.place(period_labels, period_labels == -1, [np.nan])
+        period_labels_history.append(period_labels)
 
     fig = create_fig(mat, mat_name)
     video_start_time = mat.get("video_start_time")
@@ -296,7 +355,7 @@ def create_visualization(ready):
         cache.set("video_name", video_name)
 
     cache.set("fig_resampler", fig)
-    cache.set("sleep_scores_history", sleep_scores_history)
+    cache.set("period_labels_history", period_labels_history)
     components.graph.figure = fig
     return components.visualization_div, num_signals
 
@@ -315,16 +374,16 @@ def change_sampling_level(sampling_level):
     mat = loadmat(os.path.join(TEMP_PATH, mat_name), squeeze_me=True)
 
     # copy modified (through annotation) sleep scores over
-    sleep_scores_history = cache.get("sleep_scores_history")
-    if sleep_scores_history:
-        mat["sleep_scores"] = sleep_scores_history[-1]
+    period_labels_history = cache.get("period_labels_history")
+    if period_labels_history:
+        mat["period_labels"] = period_labels_history[-1]
 
     fig = create_fig(mat, mat_name, default_n_shown_samples=n_samples)
     return fig
 
 
 @app.callback(
-    Output("video-modal", "is_open"),
+    Output("video-modal", "is_open", allow_duplicate=True),
     Output("video-path-store", "data", allow_duplicate=True),
     Output("video-container", "children", allow_duplicate=True),
     Output("video-message", "children", allow_duplicate=True),
@@ -583,9 +642,12 @@ def read_click_select(
 
     # Grab clicked x value
     x_click = clickData["points"][0]["x"]
-
+    x_click = round(x_click)
     # Determine current x-axis visible range
     x_min, x_max = figure["layout"][f"xaxis{num_signals}"]["range"]
+    if x_click < x_min or x_click > x_max:
+        return [], patched_figure, "", video_button_style
+
     total_range = x_max - x_min
 
     # Decide neighborhood size: e.g., 1% of current view range
@@ -637,7 +699,7 @@ def read_click_select(
     State("num-signals-store", "data"),
     prevent_initial_call=True,
 )
-def update_sleep_scores(
+def add_annotation(
     box_select_range,
     keyboard_press,
     keyboard_event,
@@ -659,21 +721,21 @@ def update_sleep_scores(
 
     label = int(label) - 1
     start, end = box_select_range
-    sleep_scores_history = cache.get("sleep_scores_history")
-    current_sleep_scores = sleep_scores_history[-1]  # np array
-    new_sleep_scores = current_sleep_scores.copy()
-    new_sleep_scores[start:end] = np.array([label] * (end - start))
+    period_labels_history = cache.get("period_labels_history")
+    current_period_labels = period_labels_history[-1]  # np array
+    new_period_labels = current_period_labels.copy()
+    new_period_labels[start:end] = np.array([label] * (end - start))
     # If the annotation does not change anything, don't add to history
-    if (new_sleep_scores == current_sleep_scores).all():
+    if (new_period_labels == current_period_labels).all():
         raise PreventUpdate
 
-    sleep_scores_history.append(new_sleep_scores.astype(float))
-    cache.set("sleep_scores_history", sleep_scores_history)
+    period_labels_history.append(new_period_labels.astype(float))
+    cache.set("period_labels_history", period_labels_history)
     net_annotation_count += 1
 
     patched_figure = Patch()
     for k in range(1, num_signals + 1):
-        patched_figure["data"][-k]["z"][0] = new_sleep_scores
+        patched_figure["data"][-k]["z"][0] = new_period_labels
 
     # remove box or click select after an update is made
     patched_figure["layout"]["selections"] = None
@@ -690,22 +752,22 @@ def update_sleep_scores(
     prevent_initial_call=True,
 )
 def undo_annotation(n_clicks, figure, net_annotation_count):
-    sleep_scores_history = cache.get("sleep_scores_history")
-    if len(sleep_scores_history) <= 1:
+    period_labels_history = cache.get("period_labels_history")
+    if len(period_labels_history) <= 1:
         raise PreventUpdate()
 
     net_annotation_count -= 1
-    sleep_scores_history.pop()  # pop current one, then get the last one
+    period_labels_history.pop()  # pop current one, then get the last one
 
     # undo cache
-    cache.set("sleep_scores_history", sleep_scores_history)
-    prev_sleep_scores = sleep_scores_history[-1]
+    cache.set("period_labels_history", period_labels_history)
+    prev_period_labels = period_labels_history[-1]
 
     # undo figure
     patched_figure = Patch()
-    patched_figure["data"][-3]["z"][0] = prev_sleep_scores
-    patched_figure["data"][-2]["z"][0] = prev_sleep_scores
-    patched_figure["data"][-1]["z"][0] = prev_sleep_scores
+    patched_figure["data"][-3]["z"][0] = prev_period_labels
+    patched_figure["data"][-2]["z"][0] = prev_period_labels
+    patched_figure["data"][-1]["z"][0] = prev_period_labels
     return patched_figure, net_annotation_count
 
 
@@ -719,12 +781,12 @@ def undo_annotation(n_clicks, figure, net_annotation_count):
 )
 def show_hide_save_undo_button(net_annotation_count):
     # time.sleep(10)
-    sleep_scores_history = cache.get("sleep_scores_history")
+    period_labels_history = cache.get("period_labels_history")
     save_button_style = {"visibility": "hidden"}
     undo_button_style = {"visibility": "hidden"}
     if net_annotation_count > 0:
         save_button_style = {"visibility": "visible"}
-        if len(sleep_scores_history) > 1:
+        if len(period_labels_history) > 1:
             undo_button_style = {"visibility": "visible"}
     return save_button_style, undo_button_style
 
@@ -740,26 +802,26 @@ def save_annotations(n_clicks):
     temp_mat_path = os.path.join(TEMP_PATH, mat_filename)
     mat = loadmat(temp_mat_path, squeeze_me=True)
 
-    # replace None in sleep_scores
-    sleep_scores_history = cache.get("sleep_scores_history")
+    # replace None in period_labels
+    period_labels_history = cache.get("period_labels_history")
     labels = None
-    if sleep_scores_history:
+    if period_labels_history:
         # replace any None or nan in sleep scores to -1 before saving, otherwise results in save error
         # make a copy first because we don't want to convert any nan in the cache
-        updated_sleep_scores = sleep_scores_history[-1]
+        updated_period_labels = period_labels_history[-1]
         np.place(
-            updated_sleep_scores, updated_sleep_scores == None, [-1]
+            updated_period_labels, updated_period_labels == None, [-1]
         )  # convert None to -1 for scipy's savemat
-        updated_sleep_scores = np.nan_to_num(
-            updated_sleep_scores, nan=-1
+        updated_period_labels = np.nan_to_num(
+            updated_period_labels, nan=-1
         )  # convert np.nan to -1 for scipy's savemat
 
-        mat["sleep_scores"] = updated_sleep_scores
+        mat["period_labels"] = updated_period_labels
     savemat(temp_mat_path, mat)
 
     # export sleep bout spreadsheet only if the manual scoring is complete
-    if mat.get("sleep_scores") is not None and -1 not in mat["sleep_scores"]:
-        labels = mat["sleep_scores"]
+    if mat.get("period_labels") is not None and -1 not in mat["period_labels"]:
+        labels = mat["period_labels"]
 
     if labels is not None:
         labels = labels.astype(int)

@@ -64,6 +64,31 @@ video_upload_box = du.Upload(
     default_style=video_upload_box_style,
 )
 
+annotation_upload_box_style = {
+    "fontSize": "18px",
+    "width": "100%",
+    "height": "auto",
+    "minHeight": "auto",
+    "lineHeight": "auto",
+    "borderWidth": "1px",
+    "borderStyle": "none",
+    "textAlign": "center",
+    "margin": "5px",  # spacing between the upload box and the div it's in
+    "borderRadius": "10px",  # rounded corner
+    "backgroundColor": "lightgrey",
+}
+
+# set up dash uploader
+annotation_upload_box = du.Upload(
+    id="annotation-upload",
+    text="Select Annotation File",
+    text_completed="Loaded",
+    cancel_button=True,
+    filetypes=["xlsx"],
+    upload_id="",
+    default_style=annotation_upload_box_style,
+)
+
 save_div = html.Div(
     style={
         "display": "flex",
@@ -103,6 +128,7 @@ home_div = html.Div(
             ],
         ),
         dcc.Store(id="visualization-ready-store"),
+        dcc.Store(id="annotation-uploaded-store"),
         dcc.Store(id="net-annotation-count-store"),
         dcc.Store(id="num-signals-store"),
     ]
@@ -146,6 +172,15 @@ utility_div = html.Div(
                     ]
                 ),
             ],
+        ),
+        html.Div(
+            [
+                html.Button(
+                    "Load Annotations",
+                    id="load-annotations-button",
+                )
+            ],
+            style={"marginLeft": "auto"},  # keep the button to the right edge
         ),
     ],
 )
@@ -211,6 +246,7 @@ class Components:
         self.visualization_div = visualization_div
         self.vis_upload_box = vis_upload_box
         self.video_upload_box = video_upload_box
+        self.annotation_upload_box = annotation_upload_box
 
     def configure_du(self, app, folder):
         du.configure_upload(app, folder, use_upload_id=True)
