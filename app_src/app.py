@@ -5,8 +5,10 @@ Created on Fri Oct 20 15:45:29 2023
 @author: yzhao
 """
 
+import io
 import os
 import math
+import base64
 
 # import time
 import tempfile
@@ -23,14 +25,15 @@ from dash import Dash, dcc, ctx, clientside_callback, Patch
 
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 from flask_caching import Cache
 from scipy.io import loadmat, savemat
 
 from app_src import VERSION
 from app_src.make_mp4 import make_mp4_clip
 from app_src.components import Components
-from app_src.event_analysis import make_perievent_labels
-from app_src.make_figure import get_padded_period_labels, make_figure
+from app_src.make_figure import get_padded_labels, make_figure
+from app_src.event_analysis import Event_Utils, Perievent_Plots
 
 from app_src.postprocessing import get_sleep_segments, get_pred_label_stats
 
@@ -53,7 +56,7 @@ VIDEO_DIR = Path(__file__).parent / "assets" / "videos"
 VIDEO_DIR.mkdir(parents=True, exist_ok=True)
 
 components = Components()
-app.layout = components.home_div
+app.layout = components.main_div
 du = components.configure_du(app, TEMP_PATH)
 
 # Note: np.nan is converted to None when reading from cache
@@ -75,14 +78,78 @@ def open_browser(port):
     webbrowser.open_new(f"http://127.0.0.1:{port}/")
 
 
-def create_fig(mat, mat_name, period_labels=np.array([]), default_n_shown_samples=2048):
+def create_fig(mat, mat_name, label_dict={}, default_n_shown_samples=2048):
     fig = make_figure(
         mat,
         mat_name,
-        period_labels=period_labels,
+        label_dict=label_dict,
         default_n_shown_samples=default_n_shown_samples,
     )
     return fig
+
+
+def make_analysis_plots():
+    mat_name = cache.get("filename")
+    mat = loadmat(os.path.join(TEMP_PATH, mat_name), squeeze_me=True)
+    biosignal_name = "NE2m"
+    biosignal = mat[biosignal_name]
+    annotation_filename = cache.get("annotation_filename")
+    annotation_file = os.path.join(TEMP_PATH, annotation_filename)
+    fp_freq = mat["fp_frequency"]
+    nsec_before = 60
+    nsec_after = 60
+    duration = int(np.ceil(len(biosignal) / fp_freq))
+    min_time = nsec_before
+    max_time = duration - nsec_after
+    event_time_dict = Event_Utils.read_events(annotation_file, min_time, max_time)
+    perievent_labels = np.zeros(duration)
+    perievent_labels[:] = np.nan
+    perievent_indices_dict = {}
+    for i, event in enumerate(sorted(event_time_dict.keys())):
+        event_time = event_time_dict[event]
+        perievent_windows = Event_Utils.make_perievent_windows(
+            event_time, nsec_before=nsec_before, nsec_after=nsec_after
+        )
+        perievent_indices_dict[event] = Event_Utils.get_perievent_indices(
+            perievent_windows, fp_freq
+        )
+        perievent_time = perievent_windows.flatten()
+        perievent_labels[perievent_time] = i
+
+    n_rows = 3
+    event_count = len(event_time_dict)
+    w = 4
+    h = 3
+    fig, axes = plt.subplots(n_rows, event_count, figsize=(w * event_count, h * n_rows))
+    axes = np.atleast_2d(axes)
+    for col, event in enumerate(event_time_dict.keys()):
+        perievent_indices = perievent_indices_dict[event]
+        perievent_signals = biosignal[perievent_indices]
+        Perievent_Plots.plot_perievent_signals(
+            axes[0, col],
+            event,
+            perievent_signals,
+            fp_name=mat_name,
+            biosignal_name=biosignal_name,
+        )
+        Perievent_Plots.plot_mean_perievent_signals(
+            axes[1, col],
+            event,
+            perievent_signals,
+            fp_name=mat_name,
+            biosignal_name=biosignal_name,
+        )
+        Perievent_Plots.plot_perievent_heatmaps(
+            axes[2, col], event, perievent_signals, fp_freq, fp_name=mat_name
+        )
+
+    plt.tight_layout()
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=200, bbox_inches="tight")
+    plt.close(fig)
+    buf.seek(0)
+    encoded = base64.b64encode(buf.read()).decode()
+    return f"data:image/png;base64,{encoded}"
 
 
 def reset_cache(cache, filename):
@@ -220,9 +287,22 @@ clientside_callback(
 # %% server side callbacks below
 
 
+@app.callback(
+    Output("home-page", "hidden"),
+    Output("analysis-page", "hidden"),
+    Output("analysis-image", "src"),
+    Input("url", "pathname"),
+)
+def navigate_pages(pathname):
+    if pathname == "/analysis":
+        return True, False, make_analysis_plots()  # hide home, show analysis
+    else:
+        return False, True, dash.no_update  # show home, hide analysis
+
+
 @du.callback(
     output=[
-        Output("data-upload-message", "children", allow_duplicate=True),
+        Output("data-upload-message", "children"),
         Output("visualization-ready-store", "data", allow_duplicate=True),
         Output("upload-container", "children", allow_duplicate=True),
         Output("net-annotation-count-store", "data", allow_duplicate=True),
@@ -244,7 +324,7 @@ def read_mat(status):
     message = (
         "File uploaded. Creating visualizations... This may take up to 30 seconds."
     )
-    return message, "vis", components.vis_upload_box, 0, ""
+    return message, True, components.vis_upload_box, 0, ""
 
 
 @app.callback(
@@ -281,31 +361,35 @@ def upload_annotation(status):
     prevent_initial_call=True,
 )
 def import_annotation_file(uploaded):
-    annotation_filename = cache.get("annotation_filename")
     mat_name = cache.get("filename")
     mat = loadmat(os.path.join(TEMP_PATH, mat_name), squeeze_me=True)
     biosignal_name = "NE2m"
     biosignal = mat[biosignal_name]
-
+    annotation_filename = cache.get("annotation_filename")
     annotation_file = os.path.join(TEMP_PATH, annotation_filename)
     fp_freq = mat["fp_frequency"]
     nsec_before = 60
     nsec_after = 60
     duration = int(np.ceil(len(biosignal) / fp_freq))
-    perievent_labels = make_perievent_labels(
+    perievent_label_dict = Event_Utils.make_perievent_labels(
         annotation_file, duration, nsec_before=nsec_before, nsec_after=nsec_after
     )
-    fig = create_fig(mat, mat_name, period_labels=perievent_labels)
+    fig = create_fig(mat, mat_name, label_dict=perievent_label_dict)
     return fig
 
 
 @app.callback(
-    Output("data-upload-message", "children", allow_duplicate=True),
+    Output("visualization-container", "children"),
     Output("num-signals-store", "data"),
     Input("visualization-ready-store", "data"),
+    State("visualization-container", "children"),
+    State("home-page", "hidden"),
     prevent_initial_call=True,
 )
-def create_visualization(ready):
+def create_visualization(ready, existing_children, home_hidden):
+    if not ready or existing_children or home_hidden:
+        raise PreventUpdate()
+
     mat_name = cache.get("filename")
     mat = loadmat(os.path.join(TEMP_PATH, mat_name), squeeze_me=True)
     fp_signal_names = mat["fp_signal_names"]
@@ -333,7 +417,7 @@ def create_visualization(ready):
             (signal_length - 1) / fp_freq
         )  # need to round duration to an int for later
         period_labels = mat.get("period_labels", np.array([]))
-        period_labels = get_padded_period_labels(period_labels, duration)
+        period_labels = get_padded_labels(period_labels, duration)
         np.place(period_labels, period_labels == -1, [np.nan])
         period_labels_history.append(period_labels)
 
@@ -356,8 +440,11 @@ def create_visualization(ready):
 
     cache.set("fig_resampler", fig)
     cache.set("period_labels_history", period_labels_history)
-    components.graph.figure = fig
-    return components.visualization_div, num_signals
+    # components.graph.figure = fig
+    graph = dcc.Graph(id="graph", figure=fig, config={"scrollZoom": True})
+    visualization_div = components.make_visualization_div(graph)
+
+    return visualization_div, num_signals
 
 
 @app.callback(

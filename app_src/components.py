@@ -97,6 +97,10 @@ save_div = html.Div(
         "marginBottom": "10px",
     },
     children=[
+        html.A(
+            html.Button("Run Analysis", style={"visibility": "visible"}),
+            href="/analysis",
+        ),
         html.Button(
             "Save Annotations",
             id="save-button",
@@ -111,14 +115,17 @@ save_div = html.Div(
         ),
     ],
 )
-home_div = html.Div(
-    [
+
+home_page = html.Div(
+    id="home-page",
+    children=[
         html.Div(
             id="upload-container",
             style={"marginLeft": "15px", "marginTop": "15px"},
             children=[vis_upload_box],
         ),
         html.Div(id="data-upload-message", style={"marginLeft": "10px"}),
+        html.Div(id="visualization-container", style={"marginLeft": "10px"}),
         html.Div(
             style={"display": "flex", "marginLeft": "15px"},
             children=[
@@ -131,8 +138,25 @@ home_div = html.Div(
         dcc.Store(id="annotation-uploaded-store"),
         dcc.Store(id="net-annotation-count-store"),
         dcc.Store(id="num-signals-store"),
-    ]
+    ],
+    hidden=True,
 )
+
+analysis_page = html.Div(
+    id="analysis-page",
+    hidden=True,
+    children=[
+        html.H1("Analysis Page"),
+        html.A(html.Button("← Back"), href="/"),
+        html.Br(),
+        html.Br(),
+        html.Img(
+            id="analysis-image", style={"width": "100%", "border": "1px solid #ccc"}
+        ),
+    ],
+)
+
+main_div = html.Div([dcc.Location(id="url"), home_page, analysis_page])
 
 # %% visualization div
 
@@ -225,25 +249,28 @@ backend_div = html.Div(
     ]
 )
 
-visualization_div = html.Div(
-    children=[
-        utility_div,
-        video_modal,
-        html.Div(
-            children=[graph],
-            style={"marginTop": "1px", "marginLeft": "20px", "marginRight": "20px"},
-        ),
-        backend_div,
-    ],
-)
+
+def make_visualization_div(graph):
+    visualization_div = html.Div(
+        children=[
+            utility_div,
+            video_modal,
+            html.Div(
+                children=[graph],
+                style={"marginTop": "1px", "marginLeft": "20px", "marginRight": "20px"},
+            ),
+            backend_div,
+        ],
+    )
+    return visualization_div
 
 
 # %%
 class Components:
     def __init__(self):
-        self.home_div = home_div
+        self.main_div = main_div
         self.graph = graph
-        self.visualization_div = visualization_div
+        self.make_visualization_div = make_visualization_div
         self.vis_upload_box = vis_upload_box
         self.video_upload_box = video_upload_box
         self.annotation_upload_box = annotation_upload_box

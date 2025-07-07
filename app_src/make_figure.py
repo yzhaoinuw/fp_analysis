@@ -90,13 +90,17 @@ def make_figure(
     if label_dict:
         label_names = label_dict["label_names"]
         labels = label_dict["labels"]
+    else:
+        label_names = []
+        labels = np.array([])
+
     # scored fully or partially or unscored
     labels = get_padded_labels(labels, duration)
     np.place(
         labels, labels == -1, [np.nan]
     )  # convert -1 to None for heatmap visualization
 
-    num_class = len(np.unique(labels[~np.isnan(labels)]))
+    num_class = max(2, len(label_names))
     # convert flat array to 2D array for visualization to work
     if len(labels.shape) == 1:
         labels = np.expand_dims(labels, axis=0)
@@ -163,7 +167,7 @@ def make_figure(
             col=1,
         )
 
-    for i, color in enumerate(LABEL_COLORS[:num_class]):
+    for i, color in enumerate(LABEL_COLORS[: len(label_names)]):
         fig.add_trace(
             go.Scatter(
                 x=[-100],
