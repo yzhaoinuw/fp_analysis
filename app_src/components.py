@@ -6,9 +6,10 @@ Created on Fri Oct 20 16:27:03 2023
 """
 
 import dash_uploader as du
-from dash import dcc, html
 import dash_bootstrap_components as dbc
+from dash import dcc, html, page_container
 from dash_extensions import EventListener
+from dash_extensions.pages import setup_page_components
 
 
 # %% home div
@@ -32,7 +33,7 @@ upload_box_style = {
 vis_upload_box = du.Upload(
     id="vis-data-upload",
     text="Click here to select File",
-    text_completed="Completed loading",
+    text_completed="Completed loading ",
     cancel_button=True,
     filetypes=["mat"],
     upload_id="",
@@ -56,7 +57,7 @@ video_upload_box_style = {
 video_upload_box = du.Upload(
     id="video-upload",
     text="Select avi File",
-    text_completed="Completed loading",
+    text_completed="Completed loading ",
     cancel_button=True,
     filetypes=["avi"],
     max_file_size=2048,
@@ -82,7 +83,7 @@ annotation_upload_box_style = {
 annotation_upload_box = du.Upload(
     id="annotation-upload",
     text="Select Annotation File",
-    text_completed="Loaded",
+    text_completed="Completed loading ",
     cancel_button=True,
     filetypes=["xlsx"],
     upload_id="",
@@ -97,10 +98,13 @@ save_div = html.Div(
         "marginBottom": "10px",
     },
     children=[
-        html.A(
-            html.Button("Run Analysis", style={"visibility": "visible"}),
-            href="/analysis",
+        dcc.Location(id="page-url"),
+        html.Div(
+            id="analysis-link",
+            children=[dcc.Link(children="Run Analysis", href="/analysis")],
+            style={"visibility": "hidden"},
         ),
+        # html.A(html.Button("Run Analysis"), href="/analysis"),
         html.Button(
             "Save Annotations",
             id="save-button",
@@ -115,7 +119,6 @@ save_div = html.Div(
         ),
     ],
 )
-
 home_page = html.Div(
     id="home-page",
     children=[
@@ -139,15 +142,15 @@ home_page = html.Div(
         dcc.Store(id="net-annotation-count-store"),
         dcc.Store(id="num-signals-store"),
     ],
-    hidden=True,
 )
 
 analysis_page = html.Div(
     id="analysis-page",
-    hidden=True,
+    # hidden=True,
     children=[
         html.H1("Analysis Page"),
-        html.A(html.Button("← Back"), href="/"),
+        # html.A(html.Button("← Back"), href="/"),
+        html.Div(dcc.Link(children="← Back", href="/")),
         html.Br(),
         html.Br(),
         html.Img(
@@ -156,7 +159,13 @@ analysis_page = html.Div(
     ],
 )
 
-main_div = html.Div([dcc.Location(id="url"), home_page, analysis_page])
+main_div = html.Div(
+    [
+        page_container,  # page layout is rendered here
+        setup_page_components(),  # page components are rendered here
+        home_page,
+    ]
+)
 
 # %% visualization div
 
@@ -268,7 +277,7 @@ def make_visualization_div(graph):
 # %%
 class Components:
     def __init__(self):
-        self.main_div = main_div
+        self.home_page = home_page
         self.graph = graph
         self.make_visualization_div = make_visualization_div
         self.vis_upload_box = vis_upload_box

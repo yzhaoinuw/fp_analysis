@@ -21,7 +21,8 @@ import dash_player
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 from dash.dependencies import Input, Output, State
-from dash import Dash, dcc, ctx, clientside_callback, Patch
+from dash_extensions.pages import setup_page_components
+from dash import Dash, dcc, html, ctx, clientside_callback, Patch, page_container
 
 import numpy as np
 import pandas as pd
@@ -29,22 +30,29 @@ import matplotlib.pyplot as plt
 from flask_caching import Cache
 from scipy.io import loadmat, savemat
 
+"""
 from app_src import VERSION
 from app_src.make_mp4 import make_mp4_clip
 from app_src.components import Components
 from app_src.make_figure import get_padded_labels, make_figure
 from app_src.event_analysis import Event_Utils, Perievent_Plots
-
 from app_src.postprocessing import get_sleep_segments, get_pred_label_stats
-
+"""
+# from . import VERSION
+from make_mp4 import make_mp4_clip
+from components import Components
+from make_figure import get_padded_labels, make_figure
+from event_analysis import Event_Utils, Perievent_Plots
+from postprocessing import get_sleep_segments, get_pred_label_stats
 
 app = Dash(
     __name__,
-    title=f"FP Visualization App {VERSION}",
+    # title=f"FP Visualization App {VERSION}",
     suppress_callback_exceptions=True,
     external_stylesheets=[
         dbc.themes.BOOTSTRAP
     ],  # need this for the modal to work properly
+    use_pages=True,
 )
 
 TEMP_PATH = os.path.join(tempfile.gettempdir(), "fp_visualization_app_data")
@@ -56,7 +64,14 @@ VIDEO_DIR = Path(__file__).parent / "assets" / "videos"
 VIDEO_DIR.mkdir(parents=True, exist_ok=True)
 
 components = Components()
-app.layout = components.main_div
+# app.layout = components.main_div
+app.layout = html.Div(
+    [
+        page_container,  # page layout is rendered here
+        setup_page_components(),  # page components are rendered here
+    ]
+)
+
 du = components.configure_du(app, TEMP_PATH)
 
 # Note: np.nan is converted to None when reading from cache
@@ -288,21 +303,19 @@ clientside_callback(
 
 
 @app.callback(
-    Output("home-page", "hidden"),
-    Output("analysis-page", "hidden"),
     Output("analysis-image", "src"),
-    Input("url", "pathname"),
+    Input("page-url", "pathname"),
 )
 def navigate_pages(pathname):
     if pathname == "/analysis":
-        return True, False, make_analysis_plots()  # hide home, show analysis
+        return make_analysis_plots()
     else:
-        return False, True, dash.no_update  # show home, hide analysis
+        return dash.no_update
 
 
 @du.callback(
     output=[
-        Output("data-upload-message", "children"),
+        Output("data-upload-message", "children", allow_duplicate=True),
         Output("visualization-ready-store", "data", allow_duplicate=True),
         Output("upload-container", "children", allow_duplicate=True),
         Output("net-annotation-count-store", "data", allow_duplicate=True),
@@ -357,6 +370,7 @@ def upload_annotation(status):
 
 @app.callback(
     Output("graph", "figure", allow_duplicate=True),
+    Output("analysis-link", "style"),
     Input("annotation-uploaded-store", "data"),
     prevent_initial_call=True,
 )
@@ -375,19 +389,20 @@ def import_annotation_file(uploaded):
         annotation_file, duration, nsec_before=nsec_before, nsec_after=nsec_after
     )
     fig = create_fig(mat, mat_name, label_dict=perievent_label_dict)
-    return fig
+    return fig, {"visibility": "visible"}
 
 
 @app.callback(
     Output("visualization-container", "children"),
     Output("num-signals-store", "data"),
+    Output("data-upload-message", "children", allow_duplicate=True),
     Input("visualization-ready-store", "data"),
-    State("visualization-container", "children"),
-    State("home-page", "hidden"),
+    # State("visualization-container", "children"),
+    # State("home-page", "hidden"),
     prevent_initial_call=True,
 )
-def create_visualization(ready, existing_children, home_hidden):
-    if not ready or existing_children or home_hidden:
+def create_visualization(ready):
+    if not ready:
         raise PreventUpdate()
 
     mat_name = cache.get("filename")
@@ -398,13 +413,13 @@ def create_visualization(ready, existing_children, home_hidden):
     message = "Please double check the file selected."
     if num_signals == 0:
         message = " ".join(["No FP signal found.", message])
-        return message, dash.no_update
+        return message, dash.no_update, ""
 
     fp_signals = [mat[signal_name] for signal_name in fp_signal_names]
     signal_lengths = [len(fp_signals[k]) for k in range(num_signals)]
     if not all(length == signal_lengths[0] for length in signal_lengths):
         message = " ".join(["Not all FP signals are of the same length.", message])
-        return message, dash.no_update
+        return message, dash.no_update, ""
 
     # salvage unsaved annotations
     period_labels_history = cache.get("period_labels_history")
@@ -444,7 +459,7 @@ def create_visualization(ready, existing_children, home_hidden):
     graph = dcc.Graph(id="graph", figure=fig, config={"scrollZoom": True})
     visualization_div = components.make_visualization_div(graph)
 
-    return visualization_div, num_signals
+    return visualization_div, num_signals, ""
 
 
 @app.callback(
@@ -932,4 +947,4 @@ if __name__ == "__main__":
 
     PORT = 8050
     Timer(1, partial(open_browser, PORT)).start()
-    app.run_server(debug=False, port=PORT, dev_tools_hot_reload=False)
+    app.run(debug=False, port=PORT, dev_tools_hot_reload=False)
