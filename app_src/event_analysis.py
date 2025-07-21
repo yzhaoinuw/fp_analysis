@@ -6,11 +6,15 @@ Created on Wed Jul  2 19:26:15 2025
 """
 
 import os
+import io
+import base64
+import zipfile
 
 import numpy as np
 import pandas as pd
 from scipy.io import loadmat
 import matplotlib.pyplot as plt
+from matplotlib.transforms import Bbox
 
 
 class Event_Utils:
@@ -30,6 +34,14 @@ class Event_Utils:
                 continue
             event_time_dict[event] = df_event.round().astype(int).tolist()
         return event_time_dict
+
+    @staticmethod
+    def count_events(event_time_dict):
+        event_count_records = [
+            {"Event": event, "Count": len(start_times)}
+            for event, start_times in event_time_dict.items()
+        ]
+        return event_count_records
 
     @staticmethod
     def make_perievent_windows(event_time, nsec_before=60, nsec_after=60):
@@ -127,7 +139,7 @@ class Perievent_Plots:
         ax.set_ylim(-10, 10)
         ax.set_xlabel("Time (s)", fontsize=10, fontweight="bold")
         ax.set_ylabel(f"mean {biosignal_name} (dF/F)", fontsize=10, fontweight="bold")
-        ax.set_title(f"Mean_{fp_name}_{event}", fontsize=12, fontweight="bold")
+        ax.set_title(f"{fp_name}_{event}_Mean", fontsize=12, fontweight="bold")
         # ax.tight_layout()
 
     @staticmethod
@@ -158,15 +170,119 @@ class Perievent_Plots:
         )
 
         # Format axis
-        event_labels = [f"{i+1}" for i in range(event_count)]
+        # event_labels = [f"{i+1}" for i in range(event_count)]
         ax.set_yticks(np.arange(event_count) + 0.5)
+        event_labels = [
+            str(i + 1 * (i // 5 < 1)) if i % 5 == 0 else "" for i in range(event_count)
+        ]
         ax.set_yticklabels(event_labels)
         ax.set_ylabel("Event Index", fontsize=10, fontweight="bold")
         ax.set_xlabel("Time (s)", fontsize=10, fontweight="bold")
-        ax.set_title(f"{fp_name}_{event}", fontsize=12, fontweight="bold")
+        ax.set_title(f"{fp_name}_{event}_Heatmap", fontsize=12, fontweight="bold")
 
         # Add colorbar to the figure this axis belongs to
         ax.figure.colorbar(im, ax=ax, label="(dF/F)")
+
+    @staticmethod
+    def make_perievent_plots(
+        fp_file,
+        biosignal_name,
+        event_file,
+        nsec_before=60,
+        nsec_after=60,
+        width=5,
+        height=3,
+        as_base64=False,
+    ):
+        n_cols = 3
+        fp_name = os.path.basename(fp_file).rstrip(".mat")
+        fp_data = loadmat(fp_file, squeeze_me=True)
+        # biosignal_names = fp_data["fp_signal_names"]
+        biosignal = fp_data[biosignal_name]
+        fp_freq = fp_data["fp_frequency"]
+        duration = int(np.ceil(len(biosignal) / fp_freq))
+        min_time = nsec_before
+        max_time = duration - nsec_after
+        # perievent_labels = make_perievent_labels(event_file, duration, nsec_before=2, nsec_after=2)
+        event_time_dict = Event_Utils.read_events(event_file, min_time, max_time)
+        perievent_labels = np.zeros(duration)
+        perievent_labels[:] = np.nan
+        perievent_indices_dict = {}
+        for i, event in enumerate(sorted(event_time_dict.keys())):
+            event_time = event_time_dict[event]
+            perievent_windows = Event_Utils.make_perievent_windows(
+                event_time, nsec_before=nsec_before, nsec_after=nsec_after
+            )
+            perievent_indices_dict[event] = Event_Utils.get_perievent_indices(
+                perievent_windows, fp_freq
+            )
+            perievent_time = perievent_windows.flatten()
+            perievent_labels[perievent_time] = i
+
+        event_count = len(event_time_dict)
+        fig, axes = plt.subplots(
+            event_count, n_cols, figsize=(width * n_cols, height * event_count)
+        )
+        axes = np.atleast_2d(axes)
+        for col, event in enumerate(event_time_dict.keys()):
+            perievent_indices = perievent_indices_dict[event]
+            perievent_signals = biosignal[perievent_indices]
+            Perievent_Plots.plot_perievent_signals(
+                axes[col, 0], event, perievent_signals, fp_name=fp_name
+            )
+            Perievent_Plots.plot_mean_perievent_signals(
+                axes[col, 1], event, perievent_signals, fp_name=fp_name
+            )
+            Perievent_Plots.plot_perievent_heatmaps(
+                axes[col, 2], event, perievent_signals, fp_freq, fp_name=fp_name
+            )
+
+        plt.tight_layout()
+        if as_base64:
+            buf = io.BytesIO()
+            fig.savefig(buf, format="png", dpi=200, bbox_inches="tight")
+            plt.close(fig)
+            buf.seek(0)
+            encoded = base64.b64encode(buf.read()).decode()
+            return f"data:image/png;base64,{encoded}", fig
+        else:
+            plt.show()
+            return None
+
+    @staticmethod
+    def _full_extent(ax, pad=0.0):
+        """Get the full extent of an axes, including axes labels, tick labels, and
+        titles."""
+        # For text objects, we need to draw the figure first, otherwise the extents
+        # are undefined.
+        ax.figure.canvas.draw()
+        items = ax.get_xticklabels() + ax.get_yticklabels()
+        #    items += [ax, ax.title, ax.xaxis.label, ax.yaxis.label]
+        items += [ax, ax.title]
+        bbox = Bbox.union([item.get_window_extent() for item in items])
+        return bbox.expanded(1.0 + pad, 1.0 + pad)
+
+    @staticmethod
+    def zip_plots(fig, save_zip_path):
+        zip_buf = io.BytesIO()
+        with zipfile.ZipFile(
+            zip_buf, mode="w", compression=zipfile.ZIP_DEFLATED
+        ) as zipf:
+            for ax in fig.axes:
+                title = ax.get_title()
+                if not title:  # skip colorbars and such
+                    continue
+                extent = Perievent_Plots._full_extent(ax).transformed(
+                    fig.dpi_scale_trans.inverted()
+                )
+                img_buf = io.BytesIO()
+                fig.savefig(img_buf, format="png", dpi=200, bbox_inches=extent)
+                img_buf.seek(0)
+                zipf.writestr(f"{title}.png", img_buf.read())
+
+        # Save in-memory zip to the filesystem
+        with open(save_zip_path, "wb") as f:
+            f.write(zip_buf.getvalue())
 
 
 # %%
@@ -178,15 +294,27 @@ if __name__ == "__main__":
     biosignal_names = fp_data["fp_signal_names"]
     biosignal_name = "NE2m"
     biosignal = fp_data[biosignal_name]
-
     event_file = os.path.join(DATA_PATH, "Transitions_F268.xlsx")
+    """
+    Perievent_Plots.make_perievent_plots(
+        fp_file, 
+        biosignal_name, 
+        event_file, 
+        nsec_before=60, 
+        nsec_after=60,
+        width=5,
+        height=3,
+        as_base64=False
+    )
+    """
+
     fp_freq = fp_data["fp_frequency"]
     nsec_before = 60
     nsec_after = 60
     duration = int(np.ceil(len(biosignal) / fp_freq))
     min_time = nsec_before
     max_time = duration - nsec_after
-    # perievent_labels = make_perievent_labels(event_file, duration, nsec_before=2, nsec_after=2)
+    # perievent_labels = Event_Utils.make_perievent_labels(event_file, duration, nsec_before=2, nsec_after=2)
     event_time_dict = Event_Utils.read_events(event_file, min_time, max_time)
     perievent_labels = np.zeros(duration)
     perievent_labels[:] = np.nan
@@ -202,24 +330,23 @@ if __name__ == "__main__":
         perievent_time = perievent_windows.flatten()
         perievent_labels[perievent_time] = i
 
-    n_rows = 3
+    n_cols = 3
     event_count = len(event_time_dict)
-    w = 4
+    w = 5
     h = 3
-    fig, axes = plt.subplots(n_rows, event_count, figsize=(w * event_count, h * n_rows))
+    fig, axes = plt.subplots(event_count, n_cols, figsize=(w * n_cols, h * event_count))
     axes = np.atleast_2d(axes)
     for col, event in enumerate(event_time_dict.keys()):
         perievent_indices = perievent_indices_dict[event]
         perievent_signals = biosignal[perievent_indices]
         Perievent_Plots.plot_perievent_signals(
-            axes[0, col], event, perievent_signals, fp_name=fp_name
+            axes[col, 0], event, perievent_signals, fp_name=fp_name
         )
         Perievent_Plots.plot_mean_perievent_signals(
-            axes[1, col], event, perievent_signals, fp_name=fp_name
+            axes[col, 1], event, perievent_signals, fp_name=fp_name
         )
         Perievent_Plots.plot_perievent_heatmaps(
-            axes[2, col], event, perievent_signals, fp_freq, fp_name=fp_name
+            axes[col, 2], event, perievent_signals, fp_freq, fp_name=fp_name
         )
 
     plt.tight_layout()
-    plt.show()

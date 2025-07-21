@@ -5,12 +5,9 @@ Created on Fri Oct 20 15:45:29 2023
 @author: yzhao
 """
 
-import io
 import os
 import math
-import base64
 
-# import time
 import tempfile
 import webbrowser
 from pathlib import Path
@@ -26,28 +23,21 @@ from dash import Dash, dcc, html, ctx, clientside_callback, Patch, page_containe
 
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from flask_caching import Cache
 from scipy.io import loadmat, savemat
 
-"""
+
 from app_src import VERSION
 from app_src.make_mp4 import make_mp4_clip
 from app_src.components import Components
 from app_src.make_figure import get_padded_labels, make_figure
 from app_src.event_analysis import Event_Utils, Perievent_Plots
 from app_src.postprocessing import get_sleep_segments, get_pred_label_stats
-"""
-# from . import VERSION
-from make_mp4 import make_mp4_clip
-from components import Components
-from make_figure import get_padded_labels, make_figure
-from event_analysis import Event_Utils, Perievent_Plots
-from postprocessing import get_sleep_segments, get_pred_label_stats
+
 
 app = Dash(
     __name__,
-    # title=f"FP Visualization App {VERSION}",
+    title=f"FP Visualization App {VERSION}",
     suppress_callback_exceptions=True,
     external_stylesheets=[
         dbc.themes.BOOTSTRAP
@@ -103,68 +93,18 @@ def create_fig(mat, mat_name, label_dict={}, default_n_shown_samples=2048):
     return fig
 
 
-def make_analysis_plots():
-    mat_name = cache.get("filename")
-    mat = loadmat(os.path.join(TEMP_PATH, mat_name), squeeze_me=True)
-    biosignal_name = "NE2m"
-    biosignal = mat[biosignal_name]
-    annotation_filename = cache.get("annotation_filename")
-    annotation_file = os.path.join(TEMP_PATH, annotation_filename)
-    fp_freq = mat["fp_frequency"]
-    nsec_before = 60
-    nsec_after = 60
-    duration = int(np.ceil(len(biosignal) / fp_freq))
-    min_time = nsec_before
-    max_time = duration - nsec_after
-    event_time_dict = Event_Utils.read_events(annotation_file, min_time, max_time)
-    perievent_labels = np.zeros(duration)
-    perievent_labels[:] = np.nan
-    perievent_indices_dict = {}
-    for i, event in enumerate(sorted(event_time_dict.keys())):
-        event_time = event_time_dict[event]
-        perievent_windows = Event_Utils.make_perievent_windows(
-            event_time, nsec_before=nsec_before, nsec_after=nsec_after
-        )
-        perievent_indices_dict[event] = Event_Utils.get_perievent_indices(
-            perievent_windows, fp_freq
-        )
-        perievent_time = perievent_windows.flatten()
-        perievent_labels[perievent_time] = i
-
-    n_rows = 3
-    event_count = len(event_time_dict)
-    w = 4
-    h = 3
-    fig, axes = plt.subplots(n_rows, event_count, figsize=(w * event_count, h * n_rows))
-    axes = np.atleast_2d(axes)
-    for col, event in enumerate(event_time_dict.keys()):
-        perievent_indices = perievent_indices_dict[event]
-        perievent_signals = biosignal[perievent_indices]
-        Perievent_Plots.plot_perievent_signals(
-            axes[0, col],
-            event,
-            perievent_signals,
-            fp_name=mat_name,
-            biosignal_name=biosignal_name,
-        )
-        Perievent_Plots.plot_mean_perievent_signals(
-            axes[1, col],
-            event,
-            perievent_signals,
-            fp_name=mat_name,
-            biosignal_name=biosignal_name,
-        )
-        Perievent_Plots.plot_perievent_heatmaps(
-            axes[2, col], event, perievent_signals, fp_freq, fp_name=mat_name
-        )
-
-    plt.tight_layout()
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=200, bbox_inches="tight")
-    plt.close(fig)
-    buf.seek(0)
-    encoded = base64.b64encode(buf.read()).decode()
-    return f"data:image/png;base64,{encoded}"
+def make_analysis_plots(
+    mat_file, annotation_file, biosignal_name, nsec_before=60, nsec_after=60
+):
+    image_uri, fig = Perievent_Plots.make_perievent_plots(
+        fp_file=mat_file,
+        biosignal_name=biosignal_name,
+        event_file=annotation_file,
+        nsec_before=nsec_before,
+        nsec_after=nsec_after,
+        as_base64=True,
+    )
+    return image_uri, fig
 
 
 def reset_cache(cache, filename):
@@ -182,6 +122,7 @@ def reset_cache(cache, filename):
     if file_video_record is None:
         file_video_record = {}
     cache.set("annotation_filename", "")
+    cache.set("analysis_fig", None)
     cache.set("recent_files_with_video", recent_files_with_video)
     cache.set("file_video_record", file_video_record)
     cache.set("start_time", 0)
@@ -304,13 +245,22 @@ clientside_callback(
 
 @app.callback(
     Output("analysis-image", "src"),
+    Output("save-plots-button", "style"),
     Input("page-url", "pathname"),
 )
 def navigate_pages(pathname):
     if pathname == "/analysis":
-        return make_analysis_plots()
+        mat_name = cache.get("filename")
+        biosignal_name = "NE2m"
+        annotation_filename = cache.get("annotation_filename")
+        annotation_file = os.path.join(TEMP_PATH, annotation_filename)
+        mat_file = os.path.join(TEMP_PATH, mat_name)
+
+        image_uri, fig = make_analysis_plots(mat_file, annotation_file, biosignal_name)
+        cache.set("analysis_fig", fig)
+        return image_uri, {"visibility": "visible"}
     else:
-        return dash.no_update
+        raise PreventUpdate()
 
 
 @du.callback(
@@ -371,6 +321,7 @@ def upload_annotation(status):
 @app.callback(
     Output("graph", "figure", allow_duplicate=True),
     Output("analysis-link", "style"),
+    Output("event-count-table", "data"),
     Input("annotation-uploaded-store", "data"),
     prevent_initial_call=True,
 )
@@ -385,11 +336,16 @@ def import_annotation_file(uploaded):
     nsec_before = 60
     nsec_after = 60
     duration = int(np.ceil(len(biosignal) / fp_freq))
+    min_time = nsec_before
+    max_time = duration - nsec_after
+    # perievent_labels = make_perievent_labels(event_file, duration, nsec_before=2, nsec_after=2)
+    event_time_dict = Event_Utils.read_events(annotation_file, min_time, max_time)
+    event_count_records = Event_Utils.count_events(event_time_dict)
     perievent_label_dict = Event_Utils.make_perievent_labels(
         annotation_file, duration, nsec_before=nsec_before, nsec_after=nsec_after
     )
     fig = create_fig(mat, mat_name, label_dict=perievent_label_dict)
-    return fig, {"visibility": "visible"}
+    return fig, {"visibility": "visible"}, event_count_records
 
 
 @app.callback(
@@ -397,8 +353,6 @@ def import_annotation_file(uploaded):
     Output("num-signals-store", "data"),
     Output("data-upload-message", "children", allow_duplicate=True),
     Input("visualization-ready-store", "data"),
-    # State("visualization-container", "children"),
-    # State("home-page", "hidden"),
     prevent_initial_call=True,
 )
 def create_visualization(ready):
@@ -939,6 +893,20 @@ def save_annotations(n_clicks):
         return dcc.send_file(temp_mat_path), dcc.send_file(temp_excel_path)
 
     return dcc.send_file(temp_mat_path), dash.no_update
+
+
+@app.callback(
+    Output("download-plots", "data"),
+    Input("save-plots-button", "n_clicks"),
+    prevent_initial_call=True,
+)
+def save_plots(n_clicks):
+    mat_filename = cache.get("filename")
+    mat_filename = mat_filename.rstrip(".mat")
+    save_zip_path = os.path.join(TEMP_PATH, f"{mat_filename}_plots.zip")
+    fig = cache.get("analysis_fig")
+    Perievent_Plots.zip_plots(fig, save_zip_path)
+    return dcc.send_file(save_zip_path)
 
 
 if __name__ == "__main__":

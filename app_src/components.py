@@ -7,7 +7,7 @@ Created on Fri Oct 20 16:27:03 2023
 
 import dash_uploader as du
 import dash_bootstrap_components as dbc
-from dash import dcc, html, page_container
+from dash import dcc, html, page_container, dash_table
 from dash_extensions import EventListener
 from dash_extensions.pages import setup_page_components
 
@@ -101,7 +101,7 @@ save_div = html.Div(
         dcc.Location(id="page-url"),
         html.Div(
             id="analysis-link",
-            children=[dcc.Link(children="Run Analysis", href="/analysis")],
+            children=[dcc.Link(children="Analysis ->", href="/analysis")],
             style={"visibility": "hidden"},
         ),
         # html.A(html.Button("Run Analysis"), href="/analysis"),
@@ -152,10 +152,23 @@ analysis_page = html.Div(
         # html.A(html.Button("← Back"), href="/"),
         html.Div(dcc.Link(children="← Back", href="/")),
         html.Br(),
+        html.Div(
+            dash_table.DataTable(
+                id="event-count-table",
+                style_cell={"textAlign": "center", "width": "100px"},
+            ),
+            style={"maxWidth": "300px", "marginLeft": "20px", "marginRight": "auto"},
+        ),
         html.Br(),
         html.Img(
             id="analysis-image", style={"width": "100%", "border": "1px solid #ccc"}
         ),
+        html.Button(
+            "Save Plots",
+            id="save-plots-button",
+            style={"visibility": "hidden"},
+        ),
+        dcc.Download(id="download-plots"),
     ],
 )
 

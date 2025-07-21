@@ -7,7 +7,7 @@ Created on Wed Jul 16 13:54:32 2025
 
 from dash import html, register_page
 
-from components import analysis_page
+from app_src.components import analysis_page
 
 register_page(
     __name__,
@@ -16,3 +16,4 @@ register_page(
 )
 
 layout = html.Div([])
+    

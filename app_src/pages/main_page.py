@@ -7,7 +7,7 @@ Created on Wed Jul 16 13:24:48 2025
 
 from dash import html, register_page
 
-from components import home_page
+from app_src.components import home_page
 
 
 register_page(
