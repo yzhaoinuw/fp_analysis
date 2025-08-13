@@ -19,7 +19,7 @@ import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 from dash.dependencies import Input, Output, State
 from dash_extensions.pages import setup_page_components
-from dash import Dash, dcc, html, ctx, clientside_callback, Patch, page_container
+from dash import Dash, dcc, html, ctx, clientside_callback, Patch, page_container, ALL
 
 import numpy as np
 import pandas as pd
@@ -96,7 +96,7 @@ def create_fig(mat, mat_name, label_dict={}, default_n_shown_samples=2048):
 def make_analysis_plots(
     mat_file, annotation_file, biosignal_name, nsec_before=60, nsec_after=60
 ):
-    image_uri, fig = Perievent_Plots.make_perievent_plots(
+    event_subplots = Perievent_Plots.make_perievent_plots(
         fp_file=mat_file,
         biosignal_name=biosignal_name,
         event_file=annotation_file,
@@ -104,7 +104,40 @@ def make_analysis_plots(
         nsec_after=nsec_after,
         as_base64=True,
     )
-    return image_uri, fig
+    return event_subplots
+
+
+def build_event_tab(event_name: str):
+    """A fixed template of stats/plots for one event."""
+    return dcc.Tab(
+        label=event_name,
+        value=event_name,
+        # id=f"tab-{event_name}",
+        children=[
+            html.Img(
+                id={"type": "analysis-image", "event": event_name},
+                style={"width": "100%", "border": "1px solid #ccc"},
+            ),
+            html.Button(
+                "Save Plots",
+                id={"type": "save-plots-button", "event": event_name},
+                style={"visibility": "hidden"},
+            ),
+            dcc.Download(id={"type": "download-plots", "event": event_name}),
+        ],
+    )
+
+
+def build_event_tabs(event_names):
+    # event_names should be a list like ["lick", "shock", ...]
+    if not event_names:
+        return [
+            dcc.Tab(
+                label="No events", value="none", children=html.Div("No events found.")
+            )
+        ], "none"
+    tabs = [build_event_tab(e) for e in event_names]
+    return tabs, event_names[0]  # select first tab by default
 
 
 def reset_cache(cache, filename):
@@ -244,11 +277,43 @@ clientside_callback(
 
 
 @app.callback(
-    Output("analysis-image", "src"),
-    Output("save-plots-button", "style"),
+    Output({"type": "analysis-image", "event": ALL}, "src"),
+    Output({"type": "save-plots-button", "event": ALL}, "style"),
     Input("page-url", "pathname"),
+    State({"type": "analysis-image", "event": ALL}, "id"),
+    State({"type": "save-plots-button", "event": ALL}, "id"),
 )
-def navigate_pages(pathname):
+def navigate_pages(pathname, img_ids, btn_ids):
+    if pathname != "/analysis":
+        raise PreventUpdate
+
+    mat_name = cache.get("filename")
+    biosignal_name = "NE2m"
+    annotation_filename = cache.get("annotation_filename")
+    annotation_file = os.path.join(TEMP_PATH, annotation_filename)
+    mat_file = os.path.join(TEMP_PATH, mat_name)
+
+    event_subplots = make_analysis_plots(mat_file, annotation_file, biosignal_name)
+    figs = event_subplots["figs"]  # e.g. dict {event: fig}
+    b64 = event_subplots["base64"]  # e.g. dict {event: "data:image/png;base64,..."}
+
+    cache.set("analysis_fig", figs)
+
+    # Build outputs aligned to each pattern’s IDs
+    srcs = [b64.get(img_id["event"]) for img_id in img_ids]
+    styles = [{"visibility": "visible"} for _ in btn_ids]
+
+    return srcs, styles
+
+
+"""
+@app.callback(
+    Output({"type": "analysis-image", "event": ALL}, "src"),
+    Output({"type": "save-plots-button", "event": ALL}, "style"),
+    Input("page-url", "pathname"),
+    State({"type": "analysis-image", "event": ALL}, "id"),
+)
+def navigate_pages(pathname, img_ids):
     if pathname == "/analysis":
         mat_name = cache.get("filename")
         biosignal_name = "NE2m"
@@ -256,11 +321,14 @@ def navigate_pages(pathname):
         annotation_file = os.path.join(TEMP_PATH, annotation_filename)
         mat_file = os.path.join(TEMP_PATH, mat_name)
 
-        image_uri, fig = make_analysis_plots(mat_file, annotation_file, biosignal_name)
-        cache.set("analysis_fig", fig)
-        return image_uri, {"visibility": "visible"}
+        event_subplots = make_analysis_plots(mat_file, annotation_file, biosignal_name)
+        figs = event_subplots["figs"]
+        base64 = event_subplots["base64"]
+        cache.set("analysis_fig", figs)
+        return [[base64.get(img_id["event"]), {"visibility": "visible"}] for img_id in img_ids] 
     else:
         raise PreventUpdate()
+"""
 
 
 @du.callback(
@@ -319,6 +387,8 @@ def upload_annotation(status):
 
 
 @app.callback(
+    Output("event-tabs", "children"),
+    Output("event-tabs", "value"),
     Output("graph", "figure", allow_duplicate=True),
     Output("analysis-link", "style"),
     Output("event-count-table", "data"),
@@ -341,11 +411,13 @@ def import_annotation_file(uploaded):
     # perievent_labels = make_perievent_labels(event_file, duration, nsec_before=2, nsec_after=2)
     event_time_dict = Event_Utils.read_events(annotation_file, min_time, max_time)
     event_count_records = Event_Utils.count_events(event_time_dict)
+    event_names = list(event_time_dict.keys())
+    tabs, selected_tab = build_event_tabs(event_names)
     perievent_label_dict = Event_Utils.make_perievent_labels(
         annotation_file, duration, nsec_before=nsec_before, nsec_after=nsec_after
     )
     fig = create_fig(mat, mat_name, label_dict=perievent_label_dict)
-    return fig, {"visibility": "visible"}, event_count_records
+    return tabs, selected_tab, fig, {"visibility": "visible"}, event_count_records
 
 
 @app.callback(
@@ -895,6 +967,7 @@ def save_annotations(n_clicks):
     return dcc.send_file(temp_mat_path), dash.no_update
 
 
+"""
 @app.callback(
     Output("download-plots", "data"),
     Input("save-plots-button", "n_clicks"),
@@ -907,7 +980,7 @@ def save_plots(n_clicks):
     fig = cache.get("analysis_fig")
     Perievent_Plots.zip_plots(fig, save_zip_path)
     return dcc.send_file(save_zip_path)
-
+"""
 
 if __name__ == "__main__":
     from threading import Timer

@@ -160,15 +160,7 @@ analysis_page = html.Div(
             style={"maxWidth": "300px", "marginLeft": "20px", "marginRight": "auto"},
         ),
         html.Br(),
-        html.Img(
-            id="analysis-image", style={"width": "100%", "border": "1px solid #ccc"}
-        ),
-        html.Button(
-            "Save Plots",
-            id="save-plots-button",
-            style={"visibility": "hidden"},
-        ),
-        dcc.Download(id="download-plots"),
+        dcc.Tabs(id="event-tabs"),
     ],
 )
 

@@ -183,6 +183,7 @@ class Perievent_Plots:
         # Add colorbar to the figure this axis belongs to
         ax.figure.colorbar(im, ax=ax, label="(dF/F)")
 
+    """
     @staticmethod
     def make_perievent_plots(
         fp_file,
@@ -248,6 +249,70 @@ class Perievent_Plots:
         else:
             plt.show()
             return None
+    """
+
+    @staticmethod
+    def make_perievent_plots(
+        fp_file,
+        biosignal_name,
+        event_file,
+        nsec_before=60,
+        nsec_after=60,
+        width=5,
+        height=3,
+        as_base64=False,
+    ):
+        n_cols = 3
+        fp_name = os.path.basename(fp_file).rstrip(".mat")
+        fp_data = loadmat(fp_file, squeeze_me=True)
+        # biosignal_names = fp_data["fp_signal_names"]
+        biosignal = fp_data[biosignal_name]
+        fp_freq = fp_data["fp_frequency"]
+        duration = int(np.ceil(len(biosignal) / fp_freq))
+        min_time = nsec_before
+        max_time = duration - nsec_after
+        event_time_dict = Event_Utils.read_events(event_file, min_time, max_time)
+        perievent_indices_dict = {}
+        # event_count = len(event_time_dict)
+        event_subplots = {"base64": {}, "figs": {}}
+        for i, event in enumerate(sorted(event_time_dict.keys())):
+            event_time = event_time_dict[event]
+            perievent_windows = Event_Utils.make_perievent_windows(
+                event_time, nsec_before=nsec_before, nsec_after=nsec_after
+            )
+            perievent_indices_dict[event] = Event_Utils.get_perievent_indices(
+                perievent_windows, fp_freq
+            )
+
+            fig, axes = plt.subplots(1, n_cols, figsize=(width * n_cols, height))
+            axes = np.atleast_2d(axes)
+
+            perievent_indices = perievent_indices_dict[event]
+            perievent_signals = biosignal[perievent_indices]
+            Perievent_Plots.plot_perievent_signals(
+                axes[0, 0], event, perievent_signals, fp_name=fp_name
+            )
+            Perievent_Plots.plot_mean_perievent_signals(
+                axes[0, 1], event, perievent_signals, fp_name=fp_name
+            )
+            Perievent_Plots.plot_perievent_heatmaps(
+                axes[0, 2], event, perievent_signals, fp_freq, fp_name=fp_name
+            )
+            plt.tight_layout()
+
+            if as_base64:
+                buf = io.BytesIO()
+                fig.savefig(buf, format="png", dpi=200, bbox_inches="tight")
+                plt.close(fig)
+                buf.seek(0)
+                encoded = base64.b64encode(buf.read()).decode()
+                event_subplots["base64"][event] = f"data:image/png;base64,{encoded}"
+                event_subplots["figs"][event] = fig
+
+        if as_base64:
+            return event_subplots
+        else:
+            return None
 
     @staticmethod
     def _full_extent(ax, pad=0.0):
@@ -295,8 +360,9 @@ if __name__ == "__main__":
     biosignal_name = "NE2m"
     biosignal = fp_data[biosignal_name]
     event_file = os.path.join(DATA_PATH, "Transitions_F268.xlsx")
+
     """
-    Perievent_Plots.make_perievent_plots(
+    perievent_plots = Perievent_Plots.make_perievent_plots(
         fp_file, 
         biosignal_name, 
         event_file, 
@@ -304,10 +370,10 @@ if __name__ == "__main__":
         nsec_after=60,
         width=5,
         height=3,
-        as_base64=False
+        as_base64=True
     )
+    
     """
-
     fp_freq = fp_data["fp_frequency"]
     nsec_before = 60
     nsec_after = 60
