@@ -49,9 +49,11 @@ TEMP_PATH = os.path.join(tempfile.gettempdir(), "fp_visualization_app_data")
 if not os.path.exists(TEMP_PATH):
     os.makedirs(TEMP_PATH)
 
-# VIDEO_DIR = "./assets/videos/"
+
 VIDEO_DIR = Path(__file__).parent / "assets" / "videos"
 VIDEO_DIR.mkdir(parents=True, exist_ok=True)
+FIGURE_DIR = Path(__file__).parent / "assets" / "figures"
+FIGURE_DIR.mkdir(parents=True, exist_ok=True)
 
 components = Components()
 # app.layout = components.main_div
@@ -136,7 +138,7 @@ def build_event_tabs(event_names):
                 label="No events", value="none", children=html.Div("No events found.")
             )
         ], "none"
-    tabs = [build_event_tab(e) for e in event_names]
+    tabs = [build_event_tab(event_name) for event_name in event_names]
     return tabs, event_names[0]  # select first tab by default
 
 
@@ -145,7 +147,7 @@ def reset_cache(cache, filename):
 
     # attempt for salvaging unsaved annotations
     # if prev_filename is None or prev_filename != filename:
-    cache.set("period_labels_history", deque(maxlen=4))
+    cache.set("labels_history", deque(maxlen=4))
 
     cache.set("filename", filename)
     recent_files_with_video = cache.get("recent_files_with_video")
@@ -160,6 +162,7 @@ def reset_cache(cache, filename):
     cache.set("file_video_record", file_video_record)
     cache.set("start_time", 0)
     cache.set("end_time", 0)
+    cache.set("duration", 0)
     cache.set("video_start_time", 0)
     cache.set("video_name", "")
     cache.set("video_path", "")
@@ -281,9 +284,10 @@ clientside_callback(
     Output({"type": "save-plots-button", "event": ALL}, "style"),
     Input("page-url", "pathname"),
     State({"type": "analysis-image", "event": ALL}, "id"),
+    State("perievent-window-dropdown", "value"),
     State({"type": "save-plots-button", "event": ALL}, "id"),
 )
-def navigate_pages(pathname, img_ids, btn_ids):
+def navigate_pages(pathname, img_ids, perievent_window, btn_ids):
     if pathname != "/analysis":
         raise PreventUpdate
 
@@ -292,18 +296,48 @@ def navigate_pages(pathname, img_ids, btn_ids):
     annotation_filename = cache.get("annotation_filename")
     annotation_file = os.path.join(TEMP_PATH, annotation_filename)
     mat_file = os.path.join(TEMP_PATH, mat_name)
+    fp_data = loadmat(mat_file, squeeze_me=True)
+    # biosignal_names = fp_data["fp_signal_names"]
+    biosignal = fp_data[biosignal_name]
+    fp_freq = fp_data["fp_frequency"]
+    duration = cache.get("duration")
+    nsec_before = nsec_after = perievent_window // 2
+    min_time = nsec_before
+    max_time = duration - nsec_after
+    event_time_dict = Event_Utils.read_events(annotation_file, min_time, max_time)
+    figs = {}
+    fig_paths = {}
+    for i, event in enumerate(sorted(event_time_dict.keys())):
 
-    event_subplots = make_analysis_plots(mat_file, annotation_file, biosignal_name)
-    figs = event_subplots["figs"]  # e.g. dict {event: fig}
-    b64 = event_subplots["base64"]  # e.g. dict {event: "data:image/png;base64,..."}
+        event_time = event_time_dict[event]
+        perievent_windows = Event_Utils.make_perievent_windows(
+            event_time, nsec_before=nsec_before, nsec_after=nsec_after
+        )
+        perievent_indices = Event_Utils.get_perievent_indices(
+            perievent_windows, fp_freq
+        )
+        perievent_signals = biosignal[perievent_indices]
+        figure_name = f"{mat_name}_{biosignal_name}_{event}.png"
+        figure_save_path = FIGURE_DIR / figure_name
+        fig = Perievent_Plots.make_perievent_plots(
+            perievent_signals,
+            mat_name,
+            biosignal_name,
+            event,
+            fp_freq,
+            nsec_before=nsec_before,
+            nsec_after=nsec_after,
+            figure_save_path=figure_save_path,
+        )
+        figs[event] = fig
+        fig_paths[event] = os.path.join("/assets/figures/", figure_name)
 
     cache.set("analysis_fig", figs)
-
     # Build outputs aligned to each pattern’s IDs
-    srcs = [b64.get(img_id["event"]) for img_id in img_ids]
+    figure_urls = [fig_paths.get(img_id["event"]) for img_id in img_ids]
     styles = [{"visibility": "visible"} for _ in btn_ids]
 
-    return srcs, styles
+    return figure_urls, styles
 
 
 """
@@ -341,7 +375,7 @@ def navigate_pages(pathname, img_ids):
     ],
     id="vis-data-upload",
 )
-def read_mat(status):
+def upload_mat(status):
     # clean TEMP_PATH regularly by deleting temp files written there
     mat_file = status.latest_file
     filename = os.path.basename(mat_file)
@@ -398,17 +432,13 @@ def upload_annotation(status):
 def import_annotation_file(uploaded):
     mat_name = cache.get("filename")
     mat = loadmat(os.path.join(TEMP_PATH, mat_name), squeeze_me=True)
-    biosignal_name = "NE2m"
-    biosignal = mat[biosignal_name]
     annotation_filename = cache.get("annotation_filename")
     annotation_file = os.path.join(TEMP_PATH, annotation_filename)
-    fp_freq = mat["fp_frequency"]
     nsec_before = 60
     nsec_after = 60
-    duration = int(np.ceil(len(biosignal) / fp_freq))
+    duration = cache.get("duration")
     min_time = nsec_before
     max_time = duration - nsec_after
-    # perievent_labels = make_perievent_labels(event_file, duration, nsec_before=2, nsec_after=2)
     event_time_dict = Event_Utils.read_events(annotation_file, min_time, max_time)
     event_count_records = Event_Utils.count_events(event_time_dict)
     event_names = list(event_time_dict.keys())
@@ -448,28 +478,29 @@ def create_visualization(ready):
         return message, dash.no_update, ""
 
     # salvage unsaved annotations
-    period_labels_history = cache.get("period_labels_history")
-    if period_labels_history:
-        mat["period_labels"] = period_labels_history[-1]
+    labels_history = cache.get("labels_history")
+    if labels_history:
+        mat["labels"] = labels_history[-1]
     else:
         signal_length = signal_lengths[0]
         fp_freq = mat.get("fp_frequency")
         duration = math.ceil(
             (signal_length - 1) / fp_freq
         )  # need to round duration to an int for later
-        period_labels = mat.get("period_labels", np.array([]))
-        period_labels = get_padded_labels(period_labels, duration)
-        np.place(period_labels, period_labels == -1, [np.nan])
-        period_labels_history.append(period_labels)
+        labels = mat.get("labels", np.array([]))
+        labels = get_padded_labels(labels, duration)
+        np.place(labels, labels == -1, [np.nan])
+        labels_history.append(labels)
 
     fig = create_fig(mat, mat_name)
     video_start_time = mat.get("video_start_time")
     video_path = mat.get("video_path", np.array([]))
     video_name = mat.get("video_name", np.array([]))
     time_ax = fig["data"][0]["x"]
-    eeg_start_time, eeg_end_time = time_ax[0], time_ax[-1]
-    cache.set("start_time", eeg_start_time)
-    cache.set("end_time", eeg_end_time)
+    start_time, end_time = time_ax[0], time_ax[-1]
+    cache.set("start_time", start_time)
+    cache.set("end_time", end_time)
+    cache.set("duration", duration)
     if video_start_time is not None:
         cache.set("video_start_time", video_start_time)
     if video_path.size != 0:
@@ -480,8 +511,7 @@ def create_visualization(ready):
         cache.set("video_name", video_name)
 
     cache.set("fig_resampler", fig)
-    cache.set("period_labels_history", period_labels_history)
-    # components.graph.figure = fig
+    cache.set("labels_history", labels_history)
     graph = dcc.Graph(id="graph", figure=fig, config={"scrollZoom": True})
     visualization_div = components.make_visualization_div(graph)
 
@@ -502,9 +532,9 @@ def change_sampling_level(sampling_level):
     mat = loadmat(os.path.join(TEMP_PATH, mat_name), squeeze_me=True)
 
     # copy modified (through annotation) sleep scores over
-    period_labels_history = cache.get("period_labels_history")
-    if period_labels_history:
-        mat["period_labels"] = period_labels_history[-1]
+    labels_history = cache.get("labels_history")
+    if labels_history:
+        mat["labels"] = labels_history[-1]
 
     fig = create_fig(mat, mat_name, default_n_shown_samples=n_samples)
     return fig
@@ -695,20 +725,20 @@ def read_box_select(box_select, figure, clickData):
     start, end = min(selections[0]["x0"], selections[0]["x1"]), max(
         selections[0]["x0"], selections[0]["x1"]
     )
-    eeg_start_time = cache.get("start_time")
-    eeg_end_time = cache.get("end_time")
+    start_time = cache.get("start_time")
+    end_time = cache.get("end_time")
 
-    if end < eeg_start_time or start > eeg_end_time:
+    if end < start_time or start > end_time:
         return (
             [],
             patched_figure,
-            f"Out of range. Please select from {eeg_start_time} to {eeg_end_time}.",
+            f"Out of range. Please select from {start_time} to {end_time}.",
             video_button_style,
         )
 
     start_round, end_round = round(start), round(end)
-    start_round = max(start_round, eeg_start_time)
-    end_round = min(end_round, eeg_end_time)
+    start_round = max(start_round, start_time)
+    end_round = min(end_round, end_time)
     if start_round == end_round:
         if (
             start_round - start > end - end_round
@@ -719,7 +749,7 @@ def read_box_select(box_select, figure, clickData):
             end_round = math.ceil(end)
             start_round = math.floor(end)
 
-    start, end = start_round - eeg_start_time, end_round - eeg_start_time
+    start, end = start_round - start_time, end_round - start_time
     if 1 <= end - start <= 300:
         video_button_style = {"visibility": "visible"}
 
@@ -781,8 +811,8 @@ def read_click_select(
     # Decide neighborhood size: e.g., 1% of current view range
     fraction = 0.005  # 0.5% (adjustable)
     delta = total_range * fraction
-    eeg_start_time = cache.get("start_time")
-    eeg_end_time = cache.get("end_time")
+    start_time = cache.get("start_time")
+    end_time = cache.get("end_time")
     x0, x1 = math.floor(x_click - delta / 2), math.ceil(x_click + delta / 2)
     curve_index = clickData["points"][0]["curveNumber"]
     trace = figure["data"][curve_index]
@@ -801,8 +831,8 @@ def read_click_select(
     }
 
     patched_figure["layout"]["shapes"] = [select_box]
-    start = max(x0, eeg_start_time)
-    end = min(x1, eeg_end_time)
+    start = max(x0, start_time)
+    end = min(x1, end_time)
 
     if 1 <= end - start <= 300:
         video_button_style = {"visibility": "visible"}
@@ -849,21 +879,21 @@ def add_annotation(
 
     label = int(label) - 1
     start, end = box_select_range
-    period_labels_history = cache.get("period_labels_history")
-    current_period_labels = period_labels_history[-1]  # np array
-    new_period_labels = current_period_labels.copy()
-    new_period_labels[start:end] = np.array([label] * (end - start))
+    labels_history = cache.get("labels_history")
+    current_labels = labels_history[-1]  # np array
+    new_labels = current_labels.copy()
+    new_labels[start:end] = np.array([label] * (end - start))
     # If the annotation does not change anything, don't add to history
-    if (new_period_labels == current_period_labels).all():
+    if (new_labels == current_labels).all():
         raise PreventUpdate
 
-    period_labels_history.append(new_period_labels.astype(float))
-    cache.set("period_labels_history", period_labels_history)
+    labels_history.append(new_labels.astype(float))
+    cache.set("labels_history", labels_history)
     net_annotation_count += 1
 
     patched_figure = Patch()
     for k in range(1, num_signals + 1):
-        patched_figure["data"][-k]["z"][0] = new_period_labels
+        patched_figure["data"][-k]["z"][0] = new_labels
 
     # remove box or click select after an update is made
     patched_figure["layout"]["selections"] = None
@@ -880,22 +910,22 @@ def add_annotation(
     prevent_initial_call=True,
 )
 def undo_annotation(n_clicks, figure, net_annotation_count):
-    period_labels_history = cache.get("period_labels_history")
-    if len(period_labels_history) <= 1:
+    labels_history = cache.get("labels_history")
+    if len(labels_history) <= 1:
         raise PreventUpdate()
 
     net_annotation_count -= 1
-    period_labels_history.pop()  # pop current one, then get the last one
+    labels_history.pop()  # pop current one, then get the last one
 
     # undo cache
-    cache.set("period_labels_history", period_labels_history)
-    prev_period_labels = period_labels_history[-1]
+    cache.set("labels_history", labels_history)
+    prev_labels = labels_history[-1]
 
     # undo figure
     patched_figure = Patch()
-    patched_figure["data"][-3]["z"][0] = prev_period_labels
-    patched_figure["data"][-2]["z"][0] = prev_period_labels
-    patched_figure["data"][-1]["z"][0] = prev_period_labels
+    patched_figure["data"][-3]["z"][0] = prev_labels
+    patched_figure["data"][-2]["z"][0] = prev_labels
+    patched_figure["data"][-1]["z"][0] = prev_labels
     return patched_figure, net_annotation_count
 
 
@@ -909,12 +939,12 @@ def undo_annotation(n_clicks, figure, net_annotation_count):
 )
 def show_hide_save_undo_button(net_annotation_count):
     # time.sleep(10)
-    period_labels_history = cache.get("period_labels_history")
+    labels_history = cache.get("labels_history")
     save_button_style = {"visibility": "hidden"}
     undo_button_style = {"visibility": "hidden"}
     if net_annotation_count > 0:
         save_button_style = {"visibility": "visible"}
-        if len(period_labels_history) > 1:
+        if len(labels_history) > 1:
             undo_button_style = {"visibility": "visible"}
     return save_button_style, undo_button_style
 
@@ -930,26 +960,26 @@ def save_annotations(n_clicks):
     temp_mat_path = os.path.join(TEMP_PATH, mat_filename)
     mat = loadmat(temp_mat_path, squeeze_me=True)
 
-    # replace None in period_labels
-    period_labels_history = cache.get("period_labels_history")
+    # replace None in labels
+    labels_history = cache.get("labels_history")
     labels = None
-    if period_labels_history:
+    if labels_history:
         # replace any None or nan in sleep scores to -1 before saving, otherwise results in save error
         # make a copy first because we don't want to convert any nan in the cache
-        updated_period_labels = period_labels_history[-1]
+        updated_labels = labels_history[-1]
         np.place(
-            updated_period_labels, updated_period_labels == None, [-1]
+            updated_labels, updated_labels == None, [-1]
         )  # convert None to -1 for scipy's savemat
-        updated_period_labels = np.nan_to_num(
-            updated_period_labels, nan=-1
+        updated_labels = np.nan_to_num(
+            updated_labels, nan=-1
         )  # convert np.nan to -1 for scipy's savemat
 
-        mat["period_labels"] = updated_period_labels
+        mat["labels"] = updated_labels
     savemat(temp_mat_path, mat)
 
     # export sleep bout spreadsheet only if the manual scoring is complete
-    if mat.get("period_labels") is not None and -1 not in mat["period_labels"]:
-        labels = mat["period_labels"]
+    if mat.get("labels") is not None and -1 not in mat["labels"]:
+        labels = mat["labels"]
 
     if labels is not None:
         labels = labels.astype(int)

@@ -151,6 +151,13 @@ analysis_page = html.Div(
         html.H1("Analysis Page"),
         # html.A(html.Button("← Back"), href="/"),
         html.Div(dcc.Link(children="← Back", href="/")),
+        dcc.Dropdown(
+            options=[60, 120],
+            value=120,
+            id="perievent-window-dropdown",
+            searchable=False,
+            clearable=False,
+        ),
         html.Br(),
         html.Div(
             dash_table.DataTable(

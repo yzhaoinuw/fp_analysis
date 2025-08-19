@@ -47,7 +47,7 @@ RANGE_PADDING_PERCENT = 0.2
 
 
 def get_padded_labels(labels: np.ndarray, duration: int) -> np.ndarray:
-    """Make a period laebl array the same size as the duration."""
+    """Make label array the same size as the duration."""
 
     if labels.size == 0:
         # if unscored, initialize with nan
