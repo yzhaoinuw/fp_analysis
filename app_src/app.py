@@ -292,6 +292,7 @@ def navigate_pages(pathname, img_ids, perievent_window, btn_ids):
         raise PreventUpdate
 
     mat_name = cache.get("filename")
+    fp_name = Path(mat_name).stem
     biosignal_name = "NE2m"
     annotation_filename = cache.get("annotation_filename")
     annotation_file = os.path.join(TEMP_PATH, annotation_filename)
@@ -321,7 +322,7 @@ def navigate_pages(pathname, img_ids, perievent_window, btn_ids):
         figure_save_path = FIGURE_DIR / figure_name
         fig = Perievent_Plots.make_perievent_plots(
             perievent_signals,
-            mat_name,
+            fp_name,
             biosignal_name,
             event,
             fp_freq,
