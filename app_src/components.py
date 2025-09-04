@@ -146,29 +146,6 @@ home_page = html.Div(
 
 analysis_page = html.Div(
     id="analysis-page",
-    # hidden=True,
-    children=[
-        html.H1("Analysis Page"),
-        # html.A(html.Button("← Back"), href="/"),
-        html.Div(dcc.Link(children="← Back", href="/")),
-        dcc.Dropdown(
-            options=[60, 120],
-            value=120,
-            id="perievent-window-dropdown",
-            searchable=False,
-            clearable=False,
-        ),
-        html.Br(),
-        html.Div(
-            dash_table.DataTable(
-                id="event-count-table",
-                style_cell={"textAlign": "center", "width": "100px"},
-            ),
-            style={"maxWidth": "300px", "marginLeft": "20px", "marginRight": "auto"},
-        ),
-        html.Br(),
-        dcc.Tabs(id="event-tabs"),
-    ],
 )
 
 main_div = html.Div(
@@ -299,3 +276,82 @@ class Components:
     def configure_du(self, app, folder):
         du.configure_upload(app, folder, use_upload_id=True)
         return du
+
+    def _build_event_tab(self, event_name: str):
+        """A fixed template of stats/plots for one event."""
+        return dcc.Tab(
+            label=event_name,
+            value=event_name,
+            children=[
+                html.Img(
+                    id={"type": "analysis-image", "event": event_name},
+                    style={"width": "100%", "border": "1px solid #ccc"},
+                ),
+                html.Button(
+                    "Save Plots",
+                    id={"type": "save-plots-button", "event": event_name},
+                    style={"visibility": "hidden"},
+                ),
+                dcc.Download(id={"type": "download-plots", "event": event_name}),
+            ],
+        )
+
+    def _build_event_tabs(self, event_names):
+        if not event_names:
+            return [
+                dcc.Tab(
+                    label="No events",
+                    value="none",
+                    children=html.Div("No events found."),
+                )
+            ], "none"
+        tabs = [self._build_event_tab(event_name) for event_name in event_names]
+        return tabs
+
+    def fill_analysis_page(self, event_names, event_count_records, signal_names):
+        event_tabs = self._build_event_tabs(event_names)
+        children = [
+            html.H1("Analysis Page"),
+            html.Div(dcc.Link(children="← Back", href="/")),
+            html.Div(
+                style={"display": "flex", "marginLeft": "10px", "gap": "10px"},
+                children=[
+                    html.Label(["Perievent Window Size"]),
+                    dcc.Dropdown(
+                        options=[60, 120],
+                        value=120,
+                        style={"width": "60px"},
+                        id="perievent-window-dropdown",
+                        searchable=False,
+                        clearable=False,
+                    ),
+                    html.Label(["Select 1 - 2 Signals"]),
+                    dcc.Dropdown(
+                        id="signal-select-dropdown",
+                        options=[{"label": s, "value": s} for s in signal_names],
+                        multi=True,
+                        placeholder="Choose up to two…",
+                        value=[],
+                        style={"width": "300px"},
+                        clearable=True,
+                    ),
+                    html.Button("Show Results", id="show-results-button", n_clicks=0),
+                ],
+            ),
+            html.Br(),
+            html.Div(
+                dash_table.DataTable(
+                    id="event-count-table",
+                    data=event_count_records,
+                    style_cell={"textAlign": "center", "width": "100px"},
+                ),
+                style={
+                    "maxWidth": "300px",
+                    "marginLeft": "20px",
+                    "marginRight": "auto",
+                },
+            ),
+            html.Br(),
+            dcc.Tabs(id="event-tabs", children=event_tabs, value=event_names[0]),
+        ]
+        return children

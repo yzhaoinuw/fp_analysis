@@ -31,7 +31,7 @@ from app_src import VERSION
 from app_src.make_mp4 import make_mp4_clip
 from app_src.components import Components
 from app_src.make_figure import get_padded_labels, make_figure
-from app_src.event_analysis import Event_Utils, Perievent_Plots
+from app_src.event_analysis import Event_Utils, Perievent_Plots, Analyses
 from app_src.postprocessing import get_sleep_segments, get_pred_label_stats
 
 
@@ -56,7 +56,6 @@ FIGURE_DIR = Path(__file__).parent / "assets" / "figures"
 FIGURE_DIR.mkdir(parents=True, exist_ok=True)
 
 components = Components()
-# app.layout = components.main_div
 app.layout = html.Div(
     [
         page_container,  # page layout is rendered here
@@ -107,39 +106,6 @@ def make_analysis_plots(
         as_base64=True,
     )
     return event_subplots
-
-
-def build_event_tab(event_name: str):
-    """A fixed template of stats/plots for one event."""
-    return dcc.Tab(
-        label=event_name,
-        value=event_name,
-        # id=f"tab-{event_name}",
-        children=[
-            html.Img(
-                id={"type": "analysis-image", "event": event_name},
-                style={"width": "100%", "border": "1px solid #ccc"},
-            ),
-            html.Button(
-                "Save Plots",
-                id={"type": "save-plots-button", "event": event_name},
-                style={"visibility": "hidden"},
-            ),
-            dcc.Download(id={"type": "download-plots", "event": event_name}),
-        ],
-    )
-
-
-def build_event_tabs(event_names):
-    # event_names should be a list like ["lick", "shock", ...]
-    if not event_names:
-        return [
-            dcc.Tab(
-                label="No events", value="none", children=html.Div("No events found.")
-            )
-        ], "none"
-    tabs = [build_event_tab(event_name) for event_name in event_names]
-    return tabs, event_names[0]  # select first tab by default
 
 
 def reset_cache(cache, filename):
@@ -282,53 +248,56 @@ clientside_callback(
 @app.callback(
     Output({"type": "analysis-image", "event": ALL}, "src"),
     Output({"type": "save-plots-button", "event": ALL}, "style"),
-    Input("page-url", "pathname"),
-    State({"type": "analysis-image", "event": ALL}, "id"),
+    Input("show-results-button", "n_clicks"),
+    State("signal-select-dropdown", "value"),
     State("perievent-window-dropdown", "value"),
+    State({"type": "analysis-image", "event": ALL}, "id"),
     State({"type": "save-plots-button", "event": ALL}, "id"),
+    prevent_initial_call=False,
 )
-def navigate_pages(pathname, img_ids, perievent_window, btn_ids):
-    if pathname != "/analysis":
-        raise PreventUpdate
+def show_analysis_results(
+    n_clicks, selected_signals, perievent_window, img_ids, btn_ids
+):
+    if selected_signals is None:
+        return PreventUpdate()
 
     mat_name = cache.get("filename")
+    baseline_window = 30
     fp_name = Path(mat_name).stem
     biosignal_name = "NE2m"
     annotation_filename = cache.get("annotation_filename")
     annotation_file = os.path.join(TEMP_PATH, annotation_filename)
     mat_file = os.path.join(TEMP_PATH, mat_name)
     fp_data = loadmat(mat_file, squeeze_me=True)
-    # biosignal_names = fp_data["fp_signal_names"]
+    biosignal_names = fp_data["fp_signal_names"]
     biosignal = fp_data[biosignal_name]
     fp_freq = fp_data["fp_frequency"]
     duration = cache.get("duration")
-    nsec_before = nsec_after = perievent_window // 2
-    min_time = nsec_before
-    max_time = duration - nsec_after
-    event_time_dict = Event_Utils.read_events(annotation_file, min_time, max_time)
+    event_utils = Event_Utils(fp_freq, duration, window_len=perievent_window)
+    event_time_dict = event_utils.read_events(annotation_file)
+    analyses = Analyses(fp_freq=fp_freq, baseline_window=baseline_window)
     figs = {}
     fig_paths = {}
     for i, event in enumerate(sorted(event_time_dict.keys())):
 
         event_time = event_time_dict[event]
-        perievent_windows = Event_Utils.make_perievent_windows(
-            event_time, nsec_before=nsec_before, nsec_after=nsec_after
-        )
-        perievent_indices = Event_Utils.get_perievent_indices(
-            perievent_windows, fp_freq
-        )
-        perievent_signals = biosignal[perievent_indices]
-        figure_name = f"{mat_name}_{biosignal_name}_{event}.png"
+        perievent_windows = event_utils.make_perievent_windows(event_time)
+        perievent_indices = event_utils.get_perievent_indices(perievent_windows)
+        perievent_analysis_result = {}
+        for biosignal_name in biosignal_names:
+            biosignal = fp_data[biosignal_name]
+            perievent_signals = biosignal[perievent_indices]
+            perievent_analysis_result[biosignal_name] = analyses.get_perievent_analyses(
+                perievent_signals
+            )
+
+        figure_name = f"{mat_name}_{event}.png"
         figure_save_path = FIGURE_DIR / figure_name
-        fig = Perievent_Plots.make_perievent_plots(
-            perievent_signals,
-            fp_name,
-            biosignal_name,
-            event,
-            fp_freq,
-            nsec_before=nsec_before,
-            nsec_after=nsec_after,
-            figure_save_path=figure_save_path,
+        plots = Perievent_Plots(
+            fp_freq, event, fp_name, biosignal_names, perievent_window
+        )
+        fig = plots.make_perievent_analysis_plots(
+            perievent_analysis_result, figure_save_path=figure_save_path
         )
         figs[event] = fig
         fig_paths[event] = os.path.join("/assets/figures/", figure_name)
@@ -347,22 +316,52 @@ def navigate_pages(pathname, img_ids, perievent_window, btn_ids):
     Output({"type": "save-plots-button", "event": ALL}, "style"),
     Input("page-url", "pathname"),
     State({"type": "analysis-image", "event": ALL}, "id"),
+    State("perievent-window-dropdown", "value"),
+    State({"type": "save-plots-button", "event": ALL}, "id"),
 )
-def navigate_pages(pathname, img_ids):
-    if pathname == "/analysis":
-        mat_name = cache.get("filename")
-        biosignal_name = "NE2m"
-        annotation_filename = cache.get("annotation_filename")
-        annotation_file = os.path.join(TEMP_PATH, annotation_filename)
-        mat_file = os.path.join(TEMP_PATH, mat_name)
+def navigate_pages(pathname, img_ids, perievent_window, btn_ids):
+    if pathname != "/analysis":
+        raise PreventUpdate
+    
+    mat_name = cache.get("filename")
+    window_len = 120
+    baseline_window = 30
+    fp_name = Path(mat_name).stem
+    biosignal_name = "NE2m"
+    annotation_filename = cache.get("annotation_filename")
+    annotation_file = os.path.join(TEMP_PATH, annotation_filename)
+    mat_file = os.path.join(TEMP_PATH, mat_name)
+    fp_data = loadmat(mat_file, squeeze_me=True)
+    # biosignal_names = fp_data["fp_signal_names"]
+    biosignal = fp_data[biosignal_name]
+    fp_freq = fp_data["fp_frequency"]
+    duration = cache.get("duration")
+    event_utils = Event_Utils(fp_freq, duration, window_len=window_len)
+    event_time_dict = event_utils.read_events(annotation_file)
+    analyses = Analyses(fp_freq=fp_freq, baseline_window=baseline_window)
+    figs = {}
+    fig_paths = {}
+    for i, event in enumerate(sorted(event_time_dict.keys())):
 
-        event_subplots = make_analysis_plots(mat_file, annotation_file, biosignal_name)
-        figs = event_subplots["figs"]
-        base64 = event_subplots["base64"]
-        cache.set("analysis_fig", figs)
-        return [[base64.get(img_id["event"]), {"visibility": "visible"}] for img_id in img_ids] 
-    else:
-        raise PreventUpdate()
+        event_time = event_time_dict[event]
+        perievent_windows = event_utils.make_perievent_windows(event_time)
+        perievent_indices = event_utils.get_perievent_indices(perievent_windows)
+        perievent_signals = biosignal[perievent_indices]
+        figure_name = f"{mat_name}_{biosignal_name}_{event}.png"
+        figure_save_path = FIGURE_DIR / figure_name
+        perievent_analysis_result = analyses.get_perievent_analyses(perievent_signals)
+        plots = Perievent_Plots(perievent_signals, fp_freq, event, fp_name, biosignal_name, window_len)
+        
+        fig = plots.make_perievent_analysis_plots(perievent_analysis_result, figure_save_path=figure_save_path)
+        figs[event] = fig
+        fig_paths[event] = os.path.join("/assets/figures/", figure_name)
+
+    cache.set("analysis_fig", figs)
+    # Build outputs aligned to each pattern’s IDs
+    figure_urls = [fig_paths.get(img_id["event"]) for img_id in img_ids]
+    styles = [{"visibility": "visible"} for _ in btn_ids]
+
+    return figure_urls, styles
 """
 
 
@@ -422,11 +421,9 @@ def upload_annotation(status):
 
 
 @app.callback(
-    Output("event-tabs", "children"),
-    Output("event-tabs", "value"),
+    Output("analysis-page", "children"),
     Output("graph", "figure", allow_duplicate=True),
     Output("analysis-link", "style"),
-    Output("event-count-table", "data"),
     Input("annotation-uploaded-store", "data"),
     prevent_initial_call=True,
 )
@@ -435,20 +432,20 @@ def import_annotation_file(uploaded):
     mat = loadmat(os.path.join(TEMP_PATH, mat_name), squeeze_me=True)
     annotation_filename = cache.get("annotation_filename")
     annotation_file = os.path.join(TEMP_PATH, annotation_filename)
-    nsec_before = 60
-    nsec_after = 60
+    signal_names = mat.get("fp_signal_names")
+    fp_freq = mat.get("fp_frequency")
+    window_len = 120
     duration = cache.get("duration")
-    min_time = nsec_before
-    max_time = duration - nsec_after
-    event_time_dict = Event_Utils.read_events(annotation_file, min_time, max_time)
-    event_count_records = Event_Utils.count_events(event_time_dict)
+    event_utils = Event_Utils(fp_freq, duration, window_len=window_len)
+    event_time_dict = event_utils.read_events(annotation_file)
+    event_count_records = event_utils.count_events(event_time_dict)
     event_names = list(event_time_dict.keys())
-    tabs, selected_tab = build_event_tabs(event_names)
-    perievent_label_dict = Event_Utils.make_perievent_labels(
-        annotation_file, duration, nsec_before=nsec_before, nsec_after=nsec_after
+    analysis_page_content = components.fill_analysis_page(
+        event_names, event_count_records, signal_names
     )
+    perievent_label_dict = event_utils.make_perievent_labels(annotation_file)
     fig = create_fig(mat, mat_name, label_dict=perievent_label_dict)
-    return tabs, selected_tab, fig, {"visibility": "visible"}, event_count_records
+    return analysis_page_content, fig, {"visibility": "visible"}
 
 
 @app.callback(
