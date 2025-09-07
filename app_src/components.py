@@ -287,6 +287,10 @@ class Components:
                     id={"type": "analysis-image", "event": event_name},
                     style={"width": "100%", "border": "1px solid #ccc"},
                 ),
+                html.Img(
+                    id={"type": "correlation-image", "event": event_name},
+                    style={"width": "20%", "maxWidth": "300px"},
+                ),
                 html.Button(
                     "Save Plots",
                     id={"type": "save-plots-button", "event": event_name},
