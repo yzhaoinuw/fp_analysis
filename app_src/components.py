@@ -284,12 +284,17 @@ class Components:
             value=event_name,
             children=[
                 html.Img(
+                    id={"type": "perievent-signal-image", "event": event_name},
+                    style={"width": "auto", "border": "1px solid #ccc"},
+                ),
+                html.H4("Analysis Plots"),
+                html.Img(
                     id={"type": "analysis-image", "event": event_name},
                     style={"width": "auto", "border": "1px solid #ccc"},
                 ),
                 html.Img(
                     id={"type": "correlation-image", "event": event_name},
-                    style={"width": "20%", "maxWidth": "300px"},
+                    style={"width": "40%", "maxWidth": "400px"},
                 ),
                 # html.Button(
                 #    "Save Plots",
