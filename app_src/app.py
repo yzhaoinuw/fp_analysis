@@ -12,14 +12,26 @@ import tempfile
 import webbrowser
 from pathlib import Path
 from collections import deque
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import dash
+import diskcache
 import dash_player
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 from dash.dependencies import Input, Output, State
 from dash_extensions.pages import setup_page_components
-from dash import Dash, dcc, html, ctx, clientside_callback, Patch, page_container, ALL
+from dash import (
+    Dash,
+    dcc,
+    html,
+    ctx,
+    clientside_callback,
+    Patch,
+    page_container,
+    ALL,
+    DiskcacheManager,
+)
 
 import numpy as np
 import pandas as pd
@@ -54,6 +66,8 @@ VIDEO_DIR = Path(__file__).parent / "assets" / "videos"
 VIDEO_DIR.mkdir(parents=True, exist_ok=True)
 FIGURE_DIR = Path(__file__).parent / "assets" / "figures"
 FIGURE_DIR.mkdir(parents=True, exist_ok=True)
+SPREADSHEET_DIR = Path(__file__).parent / "assets" / "spreadsheets"
+SPREADSHEET_DIR.mkdir(parents=True, exist_ok=True)
 
 components = Components()
 app.layout = html.Div(
@@ -78,6 +92,9 @@ cache = Cache(
     },
 )
 
+background_callback_cache = diskcache.Cache("./cache")
+background_callback_manager = DiskcacheManager(background_callback_cache)
+
 
 # %%
 def open_browser(port):
@@ -94,6 +111,108 @@ def create_fig(mat, mat_name, label_dict={}, default_n_shown_samples=2048):
     return fig
 
 
+def _plot_one_event(
+    event,
+    mat_file,
+    annotation_file,
+    selected_signals,
+    perievent_window,
+    baseline_window=30,
+    duration=None,
+):
+
+    fp_data = loadmat(mat_file, squeeze_me=True)
+    fp_freq = float(fp_data["fp_frequency"])
+
+    # Build helpers (pass duration if your Event_Utils needs it)
+    event_utils = Event_Utils(fp_freq, duration, window_len=perievent_window)
+    analyses = Analyses(fp_freq=fp_freq, baseline_window=baseline_window)
+
+    # Per-event windows/indices
+    event_time_dict = event_utils.read_events(annotation_file)
+    event_time = event_time_dict[event]
+    perievent_windows = event_utils.make_perievent_windows(event_time)
+    perievent_indices = event_utils.get_perievent_indices(perievent_windows)
+
+    # Per-signal analyses
+    perievent_analysis_result = {}
+    perievent_signals_normalized_array = []
+    for biosignal_name in selected_signals:
+        biosignal = fp_data[biosignal_name]
+        perievent_signals = biosignal[perievent_indices]
+        result = analyses.get_perievent_analyses(perievent_signals)
+        perievent_analysis_result[biosignal_name] = result
+        perievent_signals_normalized_array.append(
+            result["perievent_signals_normalized"]
+        )
+
+    # Plot/save
+    mat_name = os.path.splitext(os.path.basename(mat_file))[0]
+    plots = Perievent_Plots(fp_freq, event, perievent_window)
+
+    figure_name = f"{mat_name}_{event}.png"
+    spreadsheet_name = f"{mat_name}_{event}.xlsx"
+    figure_save_path = FIGURE_DIR / figure_name
+    spreadsheet_save_path = SPREADSHEET_DIR / spreadsheet_name
+    plots.make_perievent_analysis_plots(
+        perievent_analysis_result, figure_save_path=figure_save_path
+    )
+    plots.write_spreadsheet(perievent_analysis_result, spreadsheet_save_path)
+    corr_url = None
+    if len(perievent_signals_normalized_array) == 2:
+        corr_fig_name = f"{mat_name}_{event}_correlation.png"
+        corr_save_path = FIGURE_DIR / corr_fig_name
+        plots.plot_correlation(
+            perievent_signals_normalized_array[0],
+            perievent_signals_normalized_array[1],
+            figure_save_path=corr_save_path,
+        )
+        corr_url = os.path.join("/assets/figures/", corr_fig_name)
+
+    analysis_url = os.path.join("/assets/figures/", figure_name)
+    return event, analysis_url, corr_url
+
+
+def make_analysis_plots(annotation_file, selected_signals, perievent_window):
+    mat_name = cache.get("filename")
+    mat_file = os.path.join(TEMP_PATH, mat_name)
+    fp_data = loadmat(mat_file, squeeze_me=True)
+    fp_freq = float(fp_data["fp_frequency"])
+    duration = cache.get("duration")
+    baseline_window = 30
+
+    # Get the list of events once (workers will recompute their own indices)
+    event_utils = Event_Utils(fp_freq, duration, window_len=perievent_window)
+    event_time_dict = event_utils.read_events(annotation_file)
+    events = sorted(event_time_dict.keys())
+
+    fig_paths, corr_fig_paths = {}, {}
+
+    # Parallelize per-event work
+    with ProcessPoolExecutor(max_workers=8) as pool:
+        futures = {
+            pool.submit(
+                _plot_one_event,
+                e,
+                mat_file,
+                annotation_file,
+                tuple(selected_signals),  # safer to pickle
+                perievent_window,
+                baseline_window,
+                duration,
+            ): e
+            for e in events
+        }
+
+        for fut in as_completed(futures):
+            e, analysis_url, corr_url = fut.result()
+            fig_paths[e] = analysis_url
+            corr_fig_paths[e] = corr_url  # may be None if only one signal
+
+    return fig_paths, corr_fig_paths
+
+
+"""
 def make_analysis_plots(annotation_file, selected_signals, perievent_window):
     mat_name = cache.get("filename")
     mat_file = os.path.join(TEMP_PATH, mat_name)
@@ -142,6 +261,7 @@ def make_analysis_plots(annotation_file, selected_signals, perievent_window):
         fig_paths[event] = os.path.join("/assets/figures/", figure_name)
         corr_fig_paths[event] = os.path.join("/assets/figures/", corr_fig_name)
     return fig_paths, corr_fig_paths
+"""
 
 
 def reset_cache(cache, filename):
@@ -284,17 +404,22 @@ clientside_callback(
 @app.callback(
     Output({"type": "analysis-image", "event": ALL}, "src"),
     Output({"type": "correlation-image", "event": ALL}, "src"),
-    Output({"type": "save-plots-button", "event": ALL}, "style"),
+    # Output({"type": "save-plots-button", "event": ALL}, "style"),
     Input("show-results-button", "n_clicks"),
     State("signal-select-dropdown", "value"),
     State("perievent-window-dropdown", "value"),
     State({"type": "analysis-image", "event": ALL}, "id"),
     State({"type": "correlation-image", "event": ALL}, "id"),
-    State({"type": "save-plots-button", "event": ALL}, "id"),
+    # State({"type": "save-plots-button", "event": ALL}, "id"),
+    background=True,
+    manager=background_callback_manager,
+    running=[
+        (Output("show-results-button", "disabled"), True, False),
+    ],
     prevent_initial_call=False,
 )
 def show_analysis_results(
-    n_clicks, selected_signals, perievent_window, img_ids, corr_img_ids, btn_ids
+    n_clicks, selected_signals, perievent_window, img_ids, corr_img_ids
 ):
     if not n_clicks:  # None or 0 → do nothing
         raise PreventUpdate
@@ -310,9 +435,9 @@ def show_analysis_results(
     # Build outputs aligned to each pattern’s IDs
     figure_urls = [fig_paths.get(img_id["event"]) for img_id in img_ids]
     corr_figure_urls = [corr_fig_paths.get(img_id["event"]) for img_id in corr_img_ids]
-    styles = [{"visibility": "visible"} for _ in btn_ids]
+    # styles = [{"visibility": "visible"} for _ in btn_ids]
 
-    return figure_urls, corr_figure_urls, styles
+    return figure_urls, corr_figure_urls
 
 
 """

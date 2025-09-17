@@ -322,7 +322,7 @@ class Perievent_Plots:
         plt.tight_layout()
 
         if figure_save_path is not None:
-            fig.savefig(figure_save_path, format="png", dpi=200, bbox_inches="tight")
+            fig.savefig(figure_save_path, format="png", dpi=100, bbox_inches="tight")
             plt.close(fig)
             return fig
         else:
@@ -439,12 +439,12 @@ class Analyses:
     def compute_decay_time(
         self, reaction_signals, baseline_mean_values, first_peak_inds
     ):
-
+        # reaction_signals = np.asarray(reaction_signals, dtype=float)
         n, l = reaction_signals.shape
-        peaks = first_peak_inds.reshape(n)
+        peaks = np.expand_dims(first_peak_inds, axis=1)
         # Build a mask of valid positions per row: j > peak_i and X[i, j] < mean_i
         j_idx = np.arange(l)[None, :]  # shape (1, l)
-        after_peak = j_idx > peaks[:, None]  # shape (n, l); False if peak is nan
+        after_peak = j_idx > peaks  # shape (n, l); False if peak is nan
         below_mean = reaction_signals < baseline_mean_values  # shape (n, l)
         cond = after_peak & below_mean  # shape (n, l)
 
@@ -482,7 +482,9 @@ class Analyses:
         first_peak_inds = self.find_first_peaks(reaction_signals)
         first_peak_time = np.round(first_peak_inds / self.fp_freq)
         decay_time_array = self.compute_decay_time(
-            reaction_signals, baseline_mean_values, first_peak_inds
+            reaction_signals,
+            self._get_baseline_means(perievent_signals_normalized),
+            first_peak_inds,
         )
 
         return {
@@ -545,13 +547,16 @@ if __name__ == "__main__":
         spreadsheet_save_path = SPREADSHEET_DIR / spreadsheet_name
         plots = Perievent_Plots(fp_freq, event, window_len)
         plots.make_perievent_analysis_plots(
-            perievent_analysis_result, figure_save_path=figure_save_path
+            perievent_analysis_result,
+            # figure_save_path=figure_save_path
         )
+        # %%
+        """
         plots.plot_correlation(
             perievent_signals_normalized_array[0], perievent_signals_normalized_array[1]
         )
         plots.write_spreadsheet(perievent_analysis_result, spreadsheet_save_path)
-        """
+
         
         perievent_indices_dict[event] = perievent_indices
         perievent_time = perievent_windows.flatten()

@@ -285,18 +285,18 @@ class Components:
             children=[
                 html.Img(
                     id={"type": "analysis-image", "event": event_name},
-                    style={"width": "100%", "border": "1px solid #ccc"},
+                    style={"width": "auto", "border": "1px solid #ccc"},
                 ),
                 html.Img(
                     id={"type": "correlation-image", "event": event_name},
                     style={"width": "20%", "maxWidth": "300px"},
                 ),
-                html.Button(
-                    "Save Plots",
-                    id={"type": "save-plots-button", "event": event_name},
-                    style={"visibility": "hidden"},
-                ),
-                dcc.Download(id={"type": "download-plots", "event": event_name}),
+                # html.Button(
+                #    "Save Plots",
+                #    id={"type": "save-plots-button", "event": event_name},
+                #    style={"visibility": "hidden"},
+                # ),
+                # dcc.Download(id={"type": "download-plots", "event": event_name}),
             ],
         )
 
@@ -315,7 +315,7 @@ class Components:
     def fill_analysis_page(self, event_names, event_count_records, signal_names):
         event_tabs = self._build_event_tabs(event_names)
         children = [
-            html.H1("Analysis Page"),
+            html.H3("Analysis Page"),
             html.Div(dcc.Link(children="← Back", href="/")),
             html.Div(
                 style={"display": "flex", "marginLeft": "10px", "gap": "10px"},

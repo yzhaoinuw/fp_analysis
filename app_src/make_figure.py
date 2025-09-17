@@ -258,7 +258,7 @@ if __name__ == "__main__":
     import plotly.io as io
     from scipy.io import loadmat
 
-    from event_analysis import make_perievent_labels
+    from event_analysis import Event_Utils
 
     io.renderers.default = "browser"
     DATA_PATH = "../data/"
@@ -271,13 +271,10 @@ if __name__ == "__main__":
 
     event_file = os.path.join(DATA_PATH, "Transitions_F268.xlsx")
     fp_freq = fp_data["fp_frequency"]
-    nsec_before = 60
-    nsec_after = 60
+    window_len = 120
     duration = int(np.ceil(len(biosignal) / fp_freq))
-    min_time = nsec_before
-    max_time = duration - nsec_after
-    perievent_label_dict = make_perievent_labels(
-        event_file, duration, nsec_before=nsec_before, nsec_after=nsec_after
-    )
+
+    event_utils = Event_Utils(fp_freq, duration, window_len=window_len)
+    perievent_label_dict = event_utils.make_perievent_labels(event_file)
     fig = make_figure(fp_data, plot_name=fp_name, label_dict=perievent_label_dict)
     fig.show_dash(config={"scrollZoom": True})
