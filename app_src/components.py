@@ -282,28 +282,35 @@ class Components:
         return dcc.Tab(
             label=event_name,
             value=event_name,
-            children=[
-                html.Img(
-                    id={"type": "perievent-signal-image", "event": event_name},
-                    style={"width": "auto", "border": "1px solid #ccc"},
-                ),
-                html.H4("Analysis Plots"),
-                html.Img(
-                    id={"type": "analysis-image", "event": event_name},
-                    style={"width": "auto", "border": "1px solid #ccc"},
-                ),
-                html.Img(
-                    id={"type": "correlation-image", "event": event_name},
-                    style={"width": "40%", "maxWidth": "400px"},
-                ),
-                # html.Button(
-                #    "Save Plots",
-                #    id={"type": "save-plots-button", "event": event_name},
-                #    style={"visibility": "hidden"},
-                # ),
-                # dcc.Download(id={"type": "download-plots", "event": event_name}),
-            ],
+            id={"type": "tab", "event": event_name},
         )
+
+    def _fill_tab(
+        self,
+        event_name: str,
+        perievent_signals_fig_paths: dict,
+        analyses_fig_paths: dict,
+        corr_fig_paths: dict,
+    ):
+        children = [
+            html.Img(
+                # id={"type": "perievent-signal-image", "event": event_name},
+                style={"width": "auto", "border": "1px solid #ccc"},
+                src=perievent_signals_fig_paths[event_name],
+            ),
+            html.H4("Analysis Plots"),
+            html.Img(
+                # id={"type": "analysis-image", "event": event_name},
+                style={"width": "auto", "border": "1px solid #ccc"},
+                src=analyses_fig_paths[event_name],
+            ),
+            html.Img(
+                # id={"type": "correlation-image", "event": event_name},
+                style={"width": "40%", "maxWidth": "400px"},
+                src=corr_fig_paths[event_name],
+            ),
+        ]
+        return children
 
     def _build_event_tabs(self, event_names):
         if not event_names:
@@ -325,12 +332,21 @@ class Components:
             html.Div(
                 style={"display": "flex", "marginLeft": "10px", "gap": "10px"},
                 children=[
-                    html.Label(["Perievent Window Size"]),
+                    html.Label(["Baseline Window Size"]),
                     dcc.Dropdown(
-                        options=[60, 120],
-                        value=120,
+                        options=[30, 60],
+                        value=30,
                         style={"width": "60px"},
-                        id="perievent-window-dropdown",
+                        id="baseline-window-dropdown",
+                        searchable=False,
+                        clearable=False,
+                    ),
+                    html.Label(["Analysis Window Size"]),
+                    dcc.Dropdown(
+                        options=list(range(10, 70, 10)),
+                        value=60,
+                        style={"width": "60px"},
+                        id="analysis-window-dropdown",
                         searchable=False,
                         clearable=False,
                     ),
