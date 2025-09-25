@@ -19,18 +19,18 @@ else:
     # The application is not frozen
     base_path = os.path.abspath(os.path.dirname(__file__))
 
-# Add the base path to sys.path to find app_src
+# Add the base path to sys.path to find fp_analysis_app
 sys.path.insert(0, base_path)
 
 if __name__ == "__main__":
     try:
-        from app_src.app import app, open_browser
+        from fp_analysis_app.app import app, open_browser
 
         PORT = 8050
         Timer(1, partial(open_browser, PORT)).start()
         # suppress hot reload so that the app doesn't reload every time something's changed in assets/
-        app.run(debug=True, port=PORT, use_reloader=False, dev_tools_hot_reload=False)
+        app.run(debug=False, port=PORT, use_reloader=False, dev_tools_hot_reload=False)
 
     except ImportError as e:
-        print(f"Error importing app_src: {e}")
+        print(f"Error importing fp_analysis_app: {e}")
         # sys.exit(1)

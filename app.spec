@@ -5,23 +5,22 @@ import sys
 
 from PyInstaller.utils.hooks import collect_data_files
 
+sys.setrecursionlimit(sys.getrecursionlimit() * 5)
 # Add the current working directory to sys.path
 sys.path.insert(0, os.getcwd())
 
-from app_src import VERSION
+from fp_analysis_app import VERSION
 
 
 datas=[
-    ('C:\\Users\\yzhao\\miniconda3\\envs\\sleep_scoring_dist\\lib\\site-packages\\dash_player', 'dash_player'),
-    ('C:\\Users\\yzhao\\miniconda3\\envs\\sleep_scoring_dist\\lib\\site-packages\\dash_extensions', 'dash_extensions'),
-    ('C:\\Users\\yzhao\\python_projects\\sleep_scoring\\app_src\\assets', 'assets'),
-    ('C:\\Users\\yzhao\\miniconda3\\envs\\sleep_scoring_dist\\lib\\site-packages\\scipy', 'scipy'),
+    ('C:\\Users\\yzhao\\miniconda3\\envs\\fiber_photometry\\lib\\site-packages\\dash_extensions', 'dash_extensions'),
+    ('C:\\Users\\yzhao\\python_projects\\fp_analysis\\fp_analysis_app\\assets', 'assets'),
+    ('C:\\Users\\yzhao\\miniconda3\\envs\\fiber_photometry\\lib\\site-packages\\scipy', 'scipy'),
 ]
-#datas += collect_data_files('timm', include_py_files=True)
 
 a = Analysis(
     ['main.py'],
-    pathex=['C:\\Users\\yzhao\\miniconda3\\envs\\sleep_scoring_dist\\lib\\site-packages'],
+    pathex=['C:\\Users\\yzhao\\miniconda3\\envs\\fiber_photometry\\lib\\site-packages'],
     binaries=[],
     datas=datas,
     hiddenimports=[],
@@ -32,10 +31,10 @@ a = Analysis(
     noarchive=False,
 )
 
-# Remove app_src modules from the Analysis
+# Remove fp_analysis_app modules from the Analysis
 
-a.pure = [x for x in a.pure if 'app_src' not in x[0]]
-a.scripts = [x for x in a.scripts if 'app_src' not in x[0]]
+a.pure = [x for x in a.pure if 'fp_analysis_app' not in x[0]]
+a.scripts = [x for x in a.scripts if 'fp_analysis_app' not in x[0]]
 pyz = PYZ(a.pure)
 
 exe = EXE(
@@ -43,7 +42,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='run_app',
+    name='run_fp_analysis_app',
     debug=True,
     bootloader_ignore_signals=False,
     strip=False,
@@ -62,5 +61,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name=f'fp_visualization_app_{VERSION}',
+    name=f'fp_analysis_app_{VERSION}',
 )

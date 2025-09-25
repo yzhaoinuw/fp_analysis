@@ -13,11 +13,11 @@ import webbrowser
 from pathlib import Path
 from collections import deque
 
-# from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import dash
 import diskcache
-import dash_player
+
+# import dash_player
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 from dash.dependencies import Input, Output, State
@@ -26,26 +26,29 @@ from dash import (
     Dash,
     dcc,
     html,
-    ctx,
+    # ctx,
     clientside_callback,
-    Patch,
+    # Patch,
     page_container,
     ALL,
     DiskcacheManager,
 )
 
 import numpy as np
-import pandas as pd
+
+# import pandas as pd
 from flask_caching import Cache
 from scipy.io import loadmat, savemat
 
 
-from app_src import VERSION
-from app_src.make_mp4 import make_mp4_clip
-from app_src.components import Components
-from app_src.make_figure import get_padded_labels, make_figure
-from app_src.event_analysis_dev import Event_Utils, Perievent_Plots, Analyses
-from app_src.postprocessing import get_sleep_segments, get_pred_label_stats
+from fp_analysis_app import VERSION
+
+# from fp_analysis_app.make_mp4 import make_mp4_clip
+from fp_analysis_app.components import Components
+from fp_analysis_app.make_figure import get_padded_labels, make_figure
+from fp_analysis_app.event_analysis_dev import Event_Utils, Perievent_Plots, Analyses
+
+# from fp_analysis_app.postprocessing import get_sleep_segments, get_pred_label_stats
 
 
 app = Dash(
