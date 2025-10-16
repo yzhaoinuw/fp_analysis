@@ -46,7 +46,7 @@ from fp_analysis_app import VERSION
 # from fp_analysis_app.make_mp4 import make_mp4_clip
 from fp_analysis_app.components import Components
 from fp_analysis_app.make_figure import get_padded_labels, make_figure
-from fp_analysis_app.event_analysis_dev import Event_Utils, Perievent_Plots, Analyses
+from fp_analysis_app.event_analysis import Event_Utils, Perievent_Plots, Analyses
 
 # from fp_analysis_app.postprocessing import get_sleep_segments, get_pred_label_stats
 
@@ -116,7 +116,7 @@ def create_fig(mat, mat_name, label_dict={}, default_n_shown_samples=2048):
 
 
 def make_analysis_plots(
-    annotation_file: str,
+    event_time_dict: dict,
     selected_signals: tuple[str, ...],
     baseline_window: int,
     analysis_window: int,
@@ -134,7 +134,7 @@ def make_analysis_plots(
     analyses = Analyses(fp_freq=fp_freq, baseline_window=baseline_window)
 
     # Indices for this event
-    event_time_dict = event_utils.read_events(annotation_file)
+    # event_time_dict = event_utils.read_events(event_file=annotation_file)
     perievent_signals_fig_paths = {}
     analyses_fig_paths = {}
     corr_fig_paths = {}
@@ -217,29 +217,18 @@ def make_analysis_plots(
 
 
 def reset_cache(cache, filename):
-    prev_filename = cache.get("filename")
+    # prev_filename = cache.get("filename")
 
     # attempt for salvaging unsaved annotations
     # if prev_filename is None or prev_filename != filename:
     cache.set("labels_history", deque(maxlen=4))
-
     cache.set("filename", filename)
-    recent_files_with_video = cache.get("recent_files_with_video")
-    if recent_files_with_video is None:
-        recent_files_with_video = []
-    file_video_record = cache.get("file_video_record")
-    if file_video_record is None:
-        file_video_record = {}
-    cache.set("annotation_filename", "")
+    # cache.set("annotation_filename", "")
+    cache.set("event_time_dict", {})
     # cache.set("analysis_fig", None)
-    cache.set("recent_files_with_video", recent_files_with_video)
-    cache.set("file_video_record", file_video_record)
     cache.set("start_time", 0)
     cache.set("end_time", 0)
     cache.set("duration", 0)
-    cache.set("video_start_time", 0)
-    cache.set("video_name", "")
-    cache.set("video_path", "")
     cache.set("fig_resampler", None)
 
 
@@ -386,12 +375,13 @@ def show_analysis_results(
         if file.is_file() and file.suffix == ".xlsx":
             file.unlink()
 
-    annotation_filename = cache.get("annotation_filename")
+    # annotation_filename = cache.get("annotation_filename")
+    event_time_dict = cache.get("event_time_dict")
     duration = cache.get("duration")
-    annotation_file = os.path.join(TEMP_PATH, annotation_filename)
+    # annotation_file = os.path.join(TEMP_PATH, annotation_filename)
     perievent_signals_fig_paths, analyses_fig_paths, corr_fig_paths = (
         make_analysis_plots(
-            annotation_file=annotation_file,
+            event_time_dict=event_time_dict,
             selected_signals=selected_signals,
             baseline_window=baseline_window,
             analysis_window=analysis_window,
@@ -417,6 +407,7 @@ def show_analysis_results(
         Output("upload-container", "children", allow_duplicate=True),
         Output("net-annotation-count-store", "data", allow_duplicate=True),
         Output("annotation-message", "children", allow_duplicate=True),
+        Output("analysis-link", "style", allow_duplicate=True),
     ],
     id="vis-data-upload",
 )
@@ -434,7 +425,7 @@ def upload_mat(status):
     message = (
         "File uploaded. Creating visualizations... This may take up to 30 seconds."
     )
-    return message, True, components.vis_upload_box, 0, ""
+    return message, True, components.vis_upload_box, 0, "", {"visibility": "hidden"}
 
 
 @app.callback(
@@ -460,9 +451,9 @@ def prepare_annotation(n_clicks, is_open):
 def upload_annotation(status):
     annotation_file = status.latest_file
     annotation_filename = os.path.basename(annotation_file)
-    cache.set("annotation_filename", annotation_filename)
+    # cache.set("annotation_filename", annotation_filename)
     message = "File uploaded. It may take up to 30 seconds to update the visualizations. You can close this window now."
-    return message, "uploaded"
+    return message, annotation_filename
 
 
 @app.callback(
@@ -472,22 +463,23 @@ def upload_annotation(status):
     Input("annotation-uploaded-store", "data"),
     prevent_initial_call=True,
 )
-def import_annotation_file(uploaded):
+def import_annotation_file(annotation_filename):
     mat_name = cache.get("filename")
     mat = loadmat(os.path.join(TEMP_PATH, mat_name), squeeze_me=True)
-    annotation_filename = cache.get("annotation_filename")
+    # annotation_filename = cache.get("annotation_filename")
     annotation_file = os.path.join(TEMP_PATH, annotation_filename)
     signal_names = mat.get("fp_signal_names")
     fp_freq = mat.get("fp_frequency")
     duration = cache.get("duration")
     event_utils = Event_Utils(fp_freq, duration)
-    event_time_dict = event_utils.read_events(annotation_file)
+    event_time_dict = event_utils.read_events(event_file=annotation_file)
+    cache.set("event_time_dict", event_time_dict)
     event_count_records = event_utils.count_events(event_time_dict)
     event_names = list(event_time_dict.keys())
     analysis_page_content = components.fill_analysis_page(
         event_names, event_count_records, signal_names
     )
-    perievent_label_dict = event_utils.make_perievent_labels(annotation_file)
+    perievent_label_dict = event_utils.make_perievent_labels(event_file=annotation_file)
     fig = create_fig(mat, mat_name, label_dict=perievent_label_dict)
     return analysis_page_content, fig, {"visibility": "visible"}
 
@@ -496,6 +488,8 @@ def import_annotation_file(uploaded):
     Output("visualization-container", "children"),
     Output("num-signals-store", "data"),
     Output("data-upload-message", "children", allow_duplicate=True),
+    Output("analysis-page", "children", allow_duplicate=True),
+    Output("analysis-link", "style", allow_duplicate=True),
     Input("visualization-ready-store", "data"),
     prevent_initial_call=True,
 )
@@ -507,34 +501,56 @@ def create_visualization(ready):
     mat = loadmat(os.path.join(TEMP_PATH, mat_name), squeeze_me=True)
     fp_signal_names = mat["fp_signal_names"]
     num_signals = len(fp_signal_names)
+    fp_freq = mat.get("fp_frequency")
+    # duration = cache.get("duration")
+    event_data = mat.get("event")
+
+    label_dict = {}
+    analysis_page_content = dash.no_update
+    analysis_link_style = {"visibility": "hidden"}
 
     message = "Please double check the file selected."
     if num_signals == 0:
         message = " ".join(["No FP signal found.", message])
-        return message, dash.no_update, ""
+        return message, dash.no_update, "", analysis_page_content, analysis_link_style
 
     fp_signals = [mat[signal_name] for signal_name in fp_signal_names]
     signal_lengths = [len(fp_signals[k]) for k in range(num_signals)]
     if not all(length == signal_lengths[0] for length in signal_lengths):
         message = " ".join(["Not all FP signals are of the same length.", message])
-        return message, dash.no_update, ""
+        return message, dash.no_update, "", analysis_page_content, analysis_link_style
+
+    signal_length = signal_lengths[0]
+    duration = math.ceil(
+        (signal_length - 1) / fp_freq
+    )  # need to round duration to an int for later
+
+    if event_data is not None:
+        signal_names = mat.get("fp_signal_names")
+        event_utils = Event_Utils(fp_freq, duration)
+        df_events = event_utils.eventdata_to_df(event_data)
+        event_time_dict = event_utils.read_events(df_events=df_events)
+        cache.set("event_time_dict", event_time_dict)
+        event_count_records = event_utils.count_events(event_time_dict)
+        event_names = list(event_time_dict.keys())
+        print(f"EVENT_NAMES: {event_names}")
+        analysis_page_content = components.fill_analysis_page(
+            event_names, event_count_records, signal_names
+        )
+        label_dict = event_utils.make_perievent_labels(df_events=df_events)
+        analysis_link_style = {"visibility": "visible"}
 
     # salvage unsaved annotations
     labels_history = cache.get("labels_history")
     if labels_history:
         mat["labels"] = labels_history[-1]
     else:
-        signal_length = signal_lengths[0]
-        fp_freq = mat.get("fp_frequency")
-        duration = math.ceil(
-            (signal_length - 1) / fp_freq
-        )  # need to round duration to an int for later
         labels = mat.get("labels", np.array([]))
         labels = get_padded_labels(labels, duration)
         np.place(labels, labels == -1, [np.nan])
         labels_history.append(labels)
 
-    fig = create_fig(mat, mat_name)
+    fig = create_fig(mat, mat_name, label_dict=label_dict)
     video_start_time = mat.get("video_start_time")
     video_path = mat.get("video_path", np.array([]))
     video_name = mat.get("video_name", np.array([]))
@@ -557,7 +573,13 @@ def create_visualization(ready):
     graph = dcc.Graph(id="graph", figure=fig, config={"scrollZoom": True})
     visualization_div = components.make_visualization_div(graph)
 
-    return visualization_div, num_signals, ""
+    return (
+        visualization_div,
+        num_signals,
+        "",
+        analysis_page_content,
+        analysis_link_style,
+    )
 
 
 @app.callback(
@@ -609,132 +631,6 @@ def update_fig(relayoutdata, num_signals):
 
 
 '''
-@app.callback(
-    Output("video-modal", "is_open", allow_duplicate=True),
-    Output("video-path-store", "data", allow_duplicate=True),
-    Output("video-container", "children", allow_duplicate=True),
-    Output("video-message", "children", allow_duplicate=True),
-    Input("video-button", "n_clicks"),
-    State("video-modal", "is_open"),
-    prevent_initial_call=True,
-)
-def prepare_video(n_clicks, is_open):
-    file_unseen = True
-    filename = cache.get("filename")
-    recent_files_with_video = cache.get("recent_files_with_video")
-    file_video_record = cache.get("file_video_record")
-    if filename in recent_files_with_video:
-        recent_files_with_video.remove(filename)
-        video_info = file_video_record.get(filename)
-        if video_info is not None and os.path.isfile(video_info["video_path"]):
-            file_unseen = False
-
-    recent_files_with_video.append(filename)
-    cache.set("recent_files_with_video", recent_files_with_video)
-    if not file_unseen:
-        video_path = video_info["video_path"]
-        message = "Preparing clip..."
-        return (not is_open), video_path, "", message
-
-    # if original avi has not been uploaded, ask for it
-    video_path = cache.get("video_path")
-    message = "Please upload the original video (an avi file) above."
-    if video_path:
-        message += f" You may find it at {video_path}."
-    return (not is_open), dash.no_update, components.video_upload_box, message
-
-
-@du.callback(
-    output=[
-        Output("video-path-store", "data"),
-        Output("video-message", "children", allow_duplicate=True),
-    ],
-    id="video-upload",
-)
-def upload_video(status):
-    avi_path = status.latest_file  # a WindowsPath
-    avi_path = str(avi_path)  # need to turn WindowsPath to str for the output
-    filename = cache.get("filename")
-    recent_files_with_video = cache.get("recent_files_with_video")
-    file_video_record = cache.get("file_video_record")
-    file_video_record[filename] = {
-        "video_path": avi_path,
-        "video_name": os.path.basename(avi_path),
-    }
-    if len(recent_files_with_video) > 3:
-        filename_to_remove = recent_files_with_video.pop(0)
-        if filename_to_remove in file_video_record:
-            avi_file_to_remove = file_video_record[filename_to_remove]["video_path"]
-            file_video_record.pop(filename_to_remove)
-            if os.path.isfile(avi_file_to_remove):
-                os.remove(avi_file_to_remove)
-
-    cache.set("recent_files_with_video", recent_files_with_video)
-    cache.set("file_video_record", file_video_record)
-
-    return avi_path, "Preparing clip..."
-
-
-@app.callback(
-    Output("clip-name-store", "data"),
-    Output("video-message", "children", allow_duplicate=True),
-    Input("video-path-store", "data"),
-    State("box-select-store", "data"),
-    prevent_initial_call=True,
-)
-def make_clip(video_path, box_select_range):
-    if not box_select_range:
-        return dash.no_update, ""
-
-    start, end = box_select_range
-    video_start_time = cache.get("video_start_time")
-    # start_time = cache.get("start_time")
-    start = start + video_start_time
-    end = end + video_start_time
-    video_name = os.path.basename(video_path).split(".")[0]
-    clip_name = video_name + f"_time_range_{start}-{end}" + ".mp4"
-    save_path = VIDEO_DIR / clip_name
-    if save_path.is_file():
-        return clip_name, ""
-
-    for file in VIDEO_DIR.iterdir():
-        if file.is_file() and file.suffix == ".mp4":
-            file.unlink()
-
-    try:
-        make_mp4_clip(
-            video_path,
-            start_time=start,
-            end_time=end,
-            save_path=save_path,
-        )
-    except ValueError as error_message:
-        return dash.no_update, repr(error_message)
-
-    return clip_name, ""
-
-
-@app.callback(
-    Output("video-container", "children"),
-    Output("video-message", "children"),
-    Input("clip-name-store", "data"),
-    prevent_initial_call=True,
-)
-def show_clip(clip_name):
-    if not (VIDEO_DIR / clip_name).is_file():
-        return "", "Video not ready yet. Please check again in a second."
-    clip_path = os.path.join("/assets/videos/", clip_name)
-    player = dash_player.DashPlayer(
-        id="player",
-        url=clip_path,
-        controls=True,
-        width="100%",
-        height="100%",
-    )
-
-    return player, ""
-
-
 
 @app.callback(
     # Output("debug-message", "children"),

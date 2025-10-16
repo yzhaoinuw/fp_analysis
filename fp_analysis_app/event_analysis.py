@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed Jul  2 19:26:15 2025
+Created on Thu May  8 12:58:19 2025
 
 @author: yzhao
 """
@@ -17,12 +17,47 @@ from scipy.signal import find_peaks, resample_poly
 
 class Event_Utils:
 
-    def __init__(self, fp_freq, duration, window_len: int = 120):
+    def __init__(self, fp_freq, duration, nsec_before=30, nsec_after=60):
         self.fp_freq = fp_freq
         self.duration = duration
-        self.nsec_before = self.nsec_after = window_len / 2
+        self.nsec_before = nsec_before
+        self.nsec_after = nsec_after
 
-    def read_events(self, event_file):
+    @staticmethod
+    def _round_to_significant_digits(array, sig_figs=2):
+
+        # Calculate the order of magnitude
+        order_of_magnitude = np.floor(np.log10(abs(array)))
+
+        # Calculate the scaling factor for rounding
+        scale = 10 ** (sig_figs - 1 - order_of_magnitude)
+
+        # Round the scaled number and then scale it back
+        return np.round(array * scale) / scale
+
+    @staticmethod
+    def eventdata_to_df(event_data: np.array):
+        event_name, event_time = event_data[0], event_data[1]
+        event_onset, event_offset = event_time[:, 0], event_time[:, 1]
+        duration = event_offset - event_onset
+        duration_rounded = Event_Utils._round_to_significant_digits(duration)
+        df = pd.DataFrame(
+            data=np.transpose(np.vstack([event_onset, duration_rounded])),
+            columns=["onset", "duration_rounded"],
+        )
+        grouped_event_dict = (
+            df.groupby("duration_rounded")["onset"].apply(list).to_dict()
+        )
+        max_len = max(len(v) for v in grouped_event_dict.values())
+        df_event = pd.DataFrame(
+            {
+                f"{event_name}_{k}s": v + [None] * (max_len - len(v))
+                for k, v in grouped_event_dict.items()
+            }
+        )
+        return df_event
+
+    def read_events(self, event_file=None, df_events=None):
         """
         read in spreadsheet, drop nan, and remove events near the start or end.
 
@@ -30,7 +65,8 @@ class Event_Utils:
         min_time = self.nsec_before
         max_time = self.duration - self.nsec_after
         event_time_dict = {}
-        df_events = pd.read_excel(event_file)
+        if df_events is None:
+            df_events = pd.read_excel(event_file)
         for event in df_events.columns:
             df_event = df_events[event]
             df_event = df_event.dropna()
@@ -67,8 +103,8 @@ class Event_Utils:
         )
         return perievent_segments.astype(int)
 
-    def make_perievent_labels(self, event_file):
-        event_time_dict = self.read_events(event_file)
+    def make_perievent_labels(self, event_file=None, df_events=None):
+        event_time_dict = self.read_events(event_file=event_file, df_events=df_events)
         event_names = []
         perievent_labels = np.zeros(self.duration)
         perievent_labels[:] = np.nan
@@ -87,12 +123,13 @@ class Perievent_Plots:
         self,
         fp_freq,
         event,
-        window_len: int = 120,
+        nsec_before=30,
+        nsec_after=60,
     ):
         self.fp_freq = fp_freq
         self.event = event
-        self.window_len = window_len
-        self.nsec_before = self.nsec_after = window_len / 2
+        self.nsec_before = nsec_before
+        self.nsec_after = nsec_after
 
     def plot_perievent_signals(
         self,
@@ -126,6 +163,7 @@ class Perievent_Plots:
         ax.axhline(0, color="gray", linestyle="--", linewidth=1)  # Horizontal at y = 0
         ax.axvline(0, color="gray", linestyle="--", linewidth=1)  # Vertical at x = 0
         ax.set_xlim(-self.nsec_before, self.nsec_after)
+        ax.set_xticks(np.arange(-self.nsec_before, self.nsec_after + 1, 10))
         ax.set_ylim(ylim[0], ylim[1])
         ax.set_xlabel("Time (s)", fontsize=10, fontweight="bold")
         ax.set_ylabel(f"{biosignal_name} (dF/F)", fontsize=10, fontweight="bold")
@@ -154,6 +192,7 @@ class Perievent_Plots:
 
         # Axis limits and labels
         ax.set_xlim(-self.nsec_before, self.nsec_after)
+        ax.set_xticks(np.arange(-self.nsec_before, self.nsec_after + 1, 10))
         ax.set_ylim(ylim[0], ylim[1])
         ax.set_xlabel("Time (s)", fontsize=10, fontweight="bold")
         ax.set_ylabel(f"Mean {biosignal_name}(dF/F)", fontsize=10, fontweight="bold")
@@ -252,27 +291,28 @@ class Perievent_Plots:
         corr = cov / den
         return corr  # shape (n,)
 
-    def make_perievent_analysis_plots(
+    def make_perievent_plots(
         self,
-        analysis_result,
+        perievent_signals_dict,
         width=4,
         height=3,
         ylim=(-10, 10),
         figure_save_path=None,
     ):
-        n_signals = len(analysis_result)
+        n_signals = len(perievent_signals_dict)
         assert (
             n_signals <= 2
         ), "More than two biosignals are detected in analysis results."
-        n_cols = 8
+        n_cols = 3
         fig, axes = plt.subplots(
             n_signals,
             n_cols,
             figsize=(width * n_cols, height * n_signals),
         )
         axes = np.atleast_2d(axes)
-        for i, (biosignal_name, result) in enumerate(analysis_result.items()):
-            perievent_signals = result["perievent_signals"]
+        for i, (biosignal_name, perievent_signals) in enumerate(
+            perievent_signals_dict.items()
+        ):
             self.plot_perievent_signals(
                 perievent_signals=perievent_signals,
                 ax=axes[i, 0],
@@ -289,6 +329,40 @@ class Perievent_Plots:
                 perievent_signals=perievent_signals,
                 ax=axes[i, 2],
             )
+        fig.tight_layout()
+
+        if figure_save_path is not None:
+            fig.savefig(
+                figure_save_path.with_suffix(".png"),
+                format="png",
+                dpi=100,
+                bbox_inches="tight",
+            )
+            plt.close(fig)
+            return fig
+        else:
+            return None
+
+    def make_perievent_analysis_plots(
+        self,
+        analysis_result,
+        width=4,
+        height=3,
+        ylim=(-10, 10),
+        figure_save_path=None,
+    ):
+        n_signals = len(analysis_result)
+        assert (
+            n_signals <= 2
+        ), "More than two biosignals are detected in analysis results."
+        n_cols = 5
+        fig, axes = plt.subplots(
+            n_signals,
+            n_cols,
+            figsize=(width * n_cols, height * n_signals),
+        )
+        axes = np.atleast_2d(axes)
+        for i, (biosignal_name, result) in enumerate(analysis_result.items()):
             perievent_signals_normalized = result["perievent_signals_normalized"]
             reaction_signal_auc = result["reaction_signal_auc"]
             max_peak_magnitude = result["max_peak_magnitude"]
@@ -296,33 +370,41 @@ class Perievent_Plots:
             decay_time = result["decay_time"]
 
             self.plot_perievent_signals(
-                ax=axes[i, 3],
+                ax=axes[i, 0],
                 perievent_signals=perievent_signals_normalized,
                 biosignal_name=biosignal_name + "_normalized",
                 first_peak_time_array=first_peak_time,
                 ylim=ylim,
+                title="Perievent Signals Normalized",
             )
-            self.plot_distribution(reaction_signal_auc, data_type="AUC", ax=axes[i, 4])
+            self.plot_distribution(reaction_signal_auc, data_type="AUC", ax=axes[i, 1])
             self.plot_distribution(
-                max_peak_magnitude, data_type="Max Peak Magnitude", ax=axes[i, 5]
+                max_peak_magnitude,
+                data_type="Max Peak Magnitude",
+                ax=axes[i, 2],
             )
             self.plot_distribution(
                 first_peak_time,
                 data_type="First Peak Time",
-                ax=axes[i, 6],
-                ylim=(0, 0.5 * self.window_len),
+                ax=axes[i, 3],
+                ylim=(0, self.nsec_after),
             )
             self.plot_distribution(
                 decay_time,
                 data_type="Decay Time",
-                ax=axes[i, 7],
-                ylim=(0, 0.5 * self.window_len),
+                ax=axes[i, 4],
+                ylim=(0, self.nsec_after),
             )
 
-        plt.tight_layout()
+        fig.tight_layout()
 
         if figure_save_path is not None:
-            fig.savefig(figure_save_path, format="png", dpi=100, bbox_inches="tight")
+            fig.savefig(
+                figure_save_path.with_suffix(".png"),
+                format="png",
+                dpi=100,
+                bbox_inches="tight",
+            )
             plt.close(fig)
             return fig
         else:
@@ -353,7 +435,12 @@ class Perievent_Plots:
         plt.tight_layout()
 
         if figure_save_path is not None:
-            fig.savefig(figure_save_path, format="png", dpi=200, bbox_inches="tight")
+            fig.savefig(
+                figure_save_path.with_suffix(".png"),
+                format="png",
+                dpi=200,
+                bbox_inches="tight",
+            )
             plt.close(fig)
             return fig
         else:
@@ -393,18 +480,16 @@ class Analyses:
         return perievent_signals_scaled
 
     def _get_baseline_means(self, perievent_signals_scaled):
-        event_time_ind = int(np.ceil(perievent_signals_scaled.shape[1] / 2))
+        event_time_ind = round(self.baseline_window * self.fp_freq)
         baseline_signals = perievent_signals_scaled[
             :,
-            int(
-                np.floor(event_time_ind - self.baseline_window * self.fp_freq)
-            ) : event_time_ind,
+            :event_time_ind,
         ]
         baseline_mean_values = np.mean(baseline_signals, axis=1, keepdims=True)
         return baseline_mean_values
 
     def _get_reaction_signals(self, perievent_signals_normalized):
-        event_time_ind = int(np.ceil(perievent_signals_normalized.shape[1] / 2))
+        event_time_ind = round(self.baseline_window * self.fp_freq)
         reaction_signals = perievent_signals_normalized[
             :, event_time_ind:
         ]  # perievent signals after the event
@@ -415,6 +500,18 @@ class Analyses:
         down = int(round(fs))  # 1017
         y = resample_poly(signal, up, down)  # anti-aliased by design
         return y
+
+    def _normalize_perievent_signals(self, perievent_signals):
+        event_time_ind = round(self.baseline_window * self.fp_freq)
+        perievent_signals_scaled = perievent_signals + 1000
+        baseline_mean_values = self._get_baseline_means(perievent_signals_scaled)
+        perievent_signals_normalized = (
+            1000 * perievent_signals_scaled / baseline_mean_values
+        )
+        perievent_signals_normalized -= perievent_signals_normalized[
+            :, event_time_ind : event_time_ind + 1
+        ]
+        return perievent_signals_normalized
 
     def find_first_peaks(
         self, reaction_signals, distance=None, height=1, prominence=0.5
@@ -465,25 +562,20 @@ class Analyses:
         return out / self.fp_freq
 
     def get_perievent_analyses(self, perievent_signals):
-        event_time_ind = int(np.ceil(perievent_signals.shape[1] / 2))
-        # perievent_signals_scaled = self._scale_perieventsignals(perievent_signals)
-        perievent_signals_scaled = perievent_signals + 1000
-        baseline_mean_values = self._get_baseline_means(perievent_signals_scaled)
-        perievent_signals_normalized = (
-            1000 * perievent_signals_scaled / baseline_mean_values
+        perievent_signals_normalized = self._normalize_perievent_signals(
+            perievent_signals
         )
-        perievent_signals_normalized -= perievent_signals_normalized[
-            :, event_time_ind : event_time_ind + 1
-        ]
-
         reaction_signals = self._get_reaction_signals(perievent_signals_normalized)
         reaction_signal_areas = np.mean(reaction_signals, axis=1)
         max_peaks = np.max(reaction_signals, axis=1)
         first_peak_inds = self.find_first_peaks(reaction_signals)
         first_peak_time = np.round(first_peak_inds / self.fp_freq)
+        baseline_mean_perievent_signals_normalized = self._get_baseline_means(
+            perievent_signals_normalized
+        )
         decay_time_array = self.compute_decay_time(
             reaction_signals,
-            self._get_baseline_means(perievent_signals_normalized),
+            baseline_mean_perievent_signals_normalized,
             first_peak_inds,
         )
 
@@ -504,25 +596,44 @@ if __name__ == "__main__":
     FIGURE_DIR.mkdir(parents=True, exist_ok=True)
     SPREADSHEET_DIR = Path(__file__).parent / "assets" / "spreadsheets"
     SPREADSHEET_DIR.mkdir(parents=True, exist_ok=True)
-    fp_name = "F268"
+    fp_name = "M2"
     fp_file = Path(DATA_PATH) / f"{fp_name}.mat"
-    fp_data = loadmat(fp_file, squeeze_me=True)
-    biosignal_names = fp_data["fp_signal_names"]
-    biosignal_name = "NE2m"
-    biosignal = fp_data[biosignal_name]
-    event_file = Path(DATA_PATH) / "Transitions_F268.xlsx"
+    mat = loadmat(fp_file, squeeze_me=True)
+    biosignal_names = mat["fp_signal_names"]
+    num_signals = len(biosignal_names)
+    fp_signals = [mat[signal_name] for signal_name in biosignal_names]
+    signal_lengths = [len(fp_signals[k]) for k in range(num_signals)]
+    signal_length = signal_lengths[0]
+    fp_freq = mat.get("fp_frequency")
+    duration = int(
+        np.ceil((signal_length - 1) / fp_freq)
+    )  # need to round duration to an int for later
+    # biosignal_name = "NE2m"
 
-    fp_freq = fp_data["fp_frequency"]
-    window_len = 120
-    baseline_window = 30
-    duration = int(np.ceil(len(biosignal) / fp_freq))
-    event_utils = Event_Utils(fp_freq, duration, window_len=window_len)
-    # perievent_labels = Event_Utils.make_perievent_labels(event_file, duration, nsec_before=2, nsec_after=2)
+    event_file = Path(DATA_PATH) / "Transitions_F268.xlsx"
+    event_data = mat.get("event")
+
+    nsec_after = 60
+    nsec_before = 30
+    event_utils = Event_Utils(
+        fp_freq, duration, nsec_before=nsec_before, nsec_after=nsec_after
+    )
+
+    if event_data is not None:
+        signal_names = mat.get("fp_signal_names")
+        event_utils = Event_Utils(fp_freq, duration)
+        df_events = event_utils.eventdata_to_df(event_data)
+        event_time_dict = event_utils.read_events(df_events=df_events)
+        event_count_records = event_utils.count_events(event_time_dict)
+        event_names = list(event_time_dict.keys())
+
+    """
+    perievent_labels = event_utils.make_perievent_labels(event_file=event_file)
     event_time_dict = event_utils.read_events(event_file)
-    perievent_labels = np.zeros(duration)
-    perievent_labels[:] = np.nan
+    #perievent_labels = np.zeros(duration)
+    #perievent_labels[:] = np.nan
     perievent_indices_dict = {}
-    analyses = Analyses(fp_freq=fp_freq, baseline_window=baseline_window)
+    analyses = Analyses(fp_freq=fp_freq, baseline_window=nsec_before)
 
     for i, event in enumerate(sorted(event_time_dict.keys())):
 
@@ -530,13 +641,15 @@ if __name__ == "__main__":
         perievent_windows = event_utils.make_perievent_windows(event_time)
         perievent_indices = event_utils.get_perievent_indices(perievent_windows)
 
-        perievent_analysis_result = {}
+        perievent_signals_dict = {}
+        perievent_analysis_dict = {}
         perievent_signals_normalized_array = []
         for biosignal_name in biosignal_names:
-            biosignal = fp_data[biosignal_name]
+            biosignal = mat[biosignal_name]
             perievent_signals = biosignal[perievent_indices]
+            perievent_signals_dict[biosignal_name] = perievent_signals
             result = analyses.get_perievent_analyses(perievent_signals)
-            perievent_analysis_result[biosignal_name] = result
+            perievent_analysis_dict[biosignal_name] = result
             perievent_signals_normalized_array.append(
                 result["perievent_signals_normalized"]
             )
@@ -545,20 +658,22 @@ if __name__ == "__main__":
         spreadsheet_name = f"{fp_name}_{event}.xlsx"
         figure_save_path = FIGURE_DIR / figure_name
         spreadsheet_save_path = SPREADSHEET_DIR / spreadsheet_name
-        plots = Perievent_Plots(fp_freq, event, window_len)
+        plots = Perievent_Plots(
+            fp_freq, event, nsec_before=nsec_before, nsec_after=nsec_after
+        )
+        plots.make_perievent_plots(perievent_signals_dict)
         plots.make_perievent_analysis_plots(
-            perievent_analysis_result,
+            perievent_analysis_dict,
             # figure_save_path=figure_save_path
         )
         # %%
-        """
+
         plots.plot_correlation(
             perievent_signals_normalized_array[0], perievent_signals_normalized_array[1]
         )
-        plots.write_spreadsheet(perievent_analysis_result, spreadsheet_save_path)
+        plots.write_spreadsheet(perievent_analysis_dict, spreadsheet_save_path)
 
-        
         perievent_indices_dict[event] = perievent_indices
-        perievent_time = perievent_windows.flatten()
-        perievent_labels[perievent_time] = i
-        """
+        #perievent_time = perievent_windows.flatten()
+        #perievent_labels[perievent_time] = i
+    """
