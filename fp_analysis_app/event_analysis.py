@@ -12,7 +12,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from scipy.io import loadmat
-from scipy.signal import find_peaks, resample_poly
+from scipy.signal import find_peaks, resample_poly, correlation_lags, correlate
 
 
 class Event_Utils:
@@ -291,6 +291,33 @@ class Perievent_Plots:
         corr = cov / den
         return corr  # shape (n,)
 
+    def _compute_cross_correlation(self, perievent_signals_A, perievent_signals_B):
+        assert (
+            perievent_signals_A.shape == perievent_signals_B.shape
+        ), "A and B must have the same shape."
+
+        event_count, sig_len = perievent_signals_A.shape
+        max_lag_time = 0.2 * (self.nsec_before + self.nsec_after)
+        lags = correlation_lags(sig_len, sig_len, mode="full")
+        corr_start_ind = np.ceil(lags.size // 2 - max_lag_time * self.fp_freq).astype(
+            int
+        )
+        corr_end_ind = np.floor(lags.size // 2 + max_lag_time * self.fp_freq).astype(
+            int
+        )
+        lags_clipped = lags[corr_start_ind:corr_end_ind]
+        lags_time = np.linspace(-max_lag_time, max_lag_time, len(lags_clipped))
+        cross_correlations_clipped = []
+        for j in range(event_count):
+            x, y = perievent_signals_A[j], perievent_signals_B[j]
+            corr_cross = correlate(x, y)
+            corr_x = correlate(x, x, mode="valid")
+            corr_y = correlate(y, y, mode="valid")
+            corr_normalized = corr_cross / np.sqrt(corr_x * corr_y)
+            corr_normalized_clipped = corr_normalized[corr_start_ind:corr_end_ind]
+            cross_correlations_clipped.append(corr_normalized_clipped)
+        return lags_time, np.array(cross_correlations_clipped)
+
     def make_perievent_plots(
         self,
         perievent_signals_dict,
@@ -420,18 +447,28 @@ class Perievent_Plots:
         title=None,
         figure_save_path=None,
     ):
-        fig, ax = plt.subplots(figsize=(4, 3))
-        corr = self._compute_correlation(
+
+        lags_time, cross_corr = self._compute_cross_correlation(
             perievent_signals_A,
             perievent_signals_B,
         )
-        self.plot_distribution(
-            corr,
-            ax=ax,
-            data_type="Correlation",
-            ylim=(-1, 1),
-            title=title,
+        mean_corr = cross_corr.mean(axis=0)
+        se_corr = cross_corr.std(axis=0) / np.sqrt(cross_corr.shape[0])
+        fig, ax = plt.subplots(figsize=(4, 3))
+        ax.plot(lags_time, mean_corr, color="k", lw=2)
+        ax.fill_between(
+            lags_time,
+            mean_corr - se_corr,
+            mean_corr + se_corr,
+            color="gray",
+            alpha=0.3,
+            # label='± SEM'
         )
+        ax.axvline(0, color="gray", ls="--", lw=1)
+        ax.set_xlabel("Lag (s)")
+        ax.set_ylabel("Correlation")
+        ax.set_ylim(-1, 1)
+        ax.set_title("Mean Cross Correlation")
         plt.tight_layout()
 
         if figure_save_path is not None:
@@ -627,11 +664,10 @@ if __name__ == "__main__":
         event_count_records = event_utils.count_events(event_time_dict)
         event_names = list(event_time_dict.keys())
 
-    """
     perievent_labels = event_utils.make_perievent_labels(event_file=event_file)
     event_time_dict = event_utils.read_events(event_file)
-    #perievent_labels = np.zeros(duration)
-    #perievent_labels[:] = np.nan
+    # perievent_labels = np.zeros(duration)
+    # perievent_labels[:] = np.nan
     perievent_indices_dict = {}
     analyses = Analyses(fp_freq=fp_freq, baseline_window=nsec_before)
 
@@ -667,13 +703,14 @@ if __name__ == "__main__":
             # figure_save_path=figure_save_path
         )
         # %%
-
+        lags_time, cross_corr = plots._compute_cross_correlation(
+            perievent_signals_normalized_array[0], perievent_signals_normalized_array[1]
+        )
         plots.plot_correlation(
             perievent_signals_normalized_array[0], perievent_signals_normalized_array[1]
         )
-        plots.write_spreadsheet(perievent_analysis_dict, spreadsheet_save_path)
+        # plots.write_spreadsheet(perievent_analysis_dict, spreadsheet_save_path)
 
-        perievent_indices_dict[event] = perievent_indices
-        #perievent_time = perievent_windows.flatten()
-        #perievent_labels[perievent_time] = i
-    """
+        # perievent_indices_dict[event] = perievent_indices
+        # perievent_time = perievent_windows.flatten()
+        # perievent_labels[perievent_time] = i

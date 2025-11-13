@@ -533,7 +533,6 @@ def create_visualization(ready):
         cache.set("event_time_dict", event_time_dict)
         event_count_records = event_utils.count_events(event_time_dict)
         event_names = list(event_time_dict.keys())
-        print(f"EVENT_NAMES: {event_names}")
         analysis_page_content = components.fill_analysis_page(
             event_names, event_count_records, signal_names
         )
