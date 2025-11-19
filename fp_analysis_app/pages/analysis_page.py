@@ -7,7 +7,7 @@ Created on Wed Jul 16 13:54:32 2025
 
 from dash import html, register_page
 
-from fp_analysis_app.components import analysis_page
+from fp_analysis_app.components_dev import analysis_page
 
 register_page(
     __name__,

@@ -19,7 +19,7 @@ datas=[
 ]
 
 a = Analysis(
-    ['main.py'],
+    ['run_desktop_app.py'],
     pathex=['C:\\Users\\yzhao\\miniconda3\\envs\\fiber_photometry\\lib\\site-packages'],
     binaries=[],
     datas=datas,

@@ -5,8 +5,6 @@ Created on Fri Oct 20 16:27:03 2023
 @author: yzhao
 """
 
-import dash_uploader as du
-import dash_bootstrap_components as dbc
 from dash import dcc, html, page_container, dash_table
 from dash_extensions import EventListener
 from dash_extensions.pages import setup_page_components
@@ -16,7 +14,7 @@ from dash_extensions.pages import setup_page_components
 
 upload_box_style = {
     "fontSize": "18px",
-    "width": "15%",
+    "width": "20%",
     "height": "auto",
     "minHeight": "auto",
     "lineHeight": "auto",
@@ -29,42 +27,13 @@ upload_box_style = {
     "padding": "0px",
 }
 
-# set up dash uploader
-vis_upload_box = du.Upload(
-    id="vis-data-upload",
-    text="Click here to select File",
-    text_completed="Completed loading ",
-    cancel_button=True,
-    filetypes=["mat"],
-    upload_id="",
-    default_style=upload_box_style,
+
+vis_upload_button = html.Button(
+    "Click here to select File",
+    id="vis-data-upload-button",
+    style=upload_box_style,
 )
 
-
-annotation_upload_box_style = {
-    "fontSize": "18px",
-    "width": "100%",
-    "height": "auto",
-    "minHeight": "auto",
-    "lineHeight": "auto",
-    "borderWidth": "1px",
-    "borderStyle": "none",
-    "textAlign": "center",
-    "margin": "5px",  # spacing between the upload box and the div it's in
-    "borderRadius": "10px",  # rounded corner
-    "backgroundColor": "lightgrey",
-}
-
-# set up dash uploader
-annotation_upload_box = du.Upload(
-    id="annotation-upload",
-    text="Select Annotation File",
-    text_completed="Completed loading ",
-    cancel_button=True,
-    filetypes=["xlsx"],
-    upload_id="",
-    default_style=annotation_upload_box_style,
-)
 
 save_div = html.Div(
     style={
@@ -101,7 +70,7 @@ home_page = html.Div(
         html.Div(
             id="upload-container",
             style={"marginLeft": "15px", "marginTop": "15px"},
-            children=[vis_upload_box],
+            children=[vis_upload_button],
         ),
         html.Div(id="data-upload-message", style={"marginLeft": "10px"}),
         html.Div(id="visualization-container", style={"marginLeft": "10px"}),
@@ -109,13 +78,13 @@ home_page = html.Div(
             style={"display": "flex", "marginLeft": "15px"},
             children=[
                 save_div,
-                html.Div(id="annotation-message"),
+                # html.Div(id="annotation-message"),
                 html.Div(id="debug-message"),
             ],
         ),
         dcc.Store(id="visualization-ready-store"),
         dcc.Store(id="annotation-uploaded-store"),
-        dcc.Store(id="net-annotation-count-store"),
+        # dcc.Store(id="net-annotation-count-store"),
         dcc.Store(id="num-signals-store"),
     ],
 )
@@ -190,18 +159,6 @@ graph = dcc.Graph(
     },
 )
 
-video_modal = dbc.Modal(
-    [
-        dbc.ModalHeader(dbc.ModalTitle("Video")),
-        dbc.ModalBody(html.Div(id="video-container")),
-        dbc.ModalFooter(html.Div(id="video-message")),
-    ],
-    id="video-modal",
-    size="lg",
-    is_open=False,
-    backdrop="static",  # the user must clicks the "x" to exit
-    centered=True,
-)
 
 backend_div = html.Div(
     children=[
@@ -228,7 +185,6 @@ def make_visualization_div(graph):
     visualization_div = html.Div(
         children=[
             utility_div,
-            video_modal,
             html.Div(
                 children=[graph],
                 style={"marginTop": "1px", "marginLeft": "20px", "marginRight": "20px"},
@@ -245,12 +201,8 @@ class Components:
         self.home_page = home_page
         self.graph = graph
         self.make_visualization_div = make_visualization_div
-        self.vis_upload_box = vis_upload_box
-        self.annotation_upload_box = annotation_upload_box
-
-    def configure_du(self, app, folder):
-        du.configure_upload(app, folder, use_upload_id=True)
-        return du
+        self.vis_upload_button = vis_upload_button
+        # self.annotation_upload_box = annotation_upload_box
 
     def _build_event_tab(self, event_name: str):
         """A fixed template of stats/plots for one event."""
