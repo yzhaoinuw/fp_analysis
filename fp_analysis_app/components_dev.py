@@ -29,7 +29,7 @@ upload_box_style = {
 
 
 vis_upload_button = html.Button(
-    "Click here to select File",
+    "Click here to select a mat File",
     id="vis-data-upload-button",
     style=upload_box_style,
 )

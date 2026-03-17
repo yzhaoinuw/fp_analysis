@@ -13,14 +13,14 @@ from fp_analysis_app import VERSION
 
 
 datas=[
-    ('C:\\Users\\yzhao\\miniconda3\\envs\\fiber_photometry\\lib\\site-packages\\dash_extensions', 'dash_extensions'),
+    ('C:\\Users\\yzhao\\miniconda3\\envs\\fp_analysis_dist\\lib\\site-packages\\dash_extensions', 'dash_extensions'),
     ('C:\\Users\\yzhao\\python_projects\\fp_analysis\\fp_analysis_app\\assets', 'assets'),
-    ('C:\\Users\\yzhao\\miniconda3\\envs\\fiber_photometry\\lib\\site-packages\\scipy', 'scipy'),
+    ('C:\\Users\\yzhao\\miniconda3\\envs\\fp_analysis_dist\\lib\\site-packages\\scipy', 'scipy'),
 ]
 
 a = Analysis(
     ['run_desktop_app.py'],
-    pathex=['C:\\Users\\yzhao\\miniconda3\\envs\\fiber_photometry\\lib\\site-packages'],
+    pathex=[],
     binaries=[],
     datas=datas,
     hiddenimports=[],
