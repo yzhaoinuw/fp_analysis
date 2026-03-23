@@ -501,6 +501,127 @@ class Perievent_Plots:
             df.index.name = index_name
             df.to_excel(save_path, sheet_name=biosignal_name)
 
+    def write_mean_perievent_sheet(
+        self,
+        writer,
+        perievent_signals_dict,
+        sheet_name,
+    ):
+        """
+        Write one sheet for one event.
+        First column is time_s.
+        Additional columns are mean perievent signals for each biosignal.
+        """
+        first_signal = next(iter(perievent_signals_dict.values()))
+        seg_len = first_signal.shape[1]
+    
+        # exact sample-based time axis
+        #time_s = np.arange(seg_len) / self.fp_freq
+        time_s = np.arange(seg_len) / self.fp_freq - self.nsec_before
+    
+        data = {"time_s": time_s}
+    
+        for biosignal_name, perievent_signals in perievent_signals_dict.items():
+            data[f"{biosignal_name}_mean"] = np.mean(perievent_signals, axis=0)
+    
+        df = pd.DataFrame(data)
+        df.to_excel(writer, sheet_name=sheet_name[:31], index=False)
+
+    def _make_centered_time_axis(self, n_samples):
+        return np.arange(n_samples) / self.fp_freq - self.nsec_before
+
+    @staticmethod
+    def _bin_average_1d(values, factor):
+        values = np.asarray(values, dtype=float)
+        if factor <= 1:
+            return values
+
+        trimmed_len = values.size - (values.size % factor)
+        if trimmed_len == 0:
+            return np.array([np.nanmean(values)], dtype=float)
+
+        trimmed = values[:trimmed_len]
+        return trimmed.reshape(-1, factor).mean(axis=1)
+
+    def build_mean_trace_export_df(
+        self,
+        perievent_signals,
+        subject_id,
+        downsample_factor=100,
+    ):
+        mean_trace = np.mean(perievent_signals, axis=0)
+        time_s = self._make_centered_time_axis(mean_trace.size)
+        time_s_downsampled = self._bin_average_1d(time_s, downsample_factor)
+        trace_downsampled = self._bin_average_1d(mean_trace, downsample_factor)
+        return pd.DataFrame(
+            {
+                "time_s": time_s_downsampled,
+                subject_id: trace_downsampled,
+            }
+        )
+
+    @staticmethod
+    def export_mean_trace_workbook(
+        workbook_save_path,
+        event_sheet_dfs,
+        time_tolerance=1e-9,
+    ):
+        workbook_save_path = Path(workbook_save_path)
+        workbook_save_path.parent.mkdir(parents=True, exist_ok=True)
+        sheets_to_write = {}
+
+        if workbook_save_path.exists():
+            existing_workbook = pd.read_excel(
+                workbook_save_path,
+                sheet_name=None,
+                engine="openpyxl",
+            )
+            sheets_to_write.update(existing_workbook)
+
+        for sheet_name, new_df in event_sheet_dfs.items():
+            safe_sheet_name = str(sheet_name)[:31]
+            existing_df = sheets_to_write.get(safe_sheet_name)
+            if existing_df is None:
+                sheets_to_write[safe_sheet_name] = new_df
+                continue
+
+            if "time_s" not in existing_df.columns:
+                raise ValueError(
+                    f"Sheet '{safe_sheet_name}' in '{workbook_save_path.name}' is "
+                    "missing the required 'time_s' column."
+                )
+
+            if len(existing_df) != len(new_df):
+                raise ValueError(
+                    f"Sheet '{safe_sheet_name}' in '{workbook_save_path.name}' has "
+                    "an incompatible row count."
+                )
+
+            if not np.allclose(
+                existing_df["time_s"].to_numpy(dtype=float),
+                new_df["time_s"].to_numpy(dtype=float),
+                atol=time_tolerance,
+                rtol=0,
+                equal_nan=True,
+            ):
+                raise ValueError(
+                    f"Sheet '{safe_sheet_name}' in '{workbook_save_path.name}' has "
+                    "incompatible time_s values."
+                )
+
+            subject_columns = [c for c in new_df.columns if c != "time_s"]
+            merged_df = existing_df.copy()
+            for subject_col in subject_columns:
+                merged_df[subject_col] = new_df[subject_col].to_numpy()
+            sheets_to_write[safe_sheet_name] = merged_df
+
+        with pd.ExcelWriter(
+            workbook_save_path,
+            engine="openpyxl",
+            mode="w",
+        ) as writer:
+            for sheet_name, df in sheets_to_write.items():
+                df.to_excel(writer, sheet_name=sheet_name, index=False)
 
 class Analyses:
     def __init__(self, fp_freq, baseline_window=30):

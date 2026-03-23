@@ -164,6 +164,8 @@ def make_analysis_plots(
     perievent_signals_fig_paths = {}
     analyses_fig_paths = {}
     corr_fig_paths = {}
+    subject_id = mat_name
+    signal_event_exports = {sig: {} for sig in selected_signals}
 
     for i, event in enumerate(sorted(event_time_dict.keys())):
 
@@ -185,12 +187,17 @@ def make_analysis_plots(
                 result["perievent_signals_normalized"]
             )
 
-        # Plot/save
         plots = Perievent_Plots(
             fp_freq, event, nsec_before=baseline_window, nsec_after=analysis_window
         )
 
-        # NOTE: use distinct paths for the two figures (you were reusing the same var)
+        for sig, perievent_signals in perievent_signals_dict.items():
+            signal_event_exports[sig][event] = plots.build_mean_trace_export_df(
+                perievent_signals=perievent_signals,
+                subject_id=subject_id,
+                downsample_factor=100,
+            )
+
         perievent_signals_fig_save_path = (
             FIGURE_DIR
             / f"{mat_name}_{event}_bw{baseline_window}_aw{analysis_window}.png"
@@ -199,10 +206,7 @@ def make_analysis_plots(
             FIGURE_DIR
             / f"{mat_name}_{event}_analyses_bw{baseline_window}_aw{analysis_window}.png"
         )
-        spreadsheet_save_path = (
-            SPREADSHEET_DIR
-            / f"{mat_name}_{event}_bw{baseline_window}_aw{analysis_window}.xlsx"
-        )
+
         perievent_signals_fig_paths[event] = os.path.join(
             "/assets/figures/",
             f"{mat_name}_{event}_bw{baseline_window}_aw{analysis_window}.png",
@@ -211,6 +215,7 @@ def make_analysis_plots(
             "/assets/figures/",
             f"{mat_name}_{event}_analyses_bw{baseline_window}_aw{analysis_window}.png",
         )
+
         plots.make_perievent_plots(
             perievent_signals_dict, figure_save_path=perievent_signals_fig_save_path
         )
@@ -229,11 +234,21 @@ def make_analysis_plots(
                 perievent_signals_normalized_array[1],
                 figure_save_path=corr_path,
             )
+
         corr_fig_paths[event] = os.path.join(
             "/assets/figures/",
             f"{mat_name}_{event}_correlation_bw{baseline_window}_aw{analysis_window}.png",
         )
-        plots.write_spreadsheet(perievent_analysis_dict, spreadsheet_save_path)
+
+    for sig, event_sheet_dfs in signal_event_exports.items():
+        workbook_save_path = (
+            SPREADSHEET_DIR / f"{sig}_bw{baseline_window}_aw{analysis_window}.xlsx"
+        )
+        Perievent_Plots.export_mean_trace_workbook(
+            workbook_save_path=workbook_save_path,
+            event_sheet_dfs=event_sheet_dfs,
+        )
+    
     return (
         perievent_signals_fig_paths,
         analyses_fig_paths,
@@ -379,10 +394,6 @@ def show_analysis_results(
 
     for file in FIGURE_DIR.iterdir():
         if file.is_file() and file.suffix == ".png":
-            file.unlink()
-
-    for file in SPREADSHEET_DIR.iterdir():
-        if file.is_file() and file.suffix == ".xlsx":
             file.unlink()
 
     # annotation_filepath = cache.get("annotation_filepath")
