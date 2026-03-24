@@ -561,6 +561,17 @@ class Perievent_Plots:
         )
 
     @staticmethod
+    def build_auc_export_df(auc_values, subject_id):
+        auc_values = np.asarray(auc_values, dtype=float)
+        event_index = np.arange(1, auc_values.size + 1, dtype=int)
+        return pd.DataFrame(
+            {
+                "event_index": event_index,
+                subject_id: auc_values,
+            }
+        )
+
+    @staticmethod
     def export_mean_trace_workbook(
         workbook_save_path,
         event_sheet_dfs,
@@ -614,6 +625,65 @@ class Perievent_Plots:
             for subject_col in subject_columns:
                 merged_df[subject_col] = new_df[subject_col].to_numpy()
             sheets_to_write[safe_sheet_name] = merged_df
+
+        with pd.ExcelWriter(
+            workbook_save_path,
+            engine="openpyxl",
+            mode="w",
+        ) as writer:
+            for sheet_name, df in sheets_to_write.items():
+                df.to_excel(writer, sheet_name=sheet_name, index=False)
+
+    @staticmethod
+    def export_occurrence_value_workbook(
+        workbook_save_path,
+        event_sheet_dfs,
+        index_column="event_index",
+    ):
+        workbook_save_path = Path(workbook_save_path)
+        workbook_save_path.parent.mkdir(parents=True, exist_ok=True)
+        sheets_to_write = {}
+
+        if workbook_save_path.exists():
+            existing_workbook = pd.read_excel(
+                workbook_save_path,
+                sheet_name=None,
+                engine="openpyxl",
+            )
+            sheets_to_write.update(existing_workbook)
+
+        for sheet_name, new_df in event_sheet_dfs.items():
+            safe_sheet_name = str(sheet_name)[:31]
+            if index_column not in new_df.columns:
+                raise ValueError(
+                    f"Sheet '{safe_sheet_name}' is missing the required "
+                    f"'{index_column}' column."
+                )
+
+            existing_df = sheets_to_write.get(safe_sheet_name)
+            if existing_df is None:
+                sheets_to_write[safe_sheet_name] = new_df.sort_values(
+                    index_column
+                ).reset_index(drop=True)
+                continue
+
+            if index_column not in existing_df.columns:
+                raise ValueError(
+                    f"Sheet '{safe_sheet_name}' in '{workbook_save_path.name}' is "
+                    f"missing the required '{index_column}' column."
+                )
+
+            existing_indexed = existing_df.set_index(index_column)
+            new_indexed = new_df.set_index(index_column)
+            merged_index = existing_indexed.index.union(new_indexed.index).sort_values()
+            merged_df = existing_indexed.reindex(merged_index)
+
+            for subject_col in new_indexed.columns:
+                merged_df[subject_col] = new_indexed.reindex(merged_index)[
+                    subject_col
+                ].to_numpy()
+
+            sheets_to_write[safe_sheet_name] = merged_df.reset_index()
 
         with pd.ExcelWriter(
             workbook_save_path,

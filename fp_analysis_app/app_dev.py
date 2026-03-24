@@ -165,7 +165,43 @@ def make_analysis_plots(
     analyses_fig_paths = {}
     corr_fig_paths = {}
     subject_id = mat_name
-    signal_event_exports = {sig: {} for sig in selected_signals}
+
+    def build_mean_trace_export(plots, perievent_signals, result):
+        return plots.build_mean_trace_export_df(
+            perievent_signals=perievent_signals,
+            subject_id=subject_id,
+            downsample_factor=100,
+        )
+
+    def build_auc_export(plots, perievent_signals, result):
+        return plots.build_auc_export_df(
+            auc_values=result["reaction_signal_auc"],
+            subject_id=subject_id,
+        )
+
+    def get_mean_trace_workbook_name(sig):
+        return f"{sig}_bw{baseline_window}_aw{analysis_window}.xlsx"
+
+    def get_auc_workbook_name(sig):
+        return f"{sig}_auc_bw{baseline_window}_aw{analysis_window}.xlsx"
+
+    export_specs = {
+        "mean_trace": {
+            "build_df": build_mean_trace_export,
+            "write_workbook": Perievent_Plots.export_mean_trace_workbook,
+            "workbook_name": get_mean_trace_workbook_name,
+        },
+        "auc": {
+            "build_df": build_auc_export,
+            "write_workbook": Perievent_Plots.export_occurrence_value_workbook,
+            "workbook_name": get_auc_workbook_name,
+            "write_kwargs": {"index_column": "event_index"},
+        },
+    }
+    signal_event_exports = {
+        export_name: {sig: {} for sig in selected_signals}
+        for export_name in export_specs
+    }
 
     for i, event in enumerate(sorted(event_time_dict.keys())):
 
@@ -191,12 +227,13 @@ def make_analysis_plots(
             fp_freq, event, nsec_before=baseline_window, nsec_after=analysis_window
         )
 
-        for sig, perievent_signals in perievent_signals_dict.items():
-            signal_event_exports[sig][event] = plots.build_mean_trace_export_df(
-                perievent_signals=perievent_signals,
-                subject_id=subject_id,
-                downsample_factor=100,
-            )
+        for sig in selected_signals:
+            perievent_signals = perievent_signals_dict[sig]
+            result = perievent_analysis_dict[sig]
+            for export_name, export_spec in export_specs.items():
+                signal_event_exports[export_name][sig][event] = export_spec[
+                    "build_df"
+                ](plots, perievent_signals, result)
 
         perievent_signals_fig_save_path = (
             FIGURE_DIR
@@ -240,14 +277,14 @@ def make_analysis_plots(
             f"{mat_name}_{event}_correlation_bw{baseline_window}_aw{analysis_window}.png",
         )
 
-    for sig, event_sheet_dfs in signal_event_exports.items():
-        workbook_save_path = (
-            SPREADSHEET_DIR / f"{sig}_bw{baseline_window}_aw{analysis_window}.xlsx"
-        )
-        Perievent_Plots.export_mean_trace_workbook(
-            workbook_save_path=workbook_save_path,
-            event_sheet_dfs=event_sheet_dfs,
-        )
+    for export_name, export_spec in export_specs.items():
+        for sig, event_sheet_dfs in signal_event_exports[export_name].items():
+            workbook_save_path = SPREADSHEET_DIR / export_spec["workbook_name"](sig)
+            export_spec["write_workbook"](
+                workbook_save_path=workbook_save_path,
+                event_sheet_dfs=event_sheet_dfs,
+                **export_spec.get("write_kwargs", {}),
+            )
     
     return (
         perievent_signals_fig_paths,

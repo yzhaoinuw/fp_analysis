@@ -49,10 +49,18 @@ Key classes / functions:
 Current behavior differs by app entrypoint:
 
 - `app_dev.py`
-  - Creates one workbook per analysis run
-  - File pattern: `<mat_name>_bw<baseline>_aw<analysis>.xlsx`
-  - Writes one sheet per event using `write_mean_perievent_sheet()`
   - This is the spreadsheet path most relevant to the current desktop app
+  - Export flow is now split into two phases:
+    1. compute/store per-signal perievent results for each event
+    2. build/write spreadsheet exports through an `export_specs` registry in `make_analysis_plots()`
+  - Current export registry entries:
+    - mean trace workbook per signal: `<signal>_bw<baseline>_aw<analysis>.xlsx`
+    - AUC workbook per signal: `<signal>_auc_bw<baseline>_aw<analysis>.xlsx`
+  - In both workbook types:
+    - each event type gets its own sheet
+    - each subject appends as a new column
+  - Mean trace sheets use `time_s` as the compatibility key and require matching downsampled time axes
+  - AUC sheets use `event_index` as the row key so subjects with different event counts can still append cleanly
 
 - `app.py`
   - Creates one workbook per event
@@ -105,3 +113,4 @@ If the next task is about spreadsheet output:
 - Inspect `fp_analysis_app/app_dev.py` first for desktop export behavior
 - Inspect `fp_analysis_app/event_analysis.py` for the actual workbook/sheet writing logic
 - Compare with `fp_analysis_app/app.py` if behavior seems inconsistent or partially migrated
+- For new export types in the desktop app, prefer adding a new entry to the `export_specs` registry in `app_dev.py` instead of expanding the analysis loop inline
