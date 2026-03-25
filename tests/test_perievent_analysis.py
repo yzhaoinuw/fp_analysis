@@ -257,6 +257,102 @@ class TestPerieventAnalysisWithF268(unittest.TestCase):
         )
         self.assertTrue(exported["F268_short"].iloc[10:].isna().all())
 
+    def test_first_peak_time_workbook_aligns_event_index_when_subjects_differ(self):
+        _, _, perievent_signals = self._get_perievent_signals("wake_sws", "NE2m")
+        result = self.analyses.get_perievent_analyses(perievent_signals)
+        plots = Perievent_Plots(
+            self.fp_freq,
+            "wake_sws",
+            nsec_before=BASELINE_WINDOW,
+            nsec_after=ANALYSIS_WINDOW,
+        )
+        f268_df = plots.build_occurrence_value_export_df(
+            result["first_peak_time"],
+            subject_id="F268",
+        )
+        short_df = plots.build_occurrence_value_export_df(
+            result["first_peak_time"][:10],
+            subject_id="F268_short",
+        )
+
+        with TemporaryDirectory() as tmpdir:
+            workbook_path = Path(tmpdir) / "NE2m_first_peak_time_bw30_aw60.xlsx"
+            Perievent_Plots.export_occurrence_value_workbook(
+                workbook_save_path=workbook_path,
+                event_sheet_dfs={"wake_sws": f268_df},
+                index_column="event_index",
+            )
+            Perievent_Plots.export_occurrence_value_workbook(
+                workbook_save_path=workbook_path,
+                event_sheet_dfs={"wake_sws": short_df},
+                index_column="event_index",
+            )
+
+            exported = pd.read_excel(
+                workbook_path,
+                sheet_name="wake_sws",
+                engine="openpyxl",
+            )
+
+        self.assertEqual(["event_index", "F268", "F268_short"], exported.columns.tolist())
+        self.assertEqual(list(range(1, 16)), exported["event_index"].tolist())
+        np.testing.assert_allclose(
+            exported["F268"].head(3),
+            np.array([np.nan, np.nan, np.nan]),
+            atol=1e-6,
+            equal_nan=True,
+        )
+        self.assertTrue(exported["F268_short"].iloc[10:].isna().all())
+
+    def test_decay_time_workbook_aligns_event_index_when_subjects_differ(self):
+        _, _, perievent_signals = self._get_perievent_signals("wake_sws", "NE2m")
+        result = self.analyses.get_perievent_analyses(perievent_signals)
+        plots = Perievent_Plots(
+            self.fp_freq,
+            "wake_sws",
+            nsec_before=BASELINE_WINDOW,
+            nsec_after=ANALYSIS_WINDOW,
+        )
+        f268_df = plots.build_occurrence_value_export_df(
+            result["decay_time"],
+            subject_id="F268",
+        )
+        short_df = plots.build_occurrence_value_export_df(
+            result["decay_time"][:10],
+            subject_id="F268_short",
+        )
+
+        with TemporaryDirectory() as tmpdir:
+            workbook_path = Path(tmpdir) / "NE2m_decay_time_bw30_aw60.xlsx"
+            Perievent_Plots.export_occurrence_value_workbook(
+                workbook_save_path=workbook_path,
+                event_sheet_dfs={"wake_sws": f268_df},
+                index_column="event_index",
+            )
+            Perievent_Plots.export_occurrence_value_workbook(
+                workbook_save_path=workbook_path,
+                event_sheet_dfs={"wake_sws": short_df},
+                index_column="event_index",
+            )
+
+            exported = pd.read_excel(
+                workbook_path,
+                sheet_name="wake_sws",
+                engine="openpyxl",
+            )
+
+        self.assertEqual(["event_index", "F268", "F268_short"], exported.columns.tolist())
+        self.assertEqual(list(range(1, 16)), exported["event_index"].tolist())
+        np.testing.assert_allclose(
+            exported["F268"].head(3),
+            np.array([np.nan, np.nan, np.nan]),
+            atol=1e-6,
+            equal_nan=True,
+        )
+        self.assertTrue(exported["F268"].iloc[:6].isna().all())
+        self.assertAlmostEqual(exported["F268"].iloc[6], 59.998862, places=6)
+        self.assertTrue(exported["F268_short"].iloc[10:].isna().all())
+
 
 if __name__ == "__main__":
     unittest.main()
