@@ -561,14 +561,21 @@ class Perievent_Plots:
         )
 
     @staticmethod
-    def build_auc_export_df(auc_values, subject_id):
-        auc_values = np.asarray(auc_values, dtype=float)
-        event_index = np.arange(1, auc_values.size + 1, dtype=int)
+    def build_occurrence_value_export_df(values, subject_id):
+        values = np.asarray(values, dtype=float)
+        event_index = np.arange(1, values.size + 1, dtype=int)
         return pd.DataFrame(
             {
                 "event_index": event_index,
-                subject_id: auc_values,
+                subject_id: values,
             }
+        )
+
+    @staticmethod
+    def build_auc_export_df(auc_values, subject_id):
+        return Perievent_Plots.build_occurrence_value_export_df(
+            values=auc_values,
+            subject_id=subject_id,
         )
 
     @staticmethod

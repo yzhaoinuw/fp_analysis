@@ -179,11 +179,38 @@ def make_analysis_plots(
             subject_id=subject_id,
         )
 
+    def build_max_peak_magnitude_export(plots, perievent_signals, result):
+        return plots.build_occurrence_value_export_df(
+            values=result["max_peak_magnitude"],
+            subject_id=subject_id,
+        )
+
+    def build_first_peak_time_export(plots, perievent_signals, result):
+        return plots.build_occurrence_value_export_df(
+            values=result["first_peak_time"],
+            subject_id=subject_id,
+        )
+
+    def build_decay_time_export(plots, perievent_signals, result):
+        return plots.build_occurrence_value_export_df(
+            values=result["decay_time"],
+            subject_id=subject_id,
+        )
+
     def get_mean_trace_workbook_name(sig):
         return f"{sig}_bw{baseline_window}_aw{analysis_window}.xlsx"
 
     def get_auc_workbook_name(sig):
         return f"{sig}_auc_bw{baseline_window}_aw{analysis_window}.xlsx"
+
+    def get_max_peak_magnitude_workbook_name(sig):
+        return f"{sig}_max_peak_magnitude_bw{baseline_window}_aw{analysis_window}.xlsx"
+
+    def get_first_peak_time_workbook_name(sig):
+        return f"{sig}_first_peak_time_bw{baseline_window}_aw{analysis_window}.xlsx"
+
+    def get_decay_time_workbook_name(sig):
+        return f"{sig}_decay_time_bw{baseline_window}_aw{analysis_window}.xlsx"
 
     export_specs = {
         "mean_trace": {
@@ -195,6 +222,24 @@ def make_analysis_plots(
             "build_df": build_auc_export,
             "write_workbook": Perievent_Plots.export_occurrence_value_workbook,
             "workbook_name": get_auc_workbook_name,
+            "write_kwargs": {"index_column": "event_index"},
+        },
+        "max_peak_magnitude": {
+            "build_df": build_max_peak_magnitude_export,
+            "write_workbook": Perievent_Plots.export_occurrence_value_workbook,
+            "workbook_name": get_max_peak_magnitude_workbook_name,
+            "write_kwargs": {"index_column": "event_index"},
+        },
+        "first_peak_time": {
+            "build_df": build_first_peak_time_export,
+            "write_workbook": Perievent_Plots.export_occurrence_value_workbook,
+            "workbook_name": get_first_peak_time_workbook_name,
+            "write_kwargs": {"index_column": "event_index"},
+        },
+        "decay_time": {
+            "build_df": build_decay_time_export,
+            "write_workbook": Perievent_Plots.export_occurrence_value_workbook,
+            "workbook_name": get_decay_time_workbook_name,
             "write_kwargs": {"index_column": "event_index"},
         },
     }

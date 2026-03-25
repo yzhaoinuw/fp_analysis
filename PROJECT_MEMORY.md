@@ -56,11 +56,12 @@ Current behavior differs by app entrypoint:
   - Current export registry entries:
     - mean trace workbook per signal: `<signal>_bw<baseline>_aw<analysis>.xlsx`
     - AUC workbook per signal: `<signal>_auc_bw<baseline>_aw<analysis>.xlsx`
+    - max peak magnitude workbook per signal: `<signal>_max_peak_magnitude_bw<baseline>_aw<analysis>.xlsx`
   - In both workbook types:
     - each event type gets its own sheet
     - each subject appends as a new column
   - Mean trace sheets use `time_s` as the compatibility key and require matching downsampled time axes
-  - AUC sheets use `event_index` as the row key so subjects with different event counts can still append cleanly
+  - AUC and max peak magnitude sheets use `event_index` as the row key so subjects with different event counts can still append cleanly
 
 - `app.py`
   - Creates one workbook per event
@@ -101,9 +102,20 @@ These are useful for validating spreadsheet structure after changes.
 
 ## Tests
 
-I did not find an automated `tests/` directory or spreadsheet-specific tests during the initial repo walkthrough.
+- Perievent export coverage lives in `tests/test_perievent_analysis.py`
+- That test file now covers:
+  - event filtering / extraction against the `F268` fixture
+  - AUC reference values
+  - mean trace workbook append behavior
+  - occurrence-value workbook alignment for AUC and max peak magnitude
 
-For now, spreadsheet work will likely need lightweight manual verification against sample `.mat` and `.xlsx` files.
+## Local Execution Note
+
+- For this repo, use the `fiber_photometry` conda env interpreter when running tests from Codex:
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe`
+- A known-good verification command is:
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis`
+- The base Miniconda Python and the `sleep_scoring_dist` env were missing dependencies needed for this test path during the last run.
 
 ## Recommended Starting Points For Future Work
 
