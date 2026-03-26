@@ -496,13 +496,37 @@ class Perievent_Plots:
             # label='± SEM'
         )
         ax.axvline(0, color="gray", ls="--", lw=1)
+        peak_idx = int(np.nanargmax(np.abs(mean_corr)))
+        peak_lag = float(lags_time[peak_idx])
+        ax.axvline(peak_lag, color="red", ls="--", lw=1)
+        ax.text(
+            peak_lag,
+            -0.92,
+            f"{peak_lag:.2f} s",
+            color="red",
+            fontsize=8,
+            ha="center",
+            va="bottom",
+            bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.7, "pad": 1.5},
+        )
+        lag_min = float(np.nanmin(lags_time))
+        lag_max = float(np.nanmax(lags_time))
+        lag_ticks = np.unique(np.rint(np.linspace(lag_min, lag_max, 7)).astype(int))
+        lag_ticks = np.unique(
+            np.concatenate(
+                (
+                    lag_ticks,
+                    [int(np.rint(lag_min)), 0, int(np.rint(lag_max))],
+                )
+            )
+        )
+        ax.set_xticks(lag_ticks)
         xlabel = "Lag (s)"
         if signal_names is not None:
             signal_a, signal_b = signal_names
             xlabel = (
                 "Lag (s)\n"
-                f"Positive lag: {signal_a} leads {signal_b}; "
-                f"Negative lag: {signal_b} leads {signal_a}"
+                f"Positive lag: {signal_a} leads {signal_b}"
             )
         ax.set_xlabel(xlabel)
         ax.set_ylabel("Correlation")

@@ -109,6 +109,19 @@ These are useful for validating spreadsheet structure after changes.
   - mean trace workbook append behavior
   - occurrence-value workbook alignment for AUC and max peak magnitude
 
+## Style Guidelines
+
+- Commit messages should use:
+  - a short title line
+  - a short body with flat bullet points for additional requested changes when a commit contains multiple user-requested updates
+- Commit message bullets should describe high-level added/changed behavior, not implementation details
+- Prefer bullets like:
+  - export mean cross-correlation spreadsheets for two-signal analyses
+  - clarify positive and negative lag meaning in the cross-correlation figure
+- Avoid bullets like:
+  - reuse one summarized path for plot and export
+  - refactor helper functions
+
 ## Local Execution Note
 
 - For this repo, use the `fiber_photometry` conda env interpreter when running tests from Codex:
