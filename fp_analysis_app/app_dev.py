@@ -56,6 +56,7 @@ FIGURE_DIR = Path(__file__).parent / "assets" / "figures"
 FIGURE_DIR.mkdir(parents=True, exist_ok=True)
 SPREADSHEET_DIR = Path(__file__).parent / "assets" / "spreadsheets"
 SPREADSHEET_DIR.mkdir(parents=True, exist_ok=True)
+EXPORT_DOWNSAMPLE_FACTOR = 100
 
 components = Components()
 app.layout = html.Div(
@@ -165,12 +166,13 @@ def make_analysis_plots(
     analyses_fig_paths = {}
     corr_fig_paths = {}
     subject_id = mat_name
+    cross_correlation_event_exports = {}
 
     def build_mean_trace_export(plots, perievent_signals, result):
         return plots.build_mean_trace_export_df(
             perievent_signals=perievent_signals,
             subject_id=subject_id,
-            downsample_factor=100,
+            downsample_factor=EXPORT_DOWNSAMPLE_FACTOR,
         )
 
     def build_auc_export(plots, perievent_signals, result):
@@ -211,6 +213,12 @@ def make_analysis_plots(
 
     def get_decay_time_workbook_name(sig):
         return f"{sig}_decay_time_bw{baseline_window}_aw{analysis_window}.xlsx"
+
+    def get_cross_correlation_workbook_name(sig_a, sig_b):
+        return (
+            f"{sig_a}_{sig_b}_cross_correlation_"
+            f"bw{baseline_window}_aw{analysis_window}.xlsx"
+        )
 
     export_specs = {
         "mean_trace": {
@@ -307,13 +315,34 @@ def make_analysis_plots(
 
         corr_path = None
         if len(perievent_signals_normalized_array) == 2:
+            sig_a, sig_b = selected_signals
+            lags_time, cross_corr = plots._compute_cross_correlation(
+                perievent_signals_normalized_array[0],
+                perievent_signals_normalized_array[1],
+            )
+            lags_time_export, mean_corr_export, se_corr_export = (
+                plots.summarize_cross_correlation(
+                    lags_time,
+                    cross_corr,
+                    downsample_factor=EXPORT_DOWNSAMPLE_FACTOR,
+                )
+            )
+            cross_correlation_event_exports[event] = (
+                plots.build_cross_correlation_export_df(
+                    lags_time=lags_time_export,
+                    mean_corr=mean_corr_export,
+                    subject_id=subject_id,
+                )
+            )
             corr_path = (
                 FIGURE_DIR
                 / f"{mat_name}_{event}_correlation_bw{baseline_window}_aw{analysis_window}.png"
             )
             plots.plot_correlation(
-                perievent_signals_normalized_array[0],
-                perievent_signals_normalized_array[1],
+                lags_time=lags_time_export,
+                mean_corr=mean_corr_export,
+                se_corr=se_corr_export,
+                signal_names=(sig_a, sig_b),
                 figure_save_path=corr_path,
             )
 
@@ -330,6 +359,17 @@ def make_analysis_plots(
                 event_sheet_dfs=event_sheet_dfs,
                 **export_spec.get("write_kwargs", {}),
             )
+
+    if len(selected_signals) == 2 and cross_correlation_event_exports:
+        sig_a, sig_b = selected_signals
+        workbook_save_path = SPREADSHEET_DIR / get_cross_correlation_workbook_name(
+            sig_a,
+            sig_b,
+        )
+        Perievent_Plots.export_cross_correlation_workbook(
+            workbook_save_path=workbook_save_path,
+            event_sheet_dfs=cross_correlation_event_exports,
+        )
     
     return (
         perievent_signals_fig_paths,

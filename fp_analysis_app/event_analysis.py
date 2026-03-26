@@ -318,6 +318,26 @@ class Perievent_Plots:
             cross_correlations_clipped.append(corr_normalized_clipped)
         return lags_time, np.array(cross_correlations_clipped)
 
+    def summarize_cross_correlation(
+        self,
+        lags_time,
+        cross_correlations,
+        downsample_factor=1,
+    ):
+        lags_time = np.asarray(lags_time, dtype=float)
+        cross_correlations = np.asarray(cross_correlations, dtype=float)
+        mean_corr = np.nanmean(cross_correlations, axis=0)
+        se_corr = np.nanstd(cross_correlations, axis=0) / np.sqrt(
+            cross_correlations.shape[0]
+        )
+
+        if downsample_factor > 1:
+            lags_time = self._bin_average_1d(lags_time, downsample_factor)
+            mean_corr = self._bin_average_1d(mean_corr, downsample_factor)
+            se_corr = self._bin_average_1d(se_corr, downsample_factor)
+
+        return lags_time, mean_corr, se_corr
+
     def make_perievent_plots(
         self,
         perievent_signals_dict,
@@ -439,21 +459,32 @@ class Perievent_Plots:
 
     def plot_correlation(
         self,
-        perievent_signals_A,
-        perievent_signals_B,
+        perievent_signals_A=None,
+        perievent_signals_B=None,
+        signal_names=None,
+        lags_time=None,
+        mean_corr=None,
+        se_corr=None,
         width=4,
         height=3,
         ylim=(-10, 10),
         title=None,
         figure_save_path=None,
     ):
-
-        lags_time, cross_corr = self._compute_cross_correlation(
-            perievent_signals_A,
-            perievent_signals_B,
-        )
-        mean_corr = cross_corr.mean(axis=0)
-        se_corr = cross_corr.std(axis=0) / np.sqrt(cross_corr.shape[0])
+        if lags_time is None or mean_corr is None or se_corr is None:
+            if perievent_signals_A is None or perievent_signals_B is None:
+                raise ValueError(
+                    "plot_correlation requires either precomputed lag/correlation "
+                    "summaries or both perievent signal arrays."
+                )
+            lags_time, cross_corr = self._compute_cross_correlation(
+                perievent_signals_A,
+                perievent_signals_B,
+            )
+            lags_time, mean_corr, se_corr = self.summarize_cross_correlation(
+                lags_time,
+                cross_corr,
+            )
         fig, ax = plt.subplots(figsize=(4, 3))
         ax.plot(lags_time, mean_corr, color="k", lw=2)
         ax.fill_between(
@@ -465,7 +496,39 @@ class Perievent_Plots:
             # label='± SEM'
         )
         ax.axvline(0, color="gray", ls="--", lw=1)
-        ax.set_xlabel("Lag (s)")
+        peak_idx = int(np.nanargmax(np.abs(mean_corr)))
+        peak_lag = float(lags_time[peak_idx])
+        ax.axvline(peak_lag, color="red", ls="--", lw=1)
+        ax.text(
+            peak_lag,
+            -0.92,
+            f"{peak_lag:.2f} s",
+            color="red",
+            fontsize=8,
+            ha="center",
+            va="bottom",
+            bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.7, "pad": 1.5},
+        )
+        lag_min = float(np.nanmin(lags_time))
+        lag_max = float(np.nanmax(lags_time))
+        lag_ticks = np.unique(np.rint(np.linspace(lag_min, lag_max, 7)).astype(int))
+        lag_ticks = np.unique(
+            np.concatenate(
+                (
+                    lag_ticks,
+                    [int(np.rint(lag_min)), 0, int(np.rint(lag_max))],
+                )
+            )
+        )
+        ax.set_xticks(lag_ticks)
+        xlabel = "Lag (s)"
+        if signal_names is not None:
+            signal_a, signal_b = signal_names
+            xlabel = (
+                "Lag (s)\n"
+                f"Positive lag: {signal_a} leads {signal_b}"
+            )
+        ax.set_xlabel(xlabel)
         ax.set_ylabel("Correlation")
         ax.set_ylim(-1, 1)
         ax.set_title("Mean Cross Correlation")
@@ -561,6 +624,21 @@ class Perievent_Plots:
         )
 
     @staticmethod
+    def build_cross_correlation_export_df(
+        lags_time,
+        mean_corr,
+        subject_id,
+    ):
+        lags_time = np.asarray(lags_time, dtype=float)
+        mean_corr = np.asarray(mean_corr, dtype=float)
+        return pd.DataFrame(
+            {
+                "lag_s": lags_time,
+                subject_id: mean_corr,
+            }
+        )
+
+    @staticmethod
     def build_occurrence_value_export_df(values, subject_id):
         values = np.asarray(values, dtype=float)
         event_index = np.arange(1, values.size + 1, dtype=int)
@@ -584,6 +662,33 @@ class Perievent_Plots:
         event_sheet_dfs,
         time_tolerance=1e-9,
     ):
+        return Perievent_Plots.export_trace_workbook(
+            workbook_save_path=workbook_save_path,
+            event_sheet_dfs=event_sheet_dfs,
+            axis_column="time_s",
+            axis_tolerance=time_tolerance,
+        )
+
+    @staticmethod
+    def export_cross_correlation_workbook(
+        workbook_save_path,
+        event_sheet_dfs,
+        lag_tolerance=1e-9,
+    ):
+        return Perievent_Plots.export_trace_workbook(
+            workbook_save_path=workbook_save_path,
+            event_sheet_dfs=event_sheet_dfs,
+            axis_column="lag_s",
+            axis_tolerance=lag_tolerance,
+        )
+
+    @staticmethod
+    def export_trace_workbook(
+        workbook_save_path,
+        event_sheet_dfs,
+        axis_column,
+        axis_tolerance=1e-9,
+    ):
         workbook_save_path = Path(workbook_save_path)
         workbook_save_path.parent.mkdir(parents=True, exist_ok=True)
         sheets_to_write = {}
@@ -603,10 +708,10 @@ class Perievent_Plots:
                 sheets_to_write[safe_sheet_name] = new_df
                 continue
 
-            if "time_s" not in existing_df.columns:
+            if axis_column not in existing_df.columns:
                 raise ValueError(
                     f"Sheet '{safe_sheet_name}' in '{workbook_save_path.name}' is "
-                    "missing the required 'time_s' column."
+                    f"missing the required '{axis_column}' column."
                 )
 
             if len(existing_df) != len(new_df):
@@ -616,18 +721,18 @@ class Perievent_Plots:
                 )
 
             if not np.allclose(
-                existing_df["time_s"].to_numpy(dtype=float),
-                new_df["time_s"].to_numpy(dtype=float),
-                atol=time_tolerance,
+                existing_df[axis_column].to_numpy(dtype=float),
+                new_df[axis_column].to_numpy(dtype=float),
+                atol=axis_tolerance,
                 rtol=0,
                 equal_nan=True,
             ):
                 raise ValueError(
                     f"Sheet '{safe_sheet_name}' in '{workbook_save_path.name}' has "
-                    "incompatible time_s values."
+                    f"incompatible {axis_column} values."
                 )
 
-            subject_columns = [c for c in new_df.columns if c != "time_s"]
+            subject_columns = [c for c in new_df.columns if c != axis_column]
             merged_df = existing_df.copy()
             for subject_col in subject_columns:
                 merged_df[subject_col] = new_df[subject_col].to_numpy()

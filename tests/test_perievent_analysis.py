@@ -353,5 +353,112 @@ class TestPerieventAnalysisWithF268(unittest.TestCase):
         self.assertAlmostEqual(exported["F268"].iloc[6], 59.998862, places=6)
         self.assertTrue(exported["F268_short"].iloc[10:].isna().all())
 
+    def test_cross_correlation_export_df_uses_mean_trace_per_lag(self):
+        lags_time = np.array([-1.0, 0.0, 1.0])
+        mean_corr = np.array([0.2, 0.5, 0.8])
+
+        exported = Perievent_Plots.build_cross_correlation_export_df(
+            lags_time=lags_time,
+            mean_corr=mean_corr,
+            subject_id="F268",
+        )
+
+        self.assertEqual(["lag_s", "F268"], exported.columns.tolist())
+        np.testing.assert_allclose(
+            exported["lag_s"].to_numpy(),
+            np.array([-1.0, 0.0, 1.0]),
+            atol=1e-12,
+        )
+        np.testing.assert_allclose(
+            exported["F268"].to_numpy(),
+            np.array([0.2, 0.5, 0.8]),
+            atol=1e-12,
+        )
+
+    def test_summarize_cross_correlation_downsamples_only_derived_traces(self):
+        plots = Perievent_Plots(
+            self.fp_freq,
+            "wake_sws",
+            nsec_before=BASELINE_WINDOW,
+            nsec_after=ANALYSIS_WINDOW,
+        )
+        lags_time = np.array([-1.5, -0.5, 0.5, 1.5])
+        cross_correlations = np.array(
+            [
+                [0.0, 0.2, 0.4, 0.6],
+                [0.2, 0.4, 0.6, 0.8],
+            ]
+        )
+
+        lags_downsampled, mean_corr, se_corr = plots.summarize_cross_correlation(
+            lags_time,
+            cross_correlations,
+            downsample_factor=2,
+        )
+
+        np.testing.assert_allclose(
+            lags_downsampled,
+            np.array([-1.0, 1.0]),
+            atol=1e-12,
+        )
+        np.testing.assert_allclose(
+            mean_corr,
+            np.array([0.2, 0.6]),
+            atol=1e-12,
+        )
+        np.testing.assert_allclose(
+            se_corr,
+            np.array([0.070710678, 0.070710678]),
+            atol=1e-9,
+        )
+
+    def test_cross_correlation_workbook_exports_and_appends_subject_columns(self):
+        f268_df = Perievent_Plots.build_cross_correlation_export_df(
+            lags_time=np.array([-1.0, 0.0, 1.0]),
+            mean_corr=np.array([0.2, 0.5, 0.8]),
+            subject_id="F268",
+        )
+        repeat_df = Perievent_Plots.build_cross_correlation_export_df(
+            lags_time=np.array([-1.0, 0.0, 1.0]),
+            mean_corr=np.array([0.1, 0.3, 0.5]),
+            subject_id="F268_repeat",
+        )
+
+        with TemporaryDirectory() as tmpdir:
+            workbook_path = Path(tmpdir) / "NE2m_mClY_cross_correlation_bw30_aw60.xlsx"
+            Perievent_Plots.export_cross_correlation_workbook(
+                workbook_save_path=workbook_path,
+                event_sheet_dfs={"wake_sws": f268_df},
+            )
+            Perievent_Plots.export_cross_correlation_workbook(
+                workbook_save_path=workbook_path,
+                event_sheet_dfs={"wake_sws": repeat_df},
+            )
+
+            exported = pd.read_excel(
+                workbook_path,
+                sheet_name="wake_sws",
+                engine="openpyxl",
+            )
+
+        self.assertEqual(
+            ["lag_s", "F268", "F268_repeat"],
+            exported.columns.tolist(),
+        )
+        np.testing.assert_allclose(
+            exported["lag_s"].to_numpy(),
+            np.array([-1.0, 0.0, 1.0]),
+            atol=1e-12,
+        )
+        np.testing.assert_allclose(
+            exported["F268"].to_numpy(),
+            np.array([0.2, 0.5, 0.8]),
+            atol=1e-12,
+        )
+        np.testing.assert_allclose(
+            exported["F268_repeat"].to_numpy(),
+            np.array([0.1, 0.3, 0.5]),
+            atol=1e-12,
+        )
 if __name__ == "__main__":
     unittest.main()
