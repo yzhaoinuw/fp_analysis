@@ -639,6 +639,34 @@ class Perievent_Plots:
         )
 
     @staticmethod
+    def get_lag_at_strongest_cross_correlation(lags_time, cross_correlations):
+        lags_time = np.asarray(lags_time, dtype=float)
+        cross_correlations = np.asarray(cross_correlations, dtype=float)
+        if cross_correlations.ndim != 2:
+            raise ValueError("cross_correlations must be a 2D array.")
+        if cross_correlations.shape[1] != lags_time.size:
+            raise ValueError(
+                "cross_correlations column count must match the lags_time length."
+            )
+
+        lag_values = np.full(cross_correlations.shape[0], np.nan, dtype=float)
+        for row_index, row in enumerate(cross_correlations):
+            finite_mask = np.isfinite(row)
+            if not finite_mask.any():
+                continue
+            finite_lags = lags_time[finite_mask]
+            finite_row = row[finite_mask]
+            lag_values[row_index] = finite_lags[np.argmax(np.abs(finite_row))]
+        return lag_values
+
+    @staticmethod
+    def build_strongest_cross_correlation_export_df(strongest_lag_s, subject_id):
+        return Perievent_Plots.build_occurrence_value_export_df(
+            values=strongest_lag_s,
+            subject_id=subject_id,
+        )
+
+    @staticmethod
     def build_occurrence_value_export_df(values, subject_id):
         values = np.asarray(values, dtype=float)
         event_index = np.arange(1, values.size + 1, dtype=int)
@@ -680,6 +708,17 @@ class Perievent_Plots:
             event_sheet_dfs=event_sheet_dfs,
             axis_column="lag_s",
             axis_tolerance=lag_tolerance,
+        )
+
+    @staticmethod
+    def export_strongest_cross_correlation_workbook(
+        workbook_save_path,
+        event_sheet_dfs,
+    ):
+        return Perievent_Plots.export_occurrence_value_workbook(
+            workbook_save_path=workbook_save_path,
+            event_sheet_dfs=event_sheet_dfs,
+            index_column="event_index",
         )
 
     @staticmethod
