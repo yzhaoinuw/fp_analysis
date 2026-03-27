@@ -1,5 +1,15 @@
 # fp_analysis Project Memory
 
+## Must Check First
+
+- Read this file before doing meaningful work in this repo.
+- Use this interpreter explicitly for repo commands and tests:
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe`
+- Known-good test command:
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis`
+- Do not assume `python`, `py`, or `conda` are on `PATH`.
+- In this Codex PowerShell environment, do not assume `&&` works.
+
 ## Purpose
 
 `fp_analysis` is a desktop-first Dash application for viewing fiber photometry `.mat` files, overlaying event annotations, and generating perievent analysis figures and spreadsheets.
@@ -91,6 +101,9 @@ Note: this save/export path exists in `app.py` but is not currently implemented 
 - `app.py` is not simply obsolete; it still contains functionality that `app_dev.py` does not, especially the manual annotation save/export flow.
 - Because of that, the repository is in a split state rather than a clean old/new replacement.
 - When making spreadsheet changes, verify which app path the change is meant to affect before editing.
+- This repo may intentionally have many untracked draft or scratch files in the working tree.
+- Do not treat a dirty `git status` or many untracked files as surprising by default.
+- When committing a focused change, stage only the files relevant to the task and leave unrelated tracked/untracked work untouched.
 
 ## Known Samples / Artifacts
 
@@ -108,6 +121,30 @@ These are useful for validating spreadsheet structure after changes.
   - AUC reference values
   - mean trace workbook append behavior
   - occurrence-value workbook alignment for AUC and max peak magnitude
+  - synthetic cross-correlation export and workbook behavior
+- The `F268` integration test class is skipped only when these local fixture files are absent:
+  - `data/F268.mat`
+  - `data/Transitions_F268.xlsx`
+- Practical test behavior:
+  - local runs with those files present execute the full suite
+  - clean CI checkouts skip only the fixture-dependent integration class
+  - synthetic export tests still run in both environments
+
+## Workflow Status
+
+- GitHub Actions workflow file:
+  - `.github/workflows/perievent-tests.yml`
+- Current workflow behavior:
+  - runs `python -m unittest tests.test_perievent_analysis`
+  - triggers on pushes to `codex/workflow` and `dev`, plus pull requests
+  - installs a minimal Python dependency set for the perievent suite
+  - sets `MPLBACKEND=Agg`
+  - sets `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true` to avoid the Node 20 deprecation path
+- Branch state after workflow setup:
+  - `codex/unit-test-suite` was updated with the latest `data_export` changes
+  - `codex/workflow` was created from that synced branch and used for workflow work
+  - after the workflow passed, `dev` was fast-forwarded to match `codex/workflow`
+- For future coding work, prefer the clean `dev` worktree rather than switching the dirty main checkout if `data_export` still has local changes
 
 ## Style Guidelines
 
@@ -129,6 +166,8 @@ These are useful for validating spreadsheet structure after changes.
 - A known-good verification command is:
   - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis`
 - The base Miniconda Python and the `sleep_scoring_dist` env were missing dependencies needed for this test path during the last run.
+- In this Codex environment, PowerShell may not accept `&&` as a command separator.
+- Prefer separate shell invocations or PowerShell-native sequencing instead of assuming bash-style `&&` chaining will work.
 
 ## Recommended Starting Points For Future Work
 
