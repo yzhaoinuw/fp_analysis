@@ -17,6 +17,10 @@ BASELINE_WINDOW = 30
 ANALYSIS_WINDOW = 60
 
 
+@unittest.skipUnless(
+    F268_PATH.exists() and TRANSITIONS_F268_PATH.exists(),
+    "Local F268 fixture files are required for these integration tests.",
+)
 class TestPerieventAnalysisWithF268(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -353,6 +357,9 @@ class TestPerieventAnalysisWithF268(unittest.TestCase):
         self.assertAlmostEqual(exported["F268"].iloc[6], 59.998862, places=6)
         self.assertTrue(exported["F268_short"].iloc[10:].isna().all())
 
+class TestPerieventPlotExports(unittest.TestCase):
+    FP_FREQ = 1017.25
+
     def test_cross_correlation_export_df_uses_mean_trace_per_lag(self):
         lags_time = np.array([-1.0, 0.0, 1.0])
         mean_corr = np.array([0.2, 0.5, 0.8])
@@ -412,7 +419,7 @@ class TestPerieventAnalysisWithF268(unittest.TestCase):
 
     def test_summarize_cross_correlation_downsamples_only_derived_traces(self):
         plots = Perievent_Plots(
-            self.fp_freq,
+            self.FP_FREQ,
             "wake_sws",
             nsec_before=BASELINE_WINDOW,
             nsec_after=ANALYSIS_WINDOW,
