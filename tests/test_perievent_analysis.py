@@ -375,6 +375,41 @@ class TestPerieventAnalysisWithF268(unittest.TestCase):
             atol=1e-12,
         )
 
+    def test_lag_at_strongest_cross_correlation_uses_largest_magnitude(self):
+        strongest_lag_s = Perievent_Plots.get_lag_at_strongest_cross_correlation(
+            lags_time=np.array([-1.0, 0.0, 1.0]),
+            cross_correlations=np.array(
+                [
+                    [0.2, -0.7, 0.4],
+                    [0.1, 0.3, 0.25],
+                    [np.nan, np.nan, np.nan],
+                ]
+            ),
+        )
+
+        np.testing.assert_allclose(
+            strongest_lag_s[:2],
+            np.array([0.0, 0.0]),
+            atol=1e-12,
+        )
+        self.assertTrue(np.isnan(strongest_lag_s[2]))
+
+    def test_strongest_cross_correlation_export_df_uses_event_index_per_occurrence(self):
+        strongest_lag_s = np.array([-1.5, 0.0, 1.5])
+
+        exported = Perievent_Plots.build_strongest_cross_correlation_export_df(
+            strongest_lag_s=strongest_lag_s,
+            subject_id="F268",
+        )
+
+        self.assertEqual(["event_index", "F268"], exported.columns.tolist())
+        self.assertEqual([1, 2, 3], exported["event_index"].tolist())
+        np.testing.assert_allclose(
+            exported["F268"].to_numpy(),
+            np.array([-1.5, 0.0, 1.5]),
+            atol=1e-12,
+        )
+
     def test_summarize_cross_correlation_downsamples_only_derived_traces(self):
         plots = Perievent_Plots(
             self.fp_freq,
@@ -460,5 +495,46 @@ class TestPerieventAnalysisWithF268(unittest.TestCase):
             np.array([0.1, 0.3, 0.5]),
             atol=1e-12,
         )
+    def test_strongest_cross_correlation_workbook_aligns_event_index_when_subjects_differ(self):
+        f268_df = Perievent_Plots.build_strongest_cross_correlation_export_df(
+            strongest_lag_s=np.array([-1.5, 0.0, 1.5]),
+            subject_id="F268",
+        )
+        short_df = Perievent_Plots.build_strongest_cross_correlation_export_df(
+            strongest_lag_s=np.array([-0.5, 0.5]),
+            subject_id="F268_short",
+        )
+
+        with TemporaryDirectory() as tmpdir:
+            workbook_path = (
+                Path(tmpdir)
+                / "NE2m_mClY_strongest_cross_correlation_time_lag_bw30_aw60.xlsx"
+            )
+            Perievent_Plots.export_strongest_cross_correlation_workbook(
+                workbook_save_path=workbook_path,
+                event_sheet_dfs={"wake_sws": f268_df},
+            )
+            Perievent_Plots.export_strongest_cross_correlation_workbook(
+                workbook_save_path=workbook_path,
+                event_sheet_dfs={"wake_sws": short_df},
+            )
+
+            exported = pd.read_excel(
+                workbook_path,
+                sheet_name="wake_sws",
+                engine="openpyxl",
+            )
+
+        self.assertEqual(
+            ["event_index", "F268", "F268_short"],
+            exported.columns.tolist(),
+        )
+        self.assertEqual([1, 2, 3], exported["event_index"].tolist())
+        np.testing.assert_allclose(
+            exported["F268"].to_numpy(),
+            np.array([-1.5, 0.0, 1.5]),
+            atol=1e-12,
+        )
+        self.assertTrue(exported["F268_short"].iloc[2:].isna().all())
 if __name__ == "__main__":
     unittest.main()

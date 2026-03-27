@@ -167,6 +167,7 @@ def make_analysis_plots(
     corr_fig_paths = {}
     subject_id = mat_name
     cross_correlation_event_exports = {}
+    strongest_cross_correlation_event_exports = {}
 
     def build_mean_trace_export(plots, perievent_signals, result):
         return plots.build_mean_trace_export_df(
@@ -217,6 +218,12 @@ def make_analysis_plots(
     def get_cross_correlation_workbook_name(sig_a, sig_b):
         return (
             f"{sig_a}_{sig_b}_cross_correlation_"
+            f"bw{baseline_window}_aw{analysis_window}.xlsx"
+        )
+
+    def get_strongest_cross_correlation_workbook_name(sig_a, sig_b):
+        return (
+            f"{sig_a}_{sig_b}_strongest_cross_correlation_time_lag_"
             f"bw{baseline_window}_aw{analysis_window}.xlsx"
         )
 
@@ -334,6 +341,18 @@ def make_analysis_plots(
                     subject_id=subject_id,
                 )
             )
+            strongest_cross_corr_lag_s = (
+                plots.get_lag_at_strongest_cross_correlation(
+                    lags_time=lags_time,
+                    cross_correlations=cross_corr,
+                )
+            )
+            strongest_cross_correlation_event_exports[event] = (
+                plots.build_strongest_cross_correlation_export_df(
+                    strongest_lag_s=strongest_cross_corr_lag_s,
+                    subject_id=subject_id,
+                )
+            )
             corr_path = (
                 FIGURE_DIR
                 / f"{mat_name}_{event}_correlation_bw{baseline_window}_aw{analysis_window}.png"
@@ -369,6 +388,14 @@ def make_analysis_plots(
         Perievent_Plots.export_cross_correlation_workbook(
             workbook_save_path=workbook_save_path,
             event_sheet_dfs=cross_correlation_event_exports,
+        )
+        strongest_workbook_save_path = (
+            SPREADSHEET_DIR
+            / get_strongest_cross_correlation_workbook_name(sig_a, sig_b)
+        )
+        Perievent_Plots.export_strongest_cross_correlation_workbook(
+            workbook_save_path=strongest_workbook_save_path,
+            event_sheet_dfs=strongest_cross_correlation_event_exports,
         )
     
     return (
