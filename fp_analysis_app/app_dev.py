@@ -334,10 +334,16 @@ def make_analysis_plots(
                     downsample_factor=EXPORT_DOWNSAMPLE_FACTOR,
                 )
             )
+            std_corr_export = plots._bin_average_1d(
+                np.nanstd(cross_corr, axis=0),
+                EXPORT_DOWNSAMPLE_FACTOR,
+            )
             cross_correlation_event_exports[event] = (
                 plots.build_cross_correlation_export_df(
                     lags_time=lags_time_export,
                     mean_corr=mean_corr_export,
+                    std_corr=std_corr_export,
+                    n_occurrences=cross_corr.shape[0],
                     subject_id=subject_id,
                 )
             )

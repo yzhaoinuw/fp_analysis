@@ -72,6 +72,12 @@ Current behavior differs by app entrypoint:
     - each subject appends as a new column
   - Mean trace sheets use `time_s` as the compatibility key and require matching downsampled time axes
   - AUC and max peak magnitude sheets use `event_index` as the row key so subjects with different event counts can still append cleanly
+  - As of 2026-03-28, mean-trace and mean cross-correlation exports now write Prism-friendly triplets per subject:
+    - `<subject>_mean`
+    - `<subject>_sd`
+    - `<subject>_n`
+  - `n` is repeated on every axis row for that subject so the sheet can be imported directly into GraphPad Prism as pre-averaged XY data with error values and sample size
+  - Occurrence-level exports such as AUC, max peak magnitude, first peak time, decay time, and strongest cross-correlation lag still use one subject column plus `event_index`
 
 - `app.py`
   - Creates one workbook per event
@@ -128,7 +134,8 @@ These are useful for validating spreadsheet structure after changes.
 - Practical test behavior:
   - local runs with those files present execute the full suite
   - clean CI checkouts skip only the fixture-dependent integration class
-  - synthetic export tests still run in both environments
+- synthetic export tests still run in both environments
+- The perievent export suite now also checks the `mean/sd/n` column triplet layout for mean traces and mean cross-correlation workbooks
 
 ## Workflow Status
 

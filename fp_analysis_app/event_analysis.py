@@ -613,13 +613,18 @@ class Perievent_Plots:
         downsample_factor=100,
     ):
         mean_trace = np.mean(perievent_signals, axis=0)
+        std_trace = np.std(perievent_signals, axis=0)
+        n_occurrences = int(perievent_signals.shape[0])
         time_s = self._make_centered_time_axis(mean_trace.size)
         time_s_downsampled = self._bin_average_1d(time_s, downsample_factor)
-        trace_downsampled = self._bin_average_1d(mean_trace, downsample_factor)
+        mean_downsampled = self._bin_average_1d(mean_trace, downsample_factor)
+        std_downsampled = self._bin_average_1d(std_trace, downsample_factor)
         return pd.DataFrame(
             {
                 "time_s": time_s_downsampled,
-                subject_id: trace_downsampled,
+                f"{subject_id}_mean": mean_downsampled,
+                f"{subject_id}_sd": std_downsampled,
+                f"{subject_id}_n": np.full(time_s_downsampled.shape, n_occurrences),
             }
         )
 
@@ -627,14 +632,19 @@ class Perievent_Plots:
     def build_cross_correlation_export_df(
         lags_time,
         mean_corr,
+        std_corr,
+        n_occurrences,
         subject_id,
     ):
         lags_time = np.asarray(lags_time, dtype=float)
         mean_corr = np.asarray(mean_corr, dtype=float)
+        std_corr = np.asarray(std_corr, dtype=float)
         return pd.DataFrame(
             {
                 "lag_s": lags_time,
-                subject_id: mean_corr,
+                f"{subject_id}_mean": mean_corr,
+                f"{subject_id}_sd": std_corr,
+                f"{subject_id}_n": np.full(lags_time.shape, int(n_occurrences)),
             }
         )
 

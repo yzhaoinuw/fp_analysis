@@ -151,7 +151,18 @@ class TestPerieventAnalysisWithF268(unittest.TestCase):
                 engine="openpyxl",
             )
 
-        self.assertEqual(["time_s", "F268", "F268_repeat"], exported.columns.tolist())
+        self.assertEqual(
+            [
+                "time_s",
+                "F268_mean",
+                "F268_sd",
+                "F268_n",
+                "F268_repeat_mean",
+                "F268_repeat_sd",
+                "F268_repeat_n",
+            ],
+            exported.columns.tolist(),
+        )
         self.assertEqual(915, len(exported))
         np.testing.assert_allclose(
             exported["time_s"].head(3),
@@ -159,15 +170,27 @@ class TestPerieventAnalysisWithF268(unittest.TestCase):
             atol=1e-6,
         )
         np.testing.assert_allclose(
-            exported["F268"].head(3),
+            exported["F268_mean"].head(3),
             np.array([-0.412663, -0.417773, -0.424488]),
             atol=1e-6,
         )
         np.testing.assert_allclose(
-            exported["F268"].to_numpy(),
-            exported["F268_repeat"].to_numpy(),
+            exported["F268_sd"].head(3),
+            np.array([3.088589, 3.086347, 3.082354]),
+            atol=1e-6,
+        )
+        self.assertTrue((exported["F268_n"] == 15).all())
+        np.testing.assert_allclose(
+            exported["F268_mean"].to_numpy(),
+            exported["F268_repeat_mean"].to_numpy(),
             atol=1e-12,
         )
+        np.testing.assert_allclose(
+            exported["F268_sd"].to_numpy(),
+            exported["F268_repeat_sd"].to_numpy(),
+            atol=1e-12,
+        )
+        self.assertTrue((exported["F268_repeat_n"] == 15).all())
 
     def test_auc_workbook_aligns_event_index_when_subjects_have_different_counts(self):
         _, _, perievent_signals = self._get_perievent_signals("wake_sws", "NE2m")
@@ -367,20 +390,31 @@ class TestPerieventPlotExports(unittest.TestCase):
         exported = Perievent_Plots.build_cross_correlation_export_df(
             lags_time=lags_time,
             mean_corr=mean_corr,
+            std_corr=np.array([0.1, 0.2, 0.3]),
+            n_occurrences=4,
             subject_id="F268",
         )
 
-        self.assertEqual(["lag_s", "F268"], exported.columns.tolist())
+        self.assertEqual(
+            ["lag_s", "F268_mean", "F268_sd", "F268_n"],
+            exported.columns.tolist(),
+        )
         np.testing.assert_allclose(
             exported["lag_s"].to_numpy(),
             np.array([-1.0, 0.0, 1.0]),
             atol=1e-12,
         )
         np.testing.assert_allclose(
-            exported["F268"].to_numpy(),
+            exported["F268_mean"].to_numpy(),
             np.array([0.2, 0.5, 0.8]),
             atol=1e-12,
         )
+        np.testing.assert_allclose(
+            exported["F268_sd"].to_numpy(),
+            np.array([0.1, 0.2, 0.3]),
+            atol=1e-12,
+        )
+        self.assertTrue((exported["F268_n"] == 4).all())
 
     def test_lag_at_strongest_cross_correlation_uses_largest_magnitude(self):
         strongest_lag_s = Perievent_Plots.get_lag_at_strongest_cross_correlation(
@@ -458,11 +492,15 @@ class TestPerieventPlotExports(unittest.TestCase):
         f268_df = Perievent_Plots.build_cross_correlation_export_df(
             lags_time=np.array([-1.0, 0.0, 1.0]),
             mean_corr=np.array([0.2, 0.5, 0.8]),
+            std_corr=np.array([0.05, 0.1, 0.15]),
+            n_occurrences=3,
             subject_id="F268",
         )
         repeat_df = Perievent_Plots.build_cross_correlation_export_df(
             lags_time=np.array([-1.0, 0.0, 1.0]),
             mean_corr=np.array([0.1, 0.3, 0.5]),
+            std_corr=np.array([0.02, 0.04, 0.06]),
+            n_occurrences=2,
             subject_id="F268_repeat",
         )
 
@@ -484,7 +522,15 @@ class TestPerieventPlotExports(unittest.TestCase):
             )
 
         self.assertEqual(
-            ["lag_s", "F268", "F268_repeat"],
+            [
+                "lag_s",
+                "F268_mean",
+                "F268_sd",
+                "F268_n",
+                "F268_repeat_mean",
+                "F268_repeat_sd",
+                "F268_repeat_n",
+            ],
             exported.columns.tolist(),
         )
         np.testing.assert_allclose(
@@ -493,15 +539,27 @@ class TestPerieventPlotExports(unittest.TestCase):
             atol=1e-12,
         )
         np.testing.assert_allclose(
-            exported["F268"].to_numpy(),
+            exported["F268_mean"].to_numpy(),
             np.array([0.2, 0.5, 0.8]),
             atol=1e-12,
         )
         np.testing.assert_allclose(
-            exported["F268_repeat"].to_numpy(),
+            exported["F268_sd"].to_numpy(),
+            np.array([0.05, 0.1, 0.15]),
+            atol=1e-12,
+        )
+        self.assertTrue((exported["F268_n"] == 3).all())
+        np.testing.assert_allclose(
+            exported["F268_repeat_mean"].to_numpy(),
             np.array([0.1, 0.3, 0.5]),
             atol=1e-12,
         )
+        np.testing.assert_allclose(
+            exported["F268_repeat_sd"].to_numpy(),
+            np.array([0.02, 0.04, 0.06]),
+            atol=1e-12,
+        )
+        self.assertTrue((exported["F268_repeat_n"] == 2).all())
     def test_strongest_cross_correlation_workbook_aligns_event_index_when_subjects_differ(self):
         f268_df = Perievent_Plots.build_strongest_cross_correlation_export_df(
             strongest_lag_s=np.array([-1.5, 0.0, 1.5]),
