@@ -142,6 +142,71 @@ def open_annotation_file_dialog():
     return result[0]  # return the selected file as a single string
 
 
+def get_preferred_spreadsheet_dir(filepath):
+    return Path(filepath).resolve().parent
+
+
+def write_analysis_workbooks(
+    primary_dir,
+    fallback_dir,
+    signal_event_exports,
+    export_specs,
+    selected_signals,
+    cross_correlation_event_exports,
+    strongest_cross_correlation_event_exports,
+    get_cross_correlation_workbook_name,
+    get_strongest_cross_correlation_workbook_name,
+):
+    primary_dir = Path(primary_dir)
+    fallback_dir = Path(fallback_dir)
+
+    def export_all_workbooks(target_dir):
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        for export_name, export_spec in export_specs.items():
+            for sig, event_sheet_dfs in signal_event_exports[export_name].items():
+                workbook_save_path = target_dir / export_spec["workbook_name"](sig)
+                export_spec["write_workbook"](
+                    workbook_save_path=workbook_save_path,
+                    event_sheet_dfs=event_sheet_dfs,
+                    **export_spec.get("write_kwargs", {}),
+                )
+
+        if len(selected_signals) == 2 and cross_correlation_event_exports:
+            sig_a, sig_b = selected_signals
+            workbook_save_path = target_dir / get_cross_correlation_workbook_name(
+                sig_a,
+                sig_b,
+            )
+            Perievent_Plots.export_cross_correlation_workbook(
+                workbook_save_path=workbook_save_path,
+                event_sheet_dfs=cross_correlation_event_exports,
+            )
+            strongest_workbook_save_path = (
+                target_dir
+                / get_strongest_cross_correlation_workbook_name(sig_a, sig_b)
+            )
+            Perievent_Plots.export_strongest_cross_correlation_workbook(
+                workbook_save_path=strongest_workbook_save_path,
+                event_sheet_dfs=strongest_cross_correlation_event_exports,
+            )
+
+    try:
+        export_all_workbooks(primary_dir)
+        return (
+            primary_dir,
+            f"Analysis spreadsheets saved next to the input MAT file in "
+            f"'{primary_dir}'.",
+        )
+    except OSError:
+        export_all_workbooks(fallback_dir)
+        return (
+            fallback_dir,
+            "Could not save analysis spreadsheets next to the input MAT file. "
+            f"Saved them to the app spreadsheets folder instead: '{fallback_dir}'.",
+        )
+
+
 def make_analysis_plots(
     event_time_dict: dict,
     selected_signals: tuple[str, ...],
@@ -150,6 +215,7 @@ def make_analysis_plots(
     duration: float | None = None,
 ):
     filepath = cache.get("filepath")
+    preferred_spreadsheet_dir = get_preferred_spreadsheet_dir(filepath)
     mat_name = os.path.splitext(os.path.basename(filepath))[0]
     fp_data = loadmat(filepath, squeeze_me=True)
     fp_freq = float(fp_data["fp_frequency"])
@@ -376,33 +442,18 @@ def make_analysis_plots(
             f"{mat_name}_{event}_correlation_bw{baseline_window}_aw{analysis_window}.png",
         )
 
-    for export_name, export_spec in export_specs.items():
-        for sig, event_sheet_dfs in signal_event_exports[export_name].items():
-            workbook_save_path = SPREADSHEET_DIR / export_spec["workbook_name"](sig)
-            export_spec["write_workbook"](
-                workbook_save_path=workbook_save_path,
-                event_sheet_dfs=event_sheet_dfs,
-                **export_spec.get("write_kwargs", {}),
-            )
-
-    if len(selected_signals) == 2 and cross_correlation_event_exports:
-        sig_a, sig_b = selected_signals
-        workbook_save_path = SPREADSHEET_DIR / get_cross_correlation_workbook_name(
-            sig_a,
-            sig_b,
-        )
-        Perievent_Plots.export_cross_correlation_workbook(
-            workbook_save_path=workbook_save_path,
-            event_sheet_dfs=cross_correlation_event_exports,
-        )
-        strongest_workbook_save_path = (
-            SPREADSHEET_DIR
-            / get_strongest_cross_correlation_workbook_name(sig_a, sig_b)
-        )
-        Perievent_Plots.export_strongest_cross_correlation_workbook(
-            workbook_save_path=strongest_workbook_save_path,
-            event_sheet_dfs=strongest_cross_correlation_event_exports,
-        )
+    _, export_status_message = write_analysis_workbooks(
+        primary_dir=preferred_spreadsheet_dir,
+        fallback_dir=SPREADSHEET_DIR,
+        signal_event_exports=signal_event_exports,
+        export_specs=export_specs,
+        selected_signals=selected_signals,
+        cross_correlation_event_exports=cross_correlation_event_exports,
+        strongest_cross_correlation_event_exports=strongest_cross_correlation_event_exports,
+        get_cross_correlation_workbook_name=get_cross_correlation_workbook_name,
+        get_strongest_cross_correlation_workbook_name=get_strongest_cross_correlation_workbook_name,
+    )
+    cache.set("analysis_export_status_message", export_status_message)
     
     return (
         perievent_signals_fig_paths,
@@ -425,6 +476,7 @@ def reset_cache(cache, filepath):
     cache.set("end_time", 0)
     cache.set("duration", 0)
     cache.set("fig_resampler", None)
+    cache.set("analysis_export_status_message", "")
 
 
 # %% client side callbacks below
