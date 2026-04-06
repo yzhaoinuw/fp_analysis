@@ -7,6 +7,12 @@ import pandas as pd
 from scipy.io import loadmat
 
 from fp_analysis_app.event_analysis import Analyses, Event_Utils, Perievent_Plots
+from fp_analysis_app.export_settings import (
+    build_analysis_config_dirname,
+    build_analysis_description_text,
+    get_analysis_export_dir,
+    write_analysis_description_file,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -560,6 +566,7 @@ class TestPerieventPlotExports(unittest.TestCase):
             atol=1e-12,
         )
         self.assertTrue((exported["F268_repeat_n"] == 2).all())
+
     def test_strongest_cross_correlation_workbook_aligns_event_index_when_subjects_differ(self):
         f268_df = Perievent_Plots.build_strongest_cross_correlation_export_df(
             strongest_lag_s=np.array([-1.5, 0.0, 1.5]),
@@ -601,5 +608,131 @@ class TestPerieventPlotExports(unittest.TestCase):
             atol=1e-12,
         )
         self.assertTrue(exported["F268_short"].iloc[2:].isna().all())
+
+    def test_cross_correlation_workbook_overwrites_existing_subject_columns(self):
+        first_df = Perievent_Plots.build_cross_correlation_export_df(
+            lags_time=np.array([-1.0, 0.0, 1.0]),
+            mean_corr=np.array([0.2, 0.5, 0.8]),
+            std_corr=np.array([0.05, 0.1, 0.15]),
+            n_occurrences=3,
+            subject_id="F268",
+        )
+        replacement_df = Perievent_Plots.build_cross_correlation_export_df(
+            lags_time=np.array([-1.0, 0.0, 1.0]),
+            mean_corr=np.array([0.3, 0.6, 0.9]),
+            std_corr=np.array([0.06, 0.11, 0.16]),
+            n_occurrences=4,
+            subject_id="F268",
+        )
+
+        with TemporaryDirectory() as tmpdir:
+            workbook_path = Path(tmpdir) / "NE2m_mClY_cross_correlation_bw30_aw60.xlsx"
+            Perievent_Plots.export_cross_correlation_workbook(
+                workbook_save_path=workbook_path,
+                event_sheet_dfs={"wake_sws": first_df},
+            )
+            Perievent_Plots.export_cross_correlation_workbook(
+                workbook_save_path=workbook_path,
+                event_sheet_dfs={"wake_sws": replacement_df},
+            )
+
+            exported = pd.read_excel(
+                workbook_path,
+                sheet_name="wake_sws",
+                engine="openpyxl",
+            )
+
+        self.assertEqual(
+            ["lag_s", "F268_mean", "F268_sd", "F268_n"],
+            exported.columns.tolist(),
+        )
+        np.testing.assert_allclose(
+            exported["F268_mean"].to_numpy(),
+            np.array([0.3, 0.6, 0.9]),
+            atol=1e-12,
+        )
+        np.testing.assert_allclose(
+            exported["F268_sd"].to_numpy(),
+            np.array([0.06, 0.11, 0.16]),
+            atol=1e-12,
+        )
+        self.assertTrue((exported["F268_n"] == 4).all())
+
+
+class TestAnalysisExportSettings(unittest.TestCase):
+    def test_build_analysis_config_dirname_sorts_signal_names(self):
+        dirname = build_analysis_config_dirname(
+            selected_signals=("mClY", "NE2m"),
+            baseline_window=30,
+            analysis_window=60,
+        )
+
+        self.assertEqual("NE2m_mClY_bw30_aw60", dirname)
+
+    def test_get_analysis_export_dir_uses_sorted_signal_folder_name(self):
+        export_dir = get_analysis_export_dir(
+            base_dir=Path("C:/tmp/exports"),
+            selected_signals=("mClY", "NE2m"),
+            baseline_window=30,
+            analysis_window=60,
+        )
+
+        self.assertEqual(
+            Path("C:/tmp/exports/NE2m_mClY_bw30_aw60"),
+            export_dir,
+        )
+
+    def test_build_analysis_description_text_lists_sorted_signals_and_events(self):
+        description_text = build_analysis_description_text(
+            mat_filepaths=[
+                Path("C:/data/F268.mat"),
+                Path("C:/data/F269.mat"),
+            ],
+            export_dir=Path("C:/data/NE2m_mClY_bw30_aw60"),
+            selected_signals=("mClY", "NE2m"),
+            baseline_window=30,
+            analysis_window=60,
+            event_names=["wake_sws", "sws_wake"],
+        )
+
+        self.assertIn(
+            "Selected signals (sorted folder key): NE2m, mClY",
+            description_text,
+        )
+        self.assertIn("Baseline window (s): 30", description_text)
+        self.assertIn("Analysis window (s): 60", description_text)
+        self.assertIn("Event types: wake_sws, sws_wake", description_text)
+        self.assertIn("Source MAT paths:", description_text)
+        self.assertIn("- C:\\data\\F268.mat", description_text)
+        self.assertIn("- C:\\data\\F269.mat", description_text)
+
+    def test_write_analysis_description_file_appends_new_mat_paths(self):
+        with TemporaryDirectory() as tmpdir:
+            export_dir = Path(tmpdir) / "NE2m_mClY_bw30_aw60"
+            write_analysis_description_file(
+                export_dir=export_dir,
+                mat_filepath=Path("C:/data/F268.mat"),
+                selected_signals=("mClY", "NE2m"),
+                baseline_window=30,
+                analysis_window=60,
+                event_names=["wake_sws"],
+            )
+            write_analysis_description_file(
+                export_dir=export_dir,
+                mat_filepath=Path("C:/data/F269.mat"),
+                selected_signals=("mClY", "NE2m"),
+                baseline_window=30,
+                analysis_window=60,
+                event_names=["wake_sws", "sws_wake"],
+            )
+
+            description_text = (export_dir / "data_description.txt").read_text(
+                encoding="utf-8"
+            )
+
+        self.assertEqual(1, description_text.count("- C:\\data\\F268.mat"))
+        self.assertEqual(1, description_text.count("- C:\\data\\F269.mat"))
+        self.assertIn("Event types: wake_sws, sws_wake", description_text)
+
 if __name__ == "__main__":
     unittest.main()

@@ -36,6 +36,10 @@ from fp_analysis_app import VERSION
 from fp_analysis_app.components_dev import Components
 from fp_analysis_app.make_figure import get_padded_labels, make_figure
 from fp_analysis_app.event_analysis import Event_Utils, Perievent_Plots, Analyses
+from fp_analysis_app.export_settings import (
+    get_analysis_export_dir,
+    write_analysis_description_file,
+)
 
 
 app = Dash(
@@ -156,12 +160,36 @@ def write_analysis_workbooks(
     strongest_cross_correlation_event_exports,
     get_cross_correlation_workbook_name,
     get_strongest_cross_correlation_workbook_name,
+    mat_filepath,
+    baseline_window,
+    analysis_window,
+    event_names,
 ):
     primary_dir = Path(primary_dir)
     fallback_dir = Path(fallback_dir)
+    config_dir = get_analysis_export_dir(
+        base_dir=primary_dir,
+        selected_signals=selected_signals,
+        baseline_window=baseline_window,
+        analysis_window=analysis_window,
+    )
+    fallback_config_dir = get_analysis_export_dir(
+        base_dir=fallback_dir,
+        selected_signals=selected_signals,
+        baseline_window=baseline_window,
+        analysis_window=analysis_window,
+    )
 
     def export_all_workbooks(target_dir):
         target_dir.mkdir(parents=True, exist_ok=True)
+        write_analysis_description_file(
+            export_dir=target_dir,
+            mat_filepath=mat_filepath,
+            selected_signals=selected_signals,
+            baseline_window=baseline_window,
+            analysis_window=analysis_window,
+            event_names=event_names,
+        )
 
         for export_name, export_spec in export_specs.items():
             for sig, event_sheet_dfs in signal_event_exports[export_name].items():
@@ -192,18 +220,19 @@ def write_analysis_workbooks(
             )
 
     try:
-        export_all_workbooks(primary_dir)
+        export_all_workbooks(config_dir)
         return (
-            primary_dir,
-            f"Analysis spreadsheets saved next to the input MAT file in "
-            f"'{primary_dir}'.",
+            config_dir,
+            "Analysis spreadsheets saved next to the input MAT file in "
+            f"'{config_dir}'.",
         )
     except OSError:
-        export_all_workbooks(fallback_dir)
+        export_all_workbooks(fallback_config_dir)
         return (
-            fallback_dir,
+            fallback_config_dir,
             "Could not save analysis spreadsheets next to the input MAT file. "
-            f"Saved them to the app spreadsheets folder instead: '{fallback_dir}'.",
+            "Saved them to the app spreadsheet folder instead: "
+            f"'{fallback_config_dir}'.",
         )
 
 
@@ -452,6 +481,10 @@ def make_analysis_plots(
         strongest_cross_correlation_event_exports=strongest_cross_correlation_event_exports,
         get_cross_correlation_workbook_name=get_cross_correlation_workbook_name,
         get_strongest_cross_correlation_workbook_name=get_strongest_cross_correlation_workbook_name,
+        mat_filepath=filepath,
+        baseline_window=baseline_window,
+        analysis_window=analysis_window,
+        event_names=sorted(event_time_dict.keys()),
     )
     cache.set("analysis_export_status_message", export_status_message)
     
