@@ -20,3 +20,4 @@ Before running commands, editing files, or answering environment questions:
 - For desktop export behavior, inspect `fp_analysis_app/app_dev.py` before `fp_analysis_app/app.py`.
 - This repo may intentionally contain many untracked or draft files. Do not treat a dirty worktree as unexpected.
 - When making focused changes, stage only the files relevant to the task.
+- After completing a pushed change, update `PROJECT_MEMORY.md` in the same chat so the repo memory stays current.

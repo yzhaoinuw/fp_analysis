@@ -63,13 +63,25 @@ Current behavior differs by app entrypoint:
   - Export flow is now split into two phases:
     1. compute/store per-signal perievent results for each event
     2. build/write spreadsheet exports through an `export_specs` registry in `make_analysis_plots()`
+  - Export destination behavior for the desktop app:
+    - first try to save beside the selected input `.mat`
+    - if that location is not writable, fall back to `fp_analysis_app/assets/spreadsheets/`
+    - exports are grouped into a setup-specific subfolder named from alphabetically sorted selected signals plus the baseline and analysis windows
+    - example folder pattern: `NE2m_mClY_bw30_aw60`
+    - a `data_description.txt` file is written in that folder and keeps a unique insertion-order list of analyzed MAT paths for that setup
   - Current export registry entries:
     - mean trace workbook per signal: `<signal>_bw<baseline>_aw<analysis>.xlsx`
     - AUC workbook per signal: `<signal>_auc_bw<baseline>_aw<analysis>.xlsx`
     - max peak magnitude workbook per signal: `<signal>_max_peak_magnitude_bw<baseline>_aw<analysis>.xlsx`
+    - first peak time workbook per signal: `<signal>_first_peak_time_bw<baseline>_aw<analysis>.xlsx`
+    - decay time workbook per signal: `<signal>_decay_time_bw<baseline>_aw<analysis>.xlsx`
   - In both workbook types:
     - each event type gets its own sheet
     - each subject appends as a new column
+  - Subject identity is still derived from the `.mat` filename stem
+  - Same subject plus same setup rewrites that subject's existing columns instead of appending duplicate columns
+  - Different subjects with the same setup append into the same workbook set
+  - Different signal selections or different windows produce a different setup folder and therefore a different workbook set
   - Mean trace sheets use `time_s` as the compatibility key and require matching downsampled time axes
   - AUC and max peak magnitude sheets use `event_index` as the row key so subjects with different event counts can still append cleanly
   - As of 2026-03-28, mean-trace and mean cross-correlation exports now write Prism-friendly triplets per subject:
@@ -78,6 +90,10 @@ Current behavior differs by app entrypoint:
     - `<subject>_n`
   - `n` is repeated on every axis row for that subject so the sheet can be imported directly into GraphPad Prism as pre-averaged XY data with error values and sample size
   - Occurrence-level exports such as AUC, max peak magnitude, first peak time, decay time, and strongest cross-correlation lag still use one subject column plus `event_index`
+  - Event-type differences across grouped files are tolerated:
+    - existing event sheets continue to append or overwrite subject columns as usual
+    - new event types create new sheets
+    - event sheets from prior runs are left in place if the current file does not contain that event
 
 - `app.py`
   - Creates one workbook per event
@@ -128,6 +144,9 @@ These are useful for validating spreadsheet structure after changes.
   - mean trace workbook append behavior
   - occurrence-value workbook alignment for AUC and max peak magnitude
   - synthetic cross-correlation export and workbook behavior
+  - overwrite-in-place behavior when the same subject is re-exported into the same workbook
+  - setup-folder naming derived from sorted signal names plus baseline and analysis windows
+  - `data_description.txt` content and unique MAT-path accumulation behavior
 - The `F268` integration test class is skipped only when these local fixture files are absent:
   - `data/F268.mat`
   - `data/Transitions_F268.xlsx`
@@ -159,6 +178,8 @@ These are useful for validating spreadsheet structure after changes.
   - a short title line
   - a short body with flat bullet points for additional requested changes when a commit contains multiple user-requested updates
 - Commit message bullets should describe high-level added/changed behavior, not implementation details
+- For feature commits, mention only the user-facing behavior that was added or changed
+- Do not mention tests, docs, project memory updates, or behind-the-scenes implementation details in a feature commit message unless that internal work is itself the main purpose of the commit
 - Prefer bullets like:
   - export mean cross-correlation spreadsheets for two-signal analyses
   - clarify positive and negative lag meaning in the cross-correlation figure
