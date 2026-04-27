@@ -19,6 +19,18 @@ Click "**Click here to select File**". After you select a file, the app will bri
 #### Zooming and Navigation
 **Zooming** is done by scrolling your mouse around the center of interest. **Navigation** can be done using the left/right arrow key or just dragging the figure. To zoom or navigate along X-Axis only, move your cursor to the last figure and then operate. To zoom in or navigate along Y-Axis only, move your cursor to the left edge of the figure of interest and operate. 
 
+### Analysis Spreadsheet Export
+After annotations are loaded, go to the analysis page, choose the signal(s) and analysis windows, and click `Show Results`. When the analysis results are generated, the app also writes the analysis spreadsheets automatically.
+
+The app first tries to save the spreadsheets next to the selected `.mat` file. If that location is not writable, it saves them to the app spreadsheet folder under `fp_analysis_app/assets/spreadsheets/`.
+
+Spreadsheet exports are grouped into a setup-specific subfolder based on:
+
+- the selected signal or signal pair
+- the baseline window size
+- the analysis window size
+
+For the same analysis setup, different subjects append into the same workbook set. If the same subject is exported again with the same setup, that subject's columns are updated instead of duplicated. Each export folder also includes a `data_description.txt` file that records the analyzed data source and setup details.
 
 ### Known Issues
 1. When adding a second or removing a second signal, clicking Show Results may not update the results even when the analyses are done (indicated by the Show Results button becomes available again), when this happens, switch to any other tab. That should help update the results. Fix to this issue is in progress.
