@@ -703,8 +703,9 @@ class TestAnalysisExportSettings(unittest.TestCase):
         self.assertIn("Analysis window (s): 60", description_text)
         self.assertIn("Event types: wake_sws, sws_wake", description_text)
         self.assertIn("Source MAT paths:", description_text)
-        self.assertIn("- C:\\data\\F268.mat", description_text)
-        self.assertIn("- C:\\data\\F269.mat", description_text)
+        normalized_description_text = description_text.replace("\\", "/")
+        self.assertIn("- C:/data/F268.mat", normalized_description_text)
+        self.assertIn("- C:/data/F269.mat", normalized_description_text)
 
     def test_write_analysis_description_file_appends_new_mat_paths(self):
         with TemporaryDirectory() as tmpdir:
@@ -730,8 +731,9 @@ class TestAnalysisExportSettings(unittest.TestCase):
                 encoding="utf-8"
             )
 
-        self.assertEqual(1, description_text.count("- C:\\data\\F268.mat"))
-        self.assertEqual(1, description_text.count("- C:\\data\\F269.mat"))
+        normalized_description_text = description_text.replace("\\", "/")
+        self.assertEqual(1, normalized_description_text.count("- C:/data/F268.mat"))
+        self.assertEqual(1, normalized_description_text.count("- C:/data/F269.mat"))
         self.assertIn("Event types: wake_sws, sws_wake", description_text)
 
 if __name__ == "__main__":

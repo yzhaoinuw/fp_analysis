@@ -177,6 +177,7 @@ These are useful for validating spreadsheet structure after changes.
 - `data_export` now has a release-prep commit for `v0.4.0`
 - `v0.4.0` documents the grouped analysis spreadsheet export behavior in `README.md`
 - `v0.4.0` introduces a repo-specific `CHANGELOG.md`
+- the perievent workflow needed a follow-up test-only fix so path assertions accept both Windows and POSIX separators in `data_description.txt`
 
 ## Style Guidelines
 
