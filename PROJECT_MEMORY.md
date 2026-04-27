@@ -172,6 +172,12 @@ These are useful for validating spreadsheet structure after changes.
   - after the workflow passed, `dev` was fast-forwarded to match `codex/workflow`
 - For future coding work, prefer the clean `dev` worktree rather than switching the dirty main checkout if `data_export` still has local changes
 
+## Release Notes
+
+- `data_export` now has a release-prep commit for `v0.4.0`
+- `v0.4.0` documents the grouped analysis spreadsheet export behavior in `README.md`
+- `v0.4.0` introduces a repo-specific `CHANGELOG.md`
+
 ## Style Guidelines
 
 - Commit messages should use:
