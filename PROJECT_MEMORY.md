@@ -181,6 +181,11 @@ These are useful for validating spreadsheet structure after changes.
 - `v0.4.1` adds spreadsheet import support for sleep-bout tables with `sleep_scores/start/end/duration`
 - the sleep-bout importer converts consecutive state bouts into transition events and accepts both 1-based user-facing codes (`1-4`) and older 0-based codes (`0-3`)
 - single-signal visualization imports needed the legend-only event traces attached to subplot row 1 instead of row 2
+- `v0.4.1` also adds a visualization fallback for MAT files that do not include `fp_signal_names`:
+  - `make_figure.py` now falls back to the `ne` signal when present
+  - it uses `ne_frequency` in place of `fp_frequency` for that path
+- a follow-up CI fix moved the visualization signal-selection logic into `fp_analysis_app/mat_utils.py`
+- the perievent unittest suite now tests that helper directly instead of importing `make_figure.py`, so the GitHub Actions workflow does not need Plotly dependencies just to validate the `ne` fallback
 
 ## Style Guidelines
 
