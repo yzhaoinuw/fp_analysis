@@ -18,7 +18,7 @@ from plotly.subplots import make_subplots
 from plotly_resampler import FigureResampler
 from plotly_resampler.aggregation import MinMaxLTTB
 
-from fp_analysis_app.mat_utils import get_fp_signal_names
+from fp_analysis_app.mat_utils import get_visualization_signal_names_and_frequency
 
 
 # set up color config
@@ -73,24 +73,7 @@ def make_figure(
     default_n_shown_samples=2048,
 ):
     # Time span and frequencies
-    fp_signal_names = get_fp_signal_names(mat)
-    fp_freq = mat.get("fp_frequency")
-    if not fp_signal_names:
-        if "ne" not in mat:
-            raise KeyError(
-                "MAT data must include 'fp_signal_names' or an 'ne' signal "
-                "for visualization."
-            )
-        fp_signal_names = ["ne"]
-        fp_freq = mat.get("ne_frequency")
-
-    if fp_freq is None:
-        raise KeyError(
-            "MAT data must include 'fp_frequency' or 'ne_frequency' for "
-            "visualization."
-        )
-
-    fp_freq = float(np.asarray(fp_freq).item())
+    fp_signal_names, fp_freq = get_visualization_signal_names_and_frequency(mat)
     num_signals = len(fp_signal_names)
     subplot_titles = fp_signal_names + [""] * (4 - num_signals)
     fp_signals = [mat[signal_name] for signal_name in fp_signal_names]
