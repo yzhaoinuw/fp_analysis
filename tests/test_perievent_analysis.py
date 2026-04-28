@@ -13,6 +13,7 @@ from fp_analysis_app.export_settings import (
     get_analysis_export_dir,
     write_analysis_description_file,
 )
+from fp_analysis_app.make_figure import make_figure
 from fp_analysis_app.mat_utils import get_fp_signal_names
 from fp_analysis_app.sleep_event_import import is_sleep_bout_table
 
@@ -108,6 +109,20 @@ class TestSleepBoutTableImport(unittest.TestCase):
             {"nrem_rem": [100]},
             {key: value.tolist() for key, value in events.items()},
         )
+
+
+class TestMakeFigureFallbacks(unittest.TestCase):
+    def test_make_figure_uses_ne_when_fp_signal_names_are_missing(self):
+        mat = {
+            "ne": np.array([0.0, 0.5, -0.25, 0.75]),
+            "ne_frequency": np.array(2.0),
+            "start_time": 0,
+        }
+
+        fig = make_figure(mat, plot_name="ne only", default_n_shown_samples=16)
+
+        self.assertEqual("ne", fig.data[0].name)
+        self.assertEqual((0, 2), tuple(fig.layout.xaxis.range))
 
 
 @unittest.skipUnless(

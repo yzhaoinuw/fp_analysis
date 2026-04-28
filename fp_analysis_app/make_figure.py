@@ -74,6 +74,23 @@ def make_figure(
 ):
     # Time span and frequencies
     fp_signal_names = get_fp_signal_names(mat)
+    fp_freq = mat.get("fp_frequency")
+    if not fp_signal_names:
+        if "ne" not in mat:
+            raise KeyError(
+                "MAT data must include 'fp_signal_names' or an 'ne' signal "
+                "for visualization."
+            )
+        fp_signal_names = ["ne"]
+        fp_freq = mat.get("ne_frequency")
+
+    if fp_freq is None:
+        raise KeyError(
+            "MAT data must include 'fp_frequency' or 'ne_frequency' for "
+            "visualization."
+        )
+
+    fp_freq = float(np.asarray(fp_freq).item())
     num_signals = len(fp_signal_names)
     subplot_titles = fp_signal_names + [""] * (4 - num_signals)
     fp_signals = [mat[signal_name] for signal_name in fp_signal_names]
@@ -82,7 +99,6 @@ def make_figure(
 
     signal_length = signal_lengths[0]
     fp_signals = np.vstack(fp_signals)
-    fp_freq = mat.get("fp_frequency")
     start_time = mat.get("start_time", 0)
 
     duration = math.ceil(
