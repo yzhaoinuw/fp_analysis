@@ -13,6 +13,8 @@ from fp_analysis_app.export_settings import (
     get_analysis_export_dir,
     write_analysis_description_file,
 )
+from fp_analysis_app.mat_utils import get_fp_signal_names
+from fp_analysis_app.sleep_event_import import is_sleep_bout_table
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -21,6 +23,91 @@ F268_PATH = DATA_DIR / "F268.mat"
 TRANSITIONS_F268_PATH = DATA_DIR / "Transitions_F268.xlsx"
 BASELINE_WINDOW = 30
 ANALYSIS_WINDOW = 60
+
+
+class TestSleepBoutTableImport(unittest.TestCase):
+    def setUp(self):
+        self.event_utils = Event_Utils(
+            fp_freq=1,
+            duration=400,
+            nsec_before=30,
+            nsec_after=60,
+        )
+
+    def test_detects_sleep_bout_table_format(self):
+        df = pd.DataFrame(
+            {
+                "Unnamed: 0": [0, 1],
+                "sleep_scores": [1, 2],
+                "start": [0, 50],
+                "end": [49, 99],
+                "duration": [50, 50],
+            }
+        )
+
+        self.assertTrue(is_sleep_bout_table(df))
+
+    def test_converts_one_based_sleep_scores_to_transition_events(self):
+        df = pd.DataFrame(
+            {
+                "index": [0, 1, 2, 3, 4, 5],
+                "sleep_scores": [1, 2, 3, 4, 2, 1],
+                "start": [0, 40, 80, 120, 160, 220],
+                "end": [39, 79, 119, 159, 219, 259],
+                "duration": [40, 40, 40, 40, 60, 40],
+            }
+        )
+
+        events = self.event_utils.read_events(df_events=df)
+
+        self.assertEqual(
+            {
+                "wake_nrem": [40],
+                "nrem_rem": [80],
+                "rem_ma": [120],
+                "ma_nrem": [160],
+                "nrem_wake": [220],
+            },
+            {key: value.tolist() for key, value in events.items()},
+        )
+
+    def test_converts_zero_based_sleep_scores_to_transition_events(self):
+        df = pd.DataFrame(
+            {
+                "sleep_scores": [0, 1, 2, 3],
+                "start": [35, 70, 110, 150],
+                "end": [69, 109, 149, 189],
+                "duration": [35, 40, 40, 40],
+            }
+        )
+
+        events = self.event_utils.read_events(df_events=df)
+
+        self.assertEqual(
+            {
+                "wake_nrem": [70],
+                "nrem_rem": [110],
+                "rem_ma": [150],
+            },
+            {key: value.tolist() for key, value in events.items()},
+        )
+
+    def test_filters_transition_times_using_existing_event_window_rules(self):
+        df = pd.DataFrame(
+            {
+                "sleep_scores": [1, 2, 3, 1],
+                "start": [0, 20, 100, 360],
+                "end": [19, 99, 359, 399],
+                "duration": [20, 80, 260, 40],
+            }
+        )
+
+        events = self.event_utils.read_events(df_events=df)
+
+        self.assertEqual(
+            {"nrem_rem": [100]},
+            {key: value.tolist() for key, value in events.items()},
+        )
 
 
 @unittest.skipUnless(
@@ -32,7 +119,7 @@ class TestPerieventAnalysisWithF268(unittest.TestCase):
     def setUpClass(cls):
         cls.mat = loadmat(F268_PATH, squeeze_me=True)
         cls.fp_freq = float(cls.mat["fp_frequency"])
-        cls.signal_names = tuple(cls.mat["fp_signal_names"])
+        cls.signal_names = tuple(get_fp_signal_names(cls.mat))
         cls.signal_length = len(cls.mat[cls.signal_names[0]])
         cls.duration = int(np.ceil((cls.signal_length - 1) / cls.fp_freq))
         cls.event_utils = Event_Utils(

@@ -14,6 +14,12 @@ import matplotlib.pyplot as plt
 from scipy.io import loadmat
 from scipy.signal import find_peaks, resample_poly, correlation_lags, correlate
 
+from fp_analysis_app.mat_utils import get_fp_signal_names
+from fp_analysis_app.sleep_event_import import (
+    is_sleep_bout_table,
+    sleep_bout_table_to_event_time_dict,
+)
+
 
 class Event_Utils:
 
@@ -64,9 +70,16 @@ class Event_Utils:
         """
         min_time = self.nsec_before
         max_time = self.duration - self.nsec_after
-        event_time_dict = {}
         if df_events is None:
             df_events = pd.read_excel(event_file)
+        if is_sleep_bout_table(df_events):
+            return sleep_bout_table_to_event_time_dict(
+                df_events,
+                min_time=min_time,
+                max_time=max_time,
+            )
+
+        event_time_dict = {}
         for event in df_events.columns:
             df_event = df_events[event]
             df_event = df_event.dropna()
@@ -988,7 +1001,7 @@ if __name__ == "__main__":
     fp_name = "M2"
     fp_file = Path(DATA_PATH) / f"{fp_name}.mat"
     mat = loadmat(fp_file, squeeze_me=True)
-    biosignal_names = mat["fp_signal_names"]
+    biosignal_names = get_fp_signal_names(mat)
     num_signals = len(biosignal_names)
     fp_signals = [mat[signal_name] for signal_name in biosignal_names]
     signal_lengths = [len(fp_signals[k]) for k in range(num_signals)]
@@ -1009,7 +1022,7 @@ if __name__ == "__main__":
     )
 
     if event_data is not None:
-        signal_names = mat.get("fp_signal_names")
+        signal_names = get_fp_signal_names(mat)
         event_utils = Event_Utils(fp_freq, duration)
         df_events = event_utils.eventdata_to_df(event_data)
         event_time_dict = event_utils.read_events(df_events=df_events)

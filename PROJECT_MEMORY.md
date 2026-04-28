@@ -178,6 +178,9 @@ These are useful for validating spreadsheet structure after changes.
 - `v0.4.0` documents the grouped analysis spreadsheet export behavior in `README.md`
 - `v0.4.0` introduces a repo-specific `CHANGELOG.md`
 - the perievent workflow needed a follow-up test-only fix so path assertions accept both Windows and POSIX separators in `data_description.txt`
+- `v0.4.1` adds spreadsheet import support for sleep-bout tables with `sleep_scores/start/end/duration`
+- the sleep-bout importer converts consecutive state bouts into transition events and accepts both 1-based user-facing codes (`1-4`) and older 0-based codes (`0-3`)
+- single-signal visualization imports needed the legend-only event traces attached to subplot row 1 instead of row 2
 
 ## Style Guidelines
 

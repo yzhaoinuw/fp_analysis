@@ -18,6 +18,8 @@ from plotly.subplots import make_subplots
 from plotly_resampler import FigureResampler
 from plotly_resampler.aggregation import MinMaxLTTB
 
+from fp_analysis_app.mat_utils import get_fp_signal_names
+
 
 # set up color config
 PERIOD_LABEL_OPACITY = 1
@@ -71,7 +73,7 @@ def make_figure(
     default_n_shown_samples=2048,
 ):
     # Time span and frequencies
-    fp_signal_names = mat["fp_signal_names"]
+    fp_signal_names = get_fp_signal_names(mat)
     num_signals = len(fp_signal_names)
     subplot_titles = fp_signal_names + [""] * (4 - num_signals)
     fp_signals = [mat[signal_name] for signal_name in fp_signal_names]
@@ -179,7 +181,7 @@ def make_figure(
                 ),
                 showlegend=True,
             ),
-            row=2,
+            row=1,
             col=1,
         )
 
