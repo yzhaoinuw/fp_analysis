@@ -36,6 +36,10 @@ from fp_analysis_app import VERSION
 from fp_analysis_app.components_dev import Components
 from fp_analysis_app.make_figure import get_padded_labels, make_figure
 from fp_analysis_app.event_analysis import Event_Utils, Perievent_Plots, Analyses
+from fp_analysis_app.mat_utils import (
+    get_fp_signal_names,
+    get_visualization_signal_names_and_frequency,
+)
 from fp_analysis_app.export_settings import (
     get_analysis_export_dir,
     write_analysis_description_file,
@@ -709,8 +713,7 @@ def choose_annotation(n_clicks):
 def import_annotation_file(annotation_filepath):
     mat_path = cache.get("filepath")
     mat = loadmat(mat_path, squeeze_me=True)
-    signal_names = mat.get("fp_signal_names")
-    fp_freq = mat.get("fp_frequency")
+    signal_names, fp_freq = get_visualization_signal_names_and_frequency(mat)
     duration = cache.get("duration")
     event_utils = Event_Utils(fp_freq, duration)
     event_time_dict = event_utils.read_events(event_file=annotation_filepath)
@@ -743,20 +746,19 @@ def create_visualization(ready):
     filepath = cache.get("filepath")
     mat_name = os.path.splitext(os.path.basename(filepath))[0]
     mat = loadmat(filepath, squeeze_me=True)
-    fp_signal_names = mat["fp_signal_names"]
-    num_signals = len(fp_signal_names)
-    fp_freq = mat.get("fp_frequency")
-    # duration = cache.get("duration")
-    event_data = mat.get("event")
-
     label_dict = {}
     analysis_page_content = dash.no_update
     analysis_link_style = {"visibility": "hidden"}
-
     message = "Please double check the file selected."
-    if num_signals == 0:
+    try:
+        fp_signal_names, fp_freq = get_visualization_signal_names_and_frequency(mat)
+    except KeyError:
         message = " ".join(["No FP signal found.", message])
         return message, dash.no_update, "", analysis_page_content, analysis_link_style
+
+    num_signals = len(fp_signal_names)
+    # duration = cache.get("duration")
+    event_data = mat.get("event")
 
     fp_signals = [mat[signal_name] for signal_name in fp_signal_names]
     signal_lengths = [len(fp_signals[k]) for k in range(num_signals)]
@@ -770,7 +772,7 @@ def create_visualization(ready):
     )  # need to round duration to an int for later
 
     if event_data is not None:
-        signal_names = mat.get("fp_signal_names")
+        signal_names = fp_signal_names
         event_utils = Event_Utils(fp_freq, duration)
         df_events = event_utils.eventdata_to_df(event_data)
         event_time_dict = event_utils.read_events(df_events=df_events)
@@ -794,21 +796,22 @@ def create_visualization(ready):
         labels_history.append(labels)
 
     fig = create_fig(mat, mat_name, label_dict=label_dict)
-    video_start_time = mat.get("video_start_time")
-    video_path = mat.get("video_path", np.array([]))
-    video_name = mat.get("video_name", np.array([]))
+    video_path = mat.get("video_path", "")
+    video_name = mat.get("video_name", "")
     time_ax = fig["data"][0]["x"]
     start_time, end_time = time_ax[0], time_ax[-1]
     cache.set("start_time", start_time)
     cache.set("end_time", end_time)
     cache.set("duration", duration)
-    if video_start_time is not None:
+        
+    if not isinstance(mat.get("video_start_time"), (int, float)):
+        video_start_time = 0
         cache.set("video_start_time", video_start_time)
-    if video_path.size != 0:
-        video_path = video_path.item()
+    if not isinstance(video_path, str):
+        video_path = ""  
         cache.set("video_path", video_path)
-    if video_name.size != 0:
-        video_name = video_name.item()
+    if not isinstance(video_name, str):
+        video_name = ""
         cache.set("video_name", video_name)
 
     cache.set("fig_resampler", fig)

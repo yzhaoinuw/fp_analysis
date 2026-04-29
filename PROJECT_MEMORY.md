@@ -186,6 +186,8 @@ These are useful for validating spreadsheet structure after changes.
   - it uses `ne_frequency` in place of `fp_frequency` for that path
 - a follow-up CI fix moved the visualization signal-selection logic into `fp_analysis_app/mat_utils.py`
 - the perievent unittest suite now tests that helper directly instead of importing `make_figure.py`, so the GitHub Actions workflow does not need Plotly dependencies just to validate the `ne` fallback
+- `fp_analysis_app/app_dev.py` now uses the same visualization signal/frequency helper during desktop-file validation, so NE-only MAT files are no longer rejected with "No FP signal found" before plotting
+- `run_desktop_app.py` now includes `VERSION` in the native desktop window title so packaged launches display the current app version
 
 ## Style Guidelines
 
