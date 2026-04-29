@@ -47,6 +47,11 @@ from fp_analysis_app import VERSION
 from fp_analysis_app.components import Components
 from fp_analysis_app.make_figure import get_padded_labels, make_figure
 from fp_analysis_app.event_analysis import Event_Utils, Perievent_Plots, Analyses
+from fp_analysis_app.mat_utils import (
+    get_fp_signal_names,
+    get_visualization_signal_data,
+    get_visualization_signal_names_and_frequency,
+)
 
 # from fp_analysis_app.postprocessing import get_sleep_segments, get_pred_label_stats
 
@@ -115,6 +120,22 @@ def create_fig(mat, mat_name, label_dict={}, default_n_shown_samples=2048):
     return fig
 
 
+def get_cached_runtime_fp_metadata(mat=None):
+    signal_names = cache.get("fp_signal_names")
+    fp_freq = cache.get("fp_frequency")
+    if signal_names and fp_freq is not None:
+        return signal_names, float(fp_freq)
+
+    if mat is None:
+        mat_name = cache.get("filename")
+        mat = loadmat(os.path.join(TEMP_PATH, mat_name), squeeze_me=True)
+
+    signal_names, fp_freq = get_visualization_signal_names_and_frequency(mat)
+    cache.set("fp_signal_names", signal_names)
+    cache.set("fp_frequency", float(fp_freq))
+    return signal_names, float(fp_freq)
+
+
 def make_analysis_plots(
     event_time_dict: dict,
     selected_signals: tuple[str, ...],
@@ -125,7 +146,7 @@ def make_analysis_plots(
     mat_name = cache.get("filename")
     mat_file = os.path.join(TEMP_PATH, mat_name)
     fp_data = loadmat(mat_file, squeeze_me=True)
-    fp_freq = float(fp_data["fp_frequency"])
+    _, fp_freq = get_cached_runtime_fp_metadata(mat=fp_data)
 
     # Build helpers
     event_utils = Event_Utils(
@@ -225,6 +246,8 @@ def reset_cache(cache, filename):
     cache.set("filename", filename)
     # cache.set("annotation_filename", "")
     cache.set("event_time_dict", {})
+    cache.set("fp_signal_names", [])
+    cache.set("fp_frequency", None)
     # cache.set("analysis_fig", None)
     cache.set("start_time", 0)
     cache.set("end_time", 0)
@@ -468,8 +491,7 @@ def import_annotation_file(annotation_filename):
     mat = loadmat(os.path.join(TEMP_PATH, mat_name), squeeze_me=True)
     # annotation_filename = cache.get("annotation_filename")
     annotation_file = os.path.join(TEMP_PATH, annotation_filename)
-    signal_names = mat.get("fp_signal_names")
-    fp_freq = mat.get("fp_frequency")
+    signal_names, fp_freq = get_cached_runtime_fp_metadata(mat=mat)
     duration = cache.get("duration")
     event_utils = Event_Utils(fp_freq, duration)
     event_time_dict = event_utils.read_events(event_file=annotation_file)
@@ -499,22 +521,23 @@ def create_visualization(ready):
 
     mat_name = cache.get("filename")
     mat = loadmat(os.path.join(TEMP_PATH, mat_name), squeeze_me=True)
-    fp_signal_names = mat["fp_signal_names"]
-    num_signals = len(fp_signal_names)
-    fp_freq = mat.get("fp_frequency")
-    # duration = cache.get("duration")
-    event_data = mat.get("event")
-
     label_dict = {}
     analysis_page_content = dash.no_update
     analysis_link_style = {"visibility": "hidden"}
 
     message = "Please double check the file selected."
-    if num_signals == 0:
+    try:
+        fp_signal_names, fp_signals, fp_freq = get_visualization_signal_data(mat)
+    except KeyError:
         message = " ".join(["No FP signal found.", message])
         return message, dash.no_update, "", analysis_page_content, analysis_link_style
+    cache.set("fp_signal_names", fp_signal_names)
+    cache.set("fp_frequency", float(fp_freq))
 
-    fp_signals = [mat[signal_name] for signal_name in fp_signal_names]
+    num_signals = len(fp_signal_names)
+    # duration = cache.get("duration")
+    event_data = mat.get("event")
+
     signal_lengths = [len(fp_signals[k]) for k in range(num_signals)]
     if not all(length == signal_lengths[0] for length in signal_lengths):
         message = " ".join(["Not all FP signals are of the same length.", message])
@@ -526,7 +549,7 @@ def create_visualization(ready):
     )  # need to round duration to an int for later
 
     if event_data is not None:
-        signal_names = mat.get("fp_signal_names")
+        signal_names = fp_signal_names
         event_utils = Event_Utils(fp_freq, duration)
         df_events = event_utils.eventdata_to_df(event_data)
         event_time_dict = event_utils.read_events(df_events=df_events)

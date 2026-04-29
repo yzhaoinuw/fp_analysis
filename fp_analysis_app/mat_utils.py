@@ -43,3 +43,14 @@ def get_visualization_signal_names_and_frequency(mat):
         )
 
     return signal_names, float(np.asarray(frequency).item())
+
+
+def get_visualization_signal_data(mat):
+    """
+    Return signal names, signal arrays, and frequency for app visualization and
+    analysis paths.
+    """
+
+    signal_names, frequency = get_visualization_signal_names_and_frequency(mat)
+    signals = [mat[signal_name] for signal_name in signal_names]
+    return signal_names, signals, frequency

@@ -18,7 +18,7 @@ from plotly.subplots import make_subplots
 from plotly_resampler import FigureResampler
 from plotly_resampler.aggregation import MinMaxLTTB
 
-from fp_analysis_app.mat_utils import get_visualization_signal_names_and_frequency
+from fp_analysis_app.mat_utils import get_visualization_signal_data
 
 
 # set up color config
@@ -73,10 +73,9 @@ def make_figure(
     default_n_shown_samples=2048,
 ):
     # Time span and frequencies
-    fp_signal_names, fp_freq = get_visualization_signal_names_and_frequency(mat)
+    fp_signal_names, fp_signals, fp_freq = get_visualization_signal_data(mat)
     num_signals = len(fp_signal_names)
     subplot_titles = fp_signal_names + [""] * (4 - num_signals)
-    fp_signals = [mat[signal_name] for signal_name in fp_signal_names]
     signal_lengths = [len(fp_signals[k]) for k in range(num_signals)]
     assert all(length == signal_lengths[0] for length in signal_lengths)
 

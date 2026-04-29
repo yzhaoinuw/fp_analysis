@@ -38,6 +38,7 @@ from fp_analysis_app.make_figure import get_padded_labels, make_figure
 from fp_analysis_app.event_analysis import Event_Utils, Perievent_Plots, Analyses
 from fp_analysis_app.mat_utils import (
     get_fp_signal_names,
+    get_visualization_signal_data,
     get_visualization_signal_names_and_frequency,
 )
 from fp_analysis_app.export_settings import (
@@ -102,6 +103,22 @@ def create_fig(mat, mat_name, label_dict={}, default_n_shown_samples=2048):
         default_n_shown_samples=default_n_shown_samples,
     )
     return fig
+
+
+def get_cached_runtime_fp_metadata(mat=None):
+    signal_names = cache.get("fp_signal_names")
+    fp_freq = cache.get("fp_frequency")
+    if signal_names and fp_freq is not None:
+        return signal_names, float(fp_freq)
+
+    if mat is None:
+        filepath = cache.get("filepath")
+        mat = loadmat(filepath, squeeze_me=True)
+
+    signal_names, fp_freq = get_visualization_signal_names_and_frequency(mat)
+    cache.set("fp_signal_names", signal_names)
+    cache.set("fp_frequency", float(fp_freq))
+    return signal_names, float(fp_freq)
 
 
 def open_mat_dialog():
@@ -251,7 +268,7 @@ def make_analysis_plots(
     preferred_spreadsheet_dir = get_preferred_spreadsheet_dir(filepath)
     mat_name = os.path.splitext(os.path.basename(filepath))[0]
     fp_data = loadmat(filepath, squeeze_me=True)
-    fp_freq = float(fp_data["fp_frequency"])
+    _, fp_freq = get_cached_runtime_fp_metadata(mat=fp_data)
 
     # Build helpers
     event_utils = Event_Utils(
@@ -512,6 +529,8 @@ def reset_cache(cache, filepath):
     cache.set("start_time", 0)
     cache.set("end_time", 0)
     cache.set("duration", 0)
+    cache.set("fp_signal_names", [])
+    cache.set("fp_frequency", None)
     cache.set("fig_resampler", None)
     cache.set("analysis_export_status_message", "")
 
@@ -713,7 +732,7 @@ def choose_annotation(n_clicks):
 def import_annotation_file(annotation_filepath):
     mat_path = cache.get("filepath")
     mat = loadmat(mat_path, squeeze_me=True)
-    signal_names, fp_freq = get_visualization_signal_names_and_frequency(mat)
+    signal_names, fp_freq = get_cached_runtime_fp_metadata(mat=mat)
     duration = cache.get("duration")
     event_utils = Event_Utils(fp_freq, duration)
     event_time_dict = event_utils.read_events(event_file=annotation_filepath)
@@ -751,16 +770,17 @@ def create_visualization(ready):
     analysis_link_style = {"visibility": "hidden"}
     message = "Please double check the file selected."
     try:
-        fp_signal_names, fp_freq = get_visualization_signal_names_and_frequency(mat)
+        fp_signal_names, fp_signals, fp_freq = get_visualization_signal_data(mat)
     except KeyError:
         message = " ".join(["No FP signal found.", message])
         return message, dash.no_update, "", analysis_page_content, analysis_link_style
+    cache.set("fp_signal_names", fp_signal_names)
+    cache.set("fp_frequency", float(fp_freq))
 
     num_signals = len(fp_signal_names)
     # duration = cache.get("duration")
     event_data = mat.get("event")
 
-    fp_signals = [mat[signal_name] for signal_name in fp_signal_names]
     signal_lengths = [len(fp_signals[k]) for k in range(num_signals)]
     if not all(length == signal_lengths[0] for length in signal_lengths):
         message = " ".join(["Not all FP signals are of the same length.", message])

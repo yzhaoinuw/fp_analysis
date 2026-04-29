@@ -15,6 +15,7 @@ from fp_analysis_app.export_settings import (
 )
 from fp_analysis_app.mat_utils import (
     get_fp_signal_names,
+    get_visualization_signal_data,
     get_visualization_signal_names_and_frequency,
 )
 from fp_analysis_app.sleep_event_import import is_sleep_bout_table
@@ -124,6 +125,18 @@ class TestMakeFigureFallbacks(unittest.TestCase):
         signal_names, frequency = get_visualization_signal_names_and_frequency(mat)
 
         self.assertEqual(["ne"], signal_names)
+        self.assertEqual(2.0, frequency)
+
+    def test_visualization_signal_data_helper_returns_ne_signal(self):
+        mat = {
+            "ne": np.array([0.0, 0.5, -0.25, 0.75]),
+            "ne_frequency": np.array(2.0),
+        }
+
+        signal_names, signals, frequency = get_visualization_signal_data(mat)
+
+        self.assertEqual(["ne"], signal_names)
+        np.testing.assert_array_equal(np.array([0.0, 0.5, -0.25, 0.75]), signals[0])
         self.assertEqual(2.0, frequency)
 
 
