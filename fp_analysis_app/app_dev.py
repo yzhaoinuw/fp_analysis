@@ -637,6 +637,17 @@ def toggle_save_spreadsheets_modal(open_clicks, cancel_clicks):
     Output("analysis-save-status", "children", allow_duplicate=True),
     Input("confirm-save-spreadsheets-button", "n_clicks"),
     State("save-analysis-checklist", "value"),
+    background=True,
+    manager=background_callback_manager,
+    running=[
+        (Output("confirm-save-spreadsheets-button", "disabled"), True, False),
+        (Output("cancel-save-spreadsheets-button", "disabled"), True, False),
+        (
+            Output("save-spreadsheets-button", "disabled", allow_duplicate=True),
+            True,
+            False,
+        ),
+    ],
     prevent_initial_call=True,
 )
 def save_selected_analysis_spreadsheets(n_clicks, selected_analysis_types):
