@@ -7,6 +7,7 @@ import pandas as pd
 from scipy.io import loadmat
 
 from fp_analysis_app.event_analysis import Analyses, Event_Utils, Perievent_Plots
+from fp_analysis_app.analysis_export import write_analysis_workbooks
 from fp_analysis_app.export_settings import (
     build_analysis_config_dirname,
     build_analysis_description_text,
@@ -852,6 +853,127 @@ class TestAnalysisExportSettings(unittest.TestCase):
         self.assertEqual(1, normalized_description_text.count("- C:/data/F268.mat"))
         self.assertEqual(1, normalized_description_text.count("- C:/data/F269.mat"))
         self.assertIn("Event types: wake_sws, sws_wake", description_text)
+
+
+class TestSelectiveAnalysisWorkbookExport(unittest.TestCase):
+    def _build_export_payload(self, mat_filepath, auc_values=None, decay_values=None):
+        auc_values = auc_values or [1.0, 2.0]
+        decay_values = decay_values or [3.0, 4.0]
+        return {
+            "mat_filepath": mat_filepath,
+            "subject_id": "F268",
+            "selected_signals": ("NE2m",),
+            "baseline_window": 30,
+            "analysis_window": 60,
+            "event_names": ["wake_sws"],
+            "signal_event_exports": {
+                "mean_trace": {
+                    "NE2m": {
+                        "wake_sws": pd.DataFrame(
+                            {
+                                "time_s": [0.0, 0.1],
+                                "F268_mean": [0.5, 0.6],
+                                "F268_sd": [0.05, 0.06],
+                                "F268_n": [2, 2],
+                            }
+                        )
+                    }
+                },
+                "auc": {
+                    "NE2m": {
+                        "wake_sws": pd.DataFrame(
+                            {
+                                "event_index": [1, 2],
+                                "F268": auc_values,
+                            }
+                        )
+                    }
+                },
+                "decay_time": {
+                    "NE2m": {
+                        "wake_sws": pd.DataFrame(
+                            {
+                                "event_index": [1, 2],
+                                "F268": decay_values,
+                            }
+                        )
+                    }
+                },
+            },
+            "cross_correlation_event_exports": {},
+            "strongest_cross_correlation_event_exports": {},
+        }
+
+    def test_selective_export_creates_only_selected_workbooks(self):
+        with TemporaryDirectory() as tmpdir:
+            export_payload = self._build_export_payload(Path("C:/data/F268.mat"))
+            write_analysis_workbooks(
+                primary_dir=Path(tmpdir),
+                fallback_dir=Path(tmpdir) / "fallback",
+                export_payload=export_payload,
+                selected_analysis_types=["auc"],
+            )
+            export_dir = Path(tmpdir) / "NE2m_bw30_aw60"
+
+            self.assertTrue((export_dir / "NE2m_auc_bw30_aw60.xlsx").exists())
+            self.assertFalse((export_dir / "NE2m_bw30_aw60.xlsx").exists())
+            self.assertFalse((export_dir / "NE2m_decay_time_bw30_aw60.xlsx").exists())
+
+    def test_later_export_adds_new_analysis_type_and_updates_description(self):
+        with TemporaryDirectory() as tmpdir:
+            export_payload = self._build_export_payload(Path("C:/data/F268.mat"))
+            write_analysis_workbooks(
+                primary_dir=Path(tmpdir),
+                fallback_dir=Path(tmpdir) / "fallback",
+                export_payload=export_payload,
+                selected_analysis_types=["auc"],
+            )
+            write_analysis_workbooks(
+                primary_dir=Path(tmpdir),
+                fallback_dir=Path(tmpdir) / "fallback",
+                export_payload=export_payload,
+                selected_analysis_types=["decay_time"],
+            )
+            export_dir = Path(tmpdir) / "NE2m_bw30_aw60"
+            description_text = (export_dir / "data_description.txt").read_text(
+                encoding="utf-8"
+            )
+
+            self.assertTrue((export_dir / "NE2m_auc_bw30_aw60.xlsx").exists())
+            self.assertTrue((export_dir / "NE2m_decay_time_bw30_aw60.xlsx").exists())
+            self.assertIn("Saved analysis types: AUC, Decay time", description_text)
+
+    def test_resaving_same_subject_replaces_existing_subject_column(self):
+        with TemporaryDirectory() as tmpdir:
+            export_payload = self._build_export_payload(
+                Path("C:/data/F268.mat"),
+                auc_values=[1.0, 2.0],
+            )
+            replacement_payload = self._build_export_payload(
+                Path("C:/data/F268.mat"),
+                auc_values=[9.0, 8.0],
+            )
+            write_analysis_workbooks(
+                primary_dir=Path(tmpdir),
+                fallback_dir=Path(tmpdir) / "fallback",
+                export_payload=export_payload,
+                selected_analysis_types=["auc"],
+            )
+            write_analysis_workbooks(
+                primary_dir=Path(tmpdir),
+                fallback_dir=Path(tmpdir) / "fallback",
+                export_payload=replacement_payload,
+                selected_analysis_types=["auc"],
+            )
+            workbook_path = Path(tmpdir) / "NE2m_bw30_aw60" / "NE2m_auc_bw30_aw60.xlsx"
+            exported = pd.read_excel(
+                workbook_path,
+                sheet_name="wake_sws",
+                engine="openpyxl",
+            )
+
+        self.assertEqual(["event_index", "F268"], exported.columns.tolist())
+        np.testing.assert_allclose(exported["F268"].to_numpy(), np.array([9.0, 8.0]))
 
 if __name__ == "__main__":
     unittest.main()

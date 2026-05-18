@@ -36,14 +36,14 @@ from fp_analysis_app import VERSION
 from fp_analysis_app.components_dev import Components
 from fp_analysis_app.make_figure import get_padded_labels, make_figure
 from fp_analysis_app.event_analysis import Event_Utils, Perievent_Plots, Analyses
+from fp_analysis_app.analysis_export import (
+    build_analysis_type_checklist_options,
+    write_analysis_workbooks,
+)
 from fp_analysis_app.mat_utils import (
     get_fp_signal_names,
     get_visualization_signal_data,
     get_visualization_signal_names_and_frequency,
-)
-from fp_analysis_app.export_settings import (
-    get_analysis_export_dir,
-    write_analysis_description_file,
 )
 
 
@@ -66,6 +66,7 @@ FIGURE_DIR.mkdir(parents=True, exist_ok=True)
 SPREADSHEET_DIR = Path(__file__).parent / "assets" / "spreadsheets"
 SPREADSHEET_DIR.mkdir(parents=True, exist_ok=True)
 EXPORT_DOWNSAMPLE_FACTOR = 100
+ANALYSIS_EXPORT_PAYLOAD_CACHE_KEY = "analysis_export_payload"
 
 components = Components()
 app.layout = html.Div(
@@ -171,90 +172,8 @@ def get_preferred_spreadsheet_dir(filepath):
     return Path(filepath).resolve().parent
 
 
-def write_analysis_workbooks(
-    primary_dir,
-    fallback_dir,
-    signal_event_exports,
-    export_specs,
-    selected_signals,
-    cross_correlation_event_exports,
-    strongest_cross_correlation_event_exports,
-    get_cross_correlation_workbook_name,
-    get_strongest_cross_correlation_workbook_name,
-    mat_filepath,
-    baseline_window,
-    analysis_window,
-    event_names,
-):
-    primary_dir = Path(primary_dir)
-    fallback_dir = Path(fallback_dir)
-    config_dir = get_analysis_export_dir(
-        base_dir=primary_dir,
-        selected_signals=selected_signals,
-        baseline_window=baseline_window,
-        analysis_window=analysis_window,
-    )
-    fallback_config_dir = get_analysis_export_dir(
-        base_dir=fallback_dir,
-        selected_signals=selected_signals,
-        baseline_window=baseline_window,
-        analysis_window=analysis_window,
-    )
-
-    def export_all_workbooks(target_dir):
-        target_dir.mkdir(parents=True, exist_ok=True)
-        write_analysis_description_file(
-            export_dir=target_dir,
-            mat_filepath=mat_filepath,
-            selected_signals=selected_signals,
-            baseline_window=baseline_window,
-            analysis_window=analysis_window,
-            event_names=event_names,
-        )
-
-        for export_name, export_spec in export_specs.items():
-            for sig, event_sheet_dfs in signal_event_exports[export_name].items():
-                workbook_save_path = target_dir / export_spec["workbook_name"](sig)
-                export_spec["write_workbook"](
-                    workbook_save_path=workbook_save_path,
-                    event_sheet_dfs=event_sheet_dfs,
-                    **export_spec.get("write_kwargs", {}),
-                )
-
-        if len(selected_signals) == 2 and cross_correlation_event_exports:
-            sig_a, sig_b = selected_signals
-            workbook_save_path = target_dir / get_cross_correlation_workbook_name(
-                sig_a,
-                sig_b,
-            )
-            Perievent_Plots.export_cross_correlation_workbook(
-                workbook_save_path=workbook_save_path,
-                event_sheet_dfs=cross_correlation_event_exports,
-            )
-            strongest_workbook_save_path = (
-                target_dir
-                / get_strongest_cross_correlation_workbook_name(sig_a, sig_b)
-            )
-            Perievent_Plots.export_strongest_cross_correlation_workbook(
-                workbook_save_path=strongest_workbook_save_path,
-                event_sheet_dfs=strongest_cross_correlation_event_exports,
-            )
-
-    try:
-        export_all_workbooks(config_dir)
-        return (
-            config_dir,
-            "Analysis spreadsheets saved next to the input MAT file in "
-            f"'{config_dir}'.",
-        )
-    except OSError:
-        export_all_workbooks(fallback_config_dir)
-        return (
-            fallback_config_dir,
-            "Could not save analysis spreadsheets next to the input MAT file. "
-            "Saved them to the app spreadsheet folder instead: "
-            f"'{fallback_config_dir}'.",
-        )
+def clear_analysis_export_payload():
+    cache.set(ANALYSIS_EXPORT_PAYLOAD_CACHE_KEY, None)
 
 
 def make_analysis_plots(
@@ -265,7 +184,6 @@ def make_analysis_plots(
     duration: float | None = None,
 ):
     filepath = cache.get("filepath")
-    preferred_spreadsheet_dir = get_preferred_spreadsheet_dir(filepath)
     mat_name = os.path.splitext(os.path.basename(filepath))[0]
     fp_data = loadmat(filepath, squeeze_me=True)
     _, fp_freq = get_cached_runtime_fp_metadata(mat=fp_data)
@@ -316,62 +234,21 @@ def make_analysis_plots(
             subject_id=subject_id,
         )
 
-    def get_mean_trace_workbook_name(sig):
-        return f"{sig}_bw{baseline_window}_aw{analysis_window}.xlsx"
-
-    def get_auc_workbook_name(sig):
-        return f"{sig}_auc_bw{baseline_window}_aw{analysis_window}.xlsx"
-
-    def get_max_peak_magnitude_workbook_name(sig):
-        return f"{sig}_max_peak_magnitude_bw{baseline_window}_aw{analysis_window}.xlsx"
-
-    def get_first_peak_time_workbook_name(sig):
-        return f"{sig}_first_peak_time_bw{baseline_window}_aw{analysis_window}.xlsx"
-
-    def get_decay_time_workbook_name(sig):
-        return f"{sig}_decay_time_bw{baseline_window}_aw{analysis_window}.xlsx"
-
-    def get_cross_correlation_workbook_name(sig_a, sig_b):
-        return (
-            f"{sig_a}_{sig_b}_cross_correlation_"
-            f"bw{baseline_window}_aw{analysis_window}.xlsx"
-        )
-
-    def get_strongest_cross_correlation_workbook_name(sig_a, sig_b):
-        return (
-            f"{sig_a}_{sig_b}_strongest_cross_correlation_time_lag_"
-            f"bw{baseline_window}_aw{analysis_window}.xlsx"
-        )
-
     export_specs = {
         "mean_trace": {
             "build_df": build_mean_trace_export,
-            "write_workbook": Perievent_Plots.export_mean_trace_workbook,
-            "workbook_name": get_mean_trace_workbook_name,
         },
         "auc": {
             "build_df": build_auc_export,
-            "write_workbook": Perievent_Plots.export_occurrence_value_workbook,
-            "workbook_name": get_auc_workbook_name,
-            "write_kwargs": {"index_column": "event_index"},
         },
         "max_peak_magnitude": {
             "build_df": build_max_peak_magnitude_export,
-            "write_workbook": Perievent_Plots.export_occurrence_value_workbook,
-            "workbook_name": get_max_peak_magnitude_workbook_name,
-            "write_kwargs": {"index_column": "event_index"},
         },
         "first_peak_time": {
             "build_df": build_first_peak_time_export,
-            "write_workbook": Perievent_Plots.export_occurrence_value_workbook,
-            "workbook_name": get_first_peak_time_workbook_name,
-            "write_kwargs": {"index_column": "event_index"},
         },
         "decay_time": {
             "build_df": build_decay_time_export,
-            "write_workbook": Perievent_Plots.export_occurrence_value_workbook,
-            "workbook_name": get_decay_time_workbook_name,
-            "write_kwargs": {"index_column": "event_index"},
         },
     }
     signal_event_exports = {
@@ -492,27 +369,25 @@ def make_analysis_plots(
             f"{mat_name}_{event}_correlation_bw{baseline_window}_aw{analysis_window}.png",
         )
 
-    _, export_status_message = write_analysis_workbooks(
-        primary_dir=preferred_spreadsheet_dir,
-        fallback_dir=SPREADSHEET_DIR,
-        signal_event_exports=signal_event_exports,
-        export_specs=export_specs,
-        selected_signals=selected_signals,
-        cross_correlation_event_exports=cross_correlation_event_exports,
-        strongest_cross_correlation_event_exports=strongest_cross_correlation_event_exports,
-        get_cross_correlation_workbook_name=get_cross_correlation_workbook_name,
-        get_strongest_cross_correlation_workbook_name=get_strongest_cross_correlation_workbook_name,
-        mat_filepath=filepath,
-        baseline_window=baseline_window,
-        analysis_window=analysis_window,
-        event_names=sorted(event_time_dict.keys()),
-    )
-    cache.set("analysis_export_status_message", export_status_message)
+    export_payload = {
+        "mat_filepath": filepath,
+        "subject_id": subject_id,
+        "selected_signals": tuple(selected_signals),
+        "baseline_window": baseline_window,
+        "analysis_window": analysis_window,
+        "event_names": sorted(event_time_dict.keys()),
+        "signal_event_exports": signal_event_exports,
+        "cross_correlation_event_exports": cross_correlation_event_exports,
+        "strongest_cross_correlation_event_exports": (
+            strongest_cross_correlation_event_exports
+        ),
+    }
     
     return (
         perievent_signals_fig_paths,
         analyses_fig_paths,
         corr_fig_paths,
+        export_payload,
     )
 
 
@@ -533,6 +408,7 @@ def reset_cache(cache, filepath):
     cache.set("fp_frequency", None)
     cache.set("fig_resampler", None)
     cache.set("analysis_export_status_message", "")
+    clear_analysis_export_payload()
 
 
 # %% client side callbacks below
@@ -631,6 +507,8 @@ clientside_callback(
 # %% server side callbacks below
 @app.callback(
     Output({"type": "tab", "event": ALL}, "children"),
+    Output("save-spreadsheets-button", "disabled", allow_duplicate=True),
+    Output("analysis-save-status", "children", allow_duplicate=True),
     Input("show-results-button", "n_clicks"),
     State("signal-select-dropdown", "value"),
     State("baseline-window-dropdown", "value"),
@@ -641,7 +519,7 @@ clientside_callback(
     running=[
         (Output("show-results-button", "disabled"), True, False),
     ],
-    prevent_initial_call=False,
+    prevent_initial_call=True,
 )
 def show_analysis_results(
     n_clicks,
@@ -662,7 +540,12 @@ def show_analysis_results(
     # annotation_filepath = cache.get("annotation_filepath")
     event_time_dict = cache.get("event_time_dict")
     duration = cache.get("duration")
-    perievent_signals_fig_paths, analyses_fig_paths, corr_fig_paths = (
+    (
+        perievent_signals_fig_paths,
+        analyses_fig_paths,
+        corr_fig_paths,
+        export_payload,
+    ) = (
         make_analysis_plots(
             event_time_dict=event_time_dict,
             selected_signals=selected_signals,
@@ -671,6 +554,7 @@ def show_analysis_results(
             duration=duration,
         )
     )
+    cache.set(ANALYSIS_EXPORT_PAYLOAD_CACHE_KEY, export_payload)
     # Build outputs aligned to each pattern’s IDs
     tab_children = []
     for tab in tabs:
@@ -680,7 +564,88 @@ def show_analysis_results(
         )
         tab_children.append(children)
 
-    return tab_children
+    status_message = (
+        "Analysis results are ready. Click Save Spreadsheets to choose which "
+        "workbooks to save."
+    )
+    return tab_children, False, status_message
+
+
+@app.callback(
+    Output("save-spreadsheets-button", "disabled", allow_duplicate=True),
+    Output("analysis-save-status", "children", allow_duplicate=True),
+    Input("signal-select-dropdown", "value"),
+    Input("baseline-window-dropdown", "value"),
+    Input("analysis-window-dropdown", "value"),
+    prevent_initial_call=True,
+)
+def clear_export_payload_after_analysis_setting_change(
+    selected_signals,
+    baseline_window,
+    analysis_window,
+):
+    clear_analysis_export_payload()
+    return True, "Run analysis to prepare spreadsheet exports for these settings."
+
+
+@app.callback(
+    Output("save-spreadsheets-modal", "style"),
+    Output("save-analysis-checklist", "options"),
+    Output("save-analysis-checklist", "value"),
+    Output("analysis-save-status", "children", allow_duplicate=True),
+    Input("save-spreadsheets-button", "n_clicks"),
+    Input("cancel-save-spreadsheets-button", "n_clicks"),
+    prevent_initial_call=True,
+)
+def toggle_save_spreadsheets_modal(open_clicks, cancel_clicks):
+    triggered_id = dash.callback_context.triggered_id
+    hidden_style = {"display": "none"}
+    visible_style = {"display": "block"}
+
+    if triggered_id == "cancel-save-spreadsheets-button":
+        return hidden_style, dash.no_update, dash.no_update, dash.no_update
+
+    export_payload = cache.get(ANALYSIS_EXPORT_PAYLOAD_CACHE_KEY)
+    if not export_payload:
+        return (
+            hidden_style,
+            dash.no_update,
+            dash.no_update,
+            "Run analysis before saving spreadsheets.",
+        )
+
+    options = build_analysis_type_checklist_options(export_payload)
+    selected_values = [
+        option["value"] for option in options if not option.get("disabled")
+    ]
+    return visible_style, options, selected_values, dash.no_update
+
+
+@app.callback(
+    Output("save-spreadsheets-modal", "style", allow_duplicate=True),
+    Output("analysis-save-status", "children", allow_duplicate=True),
+    Input("confirm-save-spreadsheets-button", "n_clicks"),
+    State("save-analysis-checklist", "value"),
+    prevent_initial_call=True,
+)
+def save_selected_analysis_spreadsheets(n_clicks, selected_analysis_types):
+    if not n_clicks:
+        raise PreventUpdate
+    if not selected_analysis_types:
+        return {"display": "block"}, "Select at least one analysis type to save."
+
+    export_payload = cache.get(ANALYSIS_EXPORT_PAYLOAD_CACHE_KEY)
+    if not export_payload:
+        return {"display": "none"}, "Run analysis before saving spreadsheets."
+
+    primary_dir = get_preferred_spreadsheet_dir(export_payload["mat_filepath"])
+    _, export_status_message = write_analysis_workbooks(
+        primary_dir=primary_dir,
+        fallback_dir=SPREADSHEET_DIR,
+        export_payload=export_payload,
+        selected_analysis_types=selected_analysis_types,
+    )
+    return {"display": "none"}, export_status_message
 
 
 @app.callback(
@@ -730,6 +695,7 @@ def choose_annotation(n_clicks):
     prevent_initial_call=True,
 )
 def import_annotation_file(annotation_filepath):
+    clear_analysis_export_payload()
     mat_path = cache.get("filepath")
     mat = loadmat(mat_path, squeeze_me=True)
     signal_names, fp_freq = get_cached_runtime_fp_metadata(mat=mat)

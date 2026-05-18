@@ -60,15 +60,16 @@ Current behavior differs by app entrypoint:
 
 - `app_dev.py`
   - This is the spreadsheet path most relevant to the current desktop app
-  - Export flow is now split into two phases:
-    1. compute/store per-signal perievent results for each event
-    2. build/write spreadsheet exports through an `export_specs` registry in `make_analysis_plots()`
+  - Export flow is now user-separated:
+    1. `Show Results` computes/displays analysis figures and stores export-ready DataFrames in filesystem cache
+    2. `Save Spreadsheets` opens a checklist modal and writes only the selected workbook types
+  - The selective save writer lives in `fp_analysis_app/analysis_export.py` so workbook export behavior can be tested without importing the Dash desktop app
   - Export destination behavior for the desktop app:
     - first try to save beside the selected input `.mat`
     - if that location is not writable, fall back to `fp_analysis_app/assets/spreadsheets/`
     - exports are grouped into a setup-specific subfolder named from alphabetically sorted selected signals plus the baseline and analysis windows
     - example folder pattern: `NE2m_mClY_bw30_aw60`
-    - a `data_description.txt` file is written in that folder and keeps a unique insertion-order list of analyzed MAT paths for that setup
+    - a `data_description.txt` file is written in that folder and keeps a unique insertion-order list of analyzed MAT paths and saved analysis types for that setup
   - Current export registry entries:
     - mean trace workbook per signal: `<signal>_bw<baseline>_aw<analysis>.xlsx`
     - AUC workbook per signal: `<signal>_auc_bw<baseline>_aw<analysis>.xlsx`
@@ -94,6 +95,7 @@ Current behavior differs by app entrypoint:
     - existing event sheets continue to append or overwrite subject columns as usual
     - new event types create new sheets
     - event sheets from prior runs are left in place if the current file does not contain that event
+  - Saved analysis types are tracked cumulatively in `data_description.txt`, so adding AUC first and decay time later leaves both analysis types documented
 
 - `app.py`
   - Creates one workbook per event
@@ -147,6 +149,7 @@ These are useful for validating spreadsheet structure after changes.
   - overwrite-in-place behavior when the same subject is re-exported into the same workbook
   - setup-folder naming derived from sorted signal names plus baseline and analysis windows
   - `data_description.txt` content and unique MAT-path accumulation behavior
+  - selective workbook saving so a subset of analysis types can be exported first and additional analysis types can be added later
 - The `F268` integration test class is skipped only when these local fixture files are absent:
   - `data/F268.mat`
   - `data/Transitions_F268.xlsx`
@@ -222,6 +225,7 @@ If the next task is about spreadsheet output:
 
 - Check `run_desktop_app.py` to confirm which app path is active
 - Inspect `fp_analysis_app/app_dev.py` first for desktop export behavior
+- Inspect `fp_analysis_app/analysis_export.py` for selective spreadsheet save behavior
 - Inspect `fp_analysis_app/event_analysis.py` for the actual workbook/sheet writing logic
 - Compare with `fp_analysis_app/app.py` if behavior seems inconsistent or partially migrated
-- For new export types in the desktop app, prefer adding a new entry to the `export_specs` registry in `app_dev.py` instead of expanding the analysis loop inline
+- For new export types in the desktop app, add the export-ready DataFrame build step in `app_dev.py` and the workbook naming/writing selection in `analysis_export.py`

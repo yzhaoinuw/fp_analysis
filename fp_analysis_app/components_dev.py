@@ -93,6 +93,77 @@ analysis_page = html.Div(
     id="analysis-page",
 )
 
+
+# ###########################################################################
+# Added component: Save Spreadsheets modal for separated analysis export flow.
+# ###########################################################################
+def build_save_spreadsheets_modal():
+    return html.Div(
+        id="save-spreadsheets-modal",
+        style={"display": "none"},
+        children=[
+            html.Div(
+                style={
+                    "position": "fixed",
+                    "top": 0,
+                    "left": 0,
+                    "right": 0,
+                    "bottom": 0,
+                    "backgroundColor": "rgba(0, 0, 0, 0.35)",
+                    "zIndex": 1000,
+                    "display": "flex",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                },
+                children=[
+                    html.Div(
+                        style={
+                            "backgroundColor": "white",
+                            "border": "1px solid #ccc",
+                            "borderRadius": "6px",
+                            "boxShadow": "0 4px 18px rgba(0, 0, 0, 0.2)",
+                            "padding": "18px",
+                            "minWidth": "320px",
+                            "maxWidth": "480px",
+                        },
+                        children=[
+                            html.H4("Save Spreadsheets"),
+                            dcc.Checklist(
+                                id="save-analysis-checklist",
+                                options=[],
+                                value=[],
+                                labelStyle={
+                                    "display": "block",
+                                    "marginBottom": "8px",
+                                },
+                            ),
+                            html.Div(
+                                style={
+                                    "display": "flex",
+                                    "justifyContent": "flex-end",
+                                    "gap": "8px",
+                                    "marginTop": "16px",
+                                },
+                                children=[
+                                    html.Button(
+                                        "Cancel",
+                                        id="cancel-save-spreadsheets-button",
+                                        n_clicks=0,
+                                    ),
+                                    html.Button(
+                                        "Confirm",
+                                        id="confirm-save-spreadsheets-button",
+                                        n_clicks=0,
+                                    ),
+                                ],
+                            ),
+                        ],
+                    )
+                ],
+            )
+        ],
+    )
+
 main_div = html.Div(
     [
         page_container,  # page layout is rendered here
@@ -256,6 +327,10 @@ class Components:
         children = [
             html.H3("Analysis Page"),
             html.Div(dcc.Link(children="← Back", href="/")),
+            # ################################################################
+            # Edited component: analysis controls now separate running analysis
+            # from saving spreadsheets.
+            # ################################################################
             html.Div(
                 style={"display": "flex", "marginLeft": "10px", "gap": "10px"},
                 children=[
@@ -288,8 +363,19 @@ class Components:
                         clearable=True,
                     ),
                     html.Button("Show Results", id="show-results-button", n_clicks=0),
+                    html.Button(
+                        "Save Spreadsheets",
+                        id="save-spreadsheets-button",
+                        n_clicks=0,
+                        disabled=True,
+                    ),
                 ],
             ),
+            html.Div(
+                id="analysis-save-status",
+                style={"marginLeft": "10px", "marginTop": "8px"},
+            ),
+            build_save_spreadsheets_modal(),
             html.Br(),
             html.Div(
                 dash_table.DataTable(
