@@ -573,6 +573,7 @@ def show_analysis_results(
 
 @app.callback(
     Output("save-spreadsheets-button", "disabled", allow_duplicate=True),
+    Output("show-results-button", "disabled", allow_duplicate=True),
     Output("analysis-save-status", "children", allow_duplicate=True),
     Input("signal-select-dropdown", "value"),
     Input("baseline-window-dropdown", "value"),
@@ -585,7 +586,12 @@ def clear_export_payload_after_analysis_setting_change(
     analysis_window,
 ):
     clear_analysis_export_payload()
-    return True, "Run analysis to prepare spreadsheet exports for these settings."
+    show_results_disabled = not selected_signals
+    return (
+        True,
+        show_results_disabled,
+        "Run analysis to prepare spreadsheet exports for these settings.",
+    )
 
 
 @app.callback(
@@ -653,6 +659,7 @@ def save_selected_analysis_spreadsheets(n_clicks, selected_analysis_types):
     Output("visualization-ready-store", "data", allow_duplicate=True),
     Output("upload-container", "children", allow_duplicate=True),
     Output("analysis-link", "style", allow_duplicate=True),
+    Output("analysis-page", "children", allow_duplicate=True),
     Input("vis-data-upload-button", "n_clicks"),
     prevent_initial_call=True,
 )
@@ -668,7 +675,7 @@ def choose_mat(n_clicks):
     message = (
         "File uploaded. Creating visualizations... This may take up to 30 seconds."
     )
-    return message, True, components.vis_upload_button, {"visibility": "hidden"}
+    return message, True, components.vis_upload_button, {"visibility": "hidden"}, []
 
 
 @app.callback(
@@ -732,7 +739,7 @@ def create_visualization(ready):
     mat_name = os.path.splitext(os.path.basename(filepath))[0]
     mat = loadmat(filepath, squeeze_me=True)
     label_dict = {}
-    analysis_page_content = dash.no_update
+    analysis_page_content = []
     analysis_link_style = {"visibility": "hidden"}
     message = "Please double check the file selected."
     try:

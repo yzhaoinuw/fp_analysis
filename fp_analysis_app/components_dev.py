@@ -362,7 +362,12 @@ class Components:
                         style={"width": "300px"},
                         clearable=True,
                     ),
-                    html.Button("Show Results", id="show-results-button", n_clicks=0),
+                    html.Button(
+                        "Show Results",
+                        id="show-results-button",
+                        n_clicks=0,
+                        disabled=True,
+                    ),
                     html.Button(
                         "Save Spreadsheets",
                         id="save-spreadsheets-button",
