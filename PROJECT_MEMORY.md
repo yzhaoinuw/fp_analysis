@@ -64,6 +64,9 @@ Current behavior differs by app entrypoint:
     1. `Show Results` computes/displays analysis figures and stores export-ready DataFrames in filesystem cache
     2. `Save Spreadsheets` opens a checklist modal and writes only the selected workbook types
   - The selective save writer lives in `fp_analysis_app/analysis_export.py` so workbook export behavior can be tested without importing the Dash desktop app
+  - `Show Results` is disabled until the current analysis page has at least one selected signal, and stale analysis page content is cleared when a new MAT file is selected
+  - The `Save Spreadsheets` checklist remembers the last confirmed export type choices across files and falls back to all available choices when remembered options do not apply
+  - Spreadsheet saving runs as a background callback, disabling the save modal controls while workbook exports are in progress
   - Export destination behavior for the desktop app:
     - first try to save beside the selected input `.mat`
     - if that location is not writable, fall back to `fp_analysis_app/assets/spreadsheets/`
@@ -158,6 +161,7 @@ These are useful for validating spreadsheet structure after changes.
   - clean CI checkouts skip only the fixture-dependent integration class
 - synthetic export tests still run in both environments
 - The perievent export suite now also checks the `mean/sd/n` column triplet layout for mean traces and mean cross-correlation workbooks
+- The selective export tests also cover remembered checklist defaults for available vs unavailable analysis types
 
 ## Workflow Status
 
@@ -193,6 +197,8 @@ These are useful for validating spreadsheet structure after changes.
 - `run_desktop_app.py` now includes `VERSION` in the native desktop window title so packaged launches display the current app version
 - the active app paths now normalize runtime signal metadata into cache keys named `fp_signal_names` and `fp_frequency`
 - if a MAT file has no `fp_*` metadata but does contain `ne` and `ne_frequency`, those values are redirected into the cached runtime FP metadata so downstream visualization and analysis callbacks can keep reading the same cache keys
+- `v0.5.0-beta` separates `Show Results` from spreadsheet writing; users now run analysis first, then click `Save Spreadsheets` to choose workbook types from a checklist modal
+- `v0.5.0-beta` resets stale analysis controls when loading a new MAT file, remembers the last confirmed spreadsheet export choices across files, and runs spreadsheet saving in a background callback that disables save controls while exports are running
 
 ## Style Guidelines
 

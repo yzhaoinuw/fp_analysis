@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.5.0-beta
+
+- separate analysis generation from spreadsheet export with a dedicated `Save Spreadsheets` flow
+- let users choose which spreadsheet workbook types to save from a checklist modal
+- keep spreadsheet save controls disabled while workbook exports are running
+- remember the last selected spreadsheet export types across files
+- reset stale analysis controls when switching to a new `.mat` file
+
 ## v0.4.1
 
 - import sleep-bout spreadsheets by converting 1-based or 0-based state codes into transition events

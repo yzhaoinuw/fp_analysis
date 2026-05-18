@@ -22,7 +22,7 @@ Click "**Click here to select File**". After you select a file, the app will bri
 ### Analysis Spreadsheet Export
 After annotations are loaded, go to the analysis page, choose the signal(s) and analysis windows, and click `Show Results`. This generates the analysis figures and prepares spreadsheet-ready results without writing spreadsheet files.
 
-To export spreadsheets, click `Save Spreadsheets`, choose the analysis types to save, and confirm. The app writes only the selected workbook types.
+To export spreadsheets, click `Save Spreadsheets`, check the analysis types to save, and confirm. The app writes only the selected workbook types.
 
 The app first tries to save the spreadsheets next to the selected `.mat` file. If that location is not writable, it saves them to the app spreadsheet folder under `fp_analysis_app/assets/spreadsheets/`.
 
