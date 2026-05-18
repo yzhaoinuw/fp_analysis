@@ -38,6 +38,7 @@ from fp_analysis_app.make_figure import get_padded_labels, make_figure
 from fp_analysis_app.event_analysis import Event_Utils, Perievent_Plots, Analyses
 from fp_analysis_app.analysis_export import (
     build_analysis_type_checklist_options,
+    get_analysis_type_checklist_values,
     write_analysis_workbooks,
 )
 from fp_analysis_app.mat_utils import (
@@ -67,6 +68,7 @@ SPREADSHEET_DIR = Path(__file__).parent / "assets" / "spreadsheets"
 SPREADSHEET_DIR.mkdir(parents=True, exist_ok=True)
 EXPORT_DOWNSAMPLE_FACTOR = 100
 ANALYSIS_EXPORT_PAYLOAD_CACHE_KEY = "analysis_export_payload"
+REMEMBERED_ANALYSIS_EXPORT_TYPES_CACHE_KEY = "remembered_analysis_export_types"
 
 components = Components()
 app.layout = html.Div(
@@ -621,9 +623,12 @@ def toggle_save_spreadsheets_modal(open_clicks, cancel_clicks):
         )
 
     options = build_analysis_type_checklist_options(export_payload)
-    selected_values = [
-        option["value"] for option in options if not option.get("disabled")
-    ]
+    selected_values = get_analysis_type_checklist_values(
+        options=options,
+        remembered_analysis_types=cache.get(
+            REMEMBERED_ANALYSIS_EXPORT_TYPES_CACHE_KEY
+        ),
+    )
     return visible_style, options, selected_values, dash.no_update
 
 
@@ -651,6 +656,7 @@ def save_selected_analysis_spreadsheets(n_clicks, selected_analysis_types):
         export_payload=export_payload,
         selected_analysis_types=selected_analysis_types,
     )
+    cache.set(REMEMBERED_ANALYSIS_EXPORT_TYPES_CACHE_KEY, selected_analysis_types)
     return {"display": "none"}, export_status_message
 
 

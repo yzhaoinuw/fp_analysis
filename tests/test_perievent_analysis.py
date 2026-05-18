@@ -7,7 +7,10 @@ import pandas as pd
 from scipy.io import loadmat
 
 from fp_analysis_app.event_analysis import Analyses, Event_Utils, Perievent_Plots
-from fp_analysis_app.analysis_export import write_analysis_workbooks
+from fp_analysis_app.analysis_export import (
+    get_analysis_type_checklist_values,
+    write_analysis_workbooks,
+)
 from fp_analysis_app.export_settings import (
     build_analysis_config_dirname,
     build_analysis_description_text,
@@ -974,6 +977,33 @@ class TestSelectiveAnalysisWorkbookExport(unittest.TestCase):
 
         self.assertEqual(["event_index", "F268"], exported.columns.tolist())
         np.testing.assert_allclose(exported["F268"].to_numpy(), np.array([9.0, 8.0]))
+
+    def test_checklist_values_reuse_available_remembered_analysis_types(self):
+        options = [
+            {"label": "Mean trace", "value": "mean_trace"},
+            {"label": "AUC", "value": "auc"},
+            {"label": "Mean cross-correlation", "value": "cross_correlation"},
+        ]
+
+        values = get_analysis_type_checklist_values(
+            options=options,
+            remembered_analysis_types=["auc", "cross_correlation"],
+        )
+
+        self.assertEqual(["auc", "cross_correlation"], values)
+
+    def test_checklist_values_ignore_unavailable_remembered_analysis_types(self):
+        options = [
+            {"label": "Mean trace", "value": "mean_trace"},
+            {"label": "AUC", "value": "auc"},
+        ]
+
+        values = get_analysis_type_checklist_values(
+            options=options,
+            remembered_analysis_types=["cross_correlation"],
+        )
+
+        self.assertEqual(["mean_trace", "auc"], values)
 
 if __name__ == "__main__":
     unittest.main()

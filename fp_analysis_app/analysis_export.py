@@ -115,6 +115,18 @@ def build_analysis_type_checklist_options(export_payload):
     ]
 
 
+def get_analysis_type_checklist_values(options, remembered_analysis_types=None):
+    available_values = [
+        option["value"] for option in options if not option.get("disabled")
+    ]
+    remembered_values = [
+        analysis_type
+        for analysis_type in (remembered_analysis_types or [])
+        if analysis_type in available_values
+    ]
+    return remembered_values or available_values
+
+
 def write_analysis_workbooks(
     primary_dir,
     fallback_dir,
