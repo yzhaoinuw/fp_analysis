@@ -1,3 +1,7 @@
+# FP Analysis
+
+[![Agent Collab Treaty](https://img.shields.io/badge/Agent_Collab_Treaty-adopted-6d81f1?style=flat-square)](https://github.com/yzhaoinuw/agent_collab_treaty)
+
 ## Installation
 1. Go to the [fp_analysis folder](https://uofr-my.sharepoint.com/:f:/r/personal/yzhao38_ur_rochester_edu/Documents/fp_analysis_project?csf=1&web=1&e=JIeIs6) on OneDrive. Contact Yue if you can't access it.
 2. Download **fp_analysis_app_vx.zip** (the "**x**" in the suffix "**vx**" denotes the current version). Note that if you unzip it to the same location where the zip file is, you may end up with a nested folder, ie., a "fp_analysis_app_vx" inside a "fp_analysis_app_vx". If this is the case , it may be better to peel it and move the inner "fp_analysis_app_vx" somewhere else and delete the outer "fp_analysis_app_vx".  
