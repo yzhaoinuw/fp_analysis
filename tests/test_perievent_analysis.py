@@ -21,6 +21,7 @@ from fp_analysis_app.mat_utils import (
     get_fp_signal_names,
     get_visualization_signal_data,
     get_visualization_signal_names_and_frequency,
+    has_embedded_event_data,
 )
 from fp_analysis_app.sleep_event_import import is_sleep_bout_table
 
@@ -119,6 +120,21 @@ class TestSleepBoutTableImport(unittest.TestCase):
 
 
 class TestMakeFigureFallbacks(unittest.TestCase):
+    def test_embedded_event_detection_rejects_missing_and_empty_payloads(self):
+        self.assertFalse(has_embedded_event_data(None))
+        self.assertFalse(has_embedded_event_data(np.array([])))
+        self.assertTrue(
+            has_embedded_event_data(
+                np.array(
+                    [
+                        "event",
+                        np.array([[10.0, 11.0]]),
+                    ],
+                    dtype=object,
+                )
+            )
+        )
+
     def test_visualization_signal_helper_uses_ne_when_fp_signal_names_are_missing(self):
         mat = {
             "ne": np.array([0.0, 0.5, -0.25, 0.75]),

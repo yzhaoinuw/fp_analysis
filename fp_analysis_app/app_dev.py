@@ -45,6 +45,7 @@ from fp_analysis_app.mat_utils import (
     get_fp_signal_names,
     get_visualization_signal_data,
     get_visualization_signal_names_and_frequency,
+    has_embedded_event_data,
 )
 
 
@@ -781,7 +782,7 @@ def create_visualization(ready):
         (signal_length - 1) / fp_freq
     )  # need to round duration to an int for later
 
-    if event_data is not None:
+    if has_embedded_event_data(event_data):
         signal_names = fp_signal_names
         event_utils = Event_Utils(fp_freq, duration)
         df_events = event_utils.eventdata_to_df(event_data)

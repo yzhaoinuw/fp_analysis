@@ -3,6 +3,12 @@ from __future__ import annotations
 import numpy as np
 
 
+def has_embedded_event_data(event_data) -> bool:
+    """Return whether a MAT event field contains any embedded event data."""
+
+    return event_data is not None and np.size(event_data) > 0
+
+
 def get_fp_signal_names(mat) -> list[str]:
     """Return FP signal names as a list, including single-name MAT payloads."""
 

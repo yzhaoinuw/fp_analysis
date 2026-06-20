@@ -4,6 +4,18 @@ Prepend new session notes to this file. The live log holds at most the five most
 
 If today's date already appears at the top, add another `###` session under it rather than creating a duplicate date heading. Each substantive session needs compact model metadata and a `- Verification:` subsection containing commands that were actually run.
 
+## 2026-06-19
+
+### Handle MAT files with an empty event field (gpt-5)
+
+- Treated missing and zero-sized embedded event payloads as equivalent so visualization still loads and spreadsheet event import remains available.
+- Added regression coverage for missing, empty, and populated embedded event payloads.
+- Verification:
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis` - 31 tests passed.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -c "import fp_analysis_app.analysis_export, fp_analysis_app.event_analysis, fp_analysis_app.mat_utils; print('import ok')"` - printed `import ok`.
+  - `C:\Users\yzhao\python_projects\agent_collab_treaty\.venv\Scripts\treaty.exe validate .` - passed.
+  - `git diff --check` - clean apart from Git line-ending conversion warnings.
+
 ## 2026-06-18
 
 ### Adopt the Agent Collab Treaty documentation (gpt-5)
