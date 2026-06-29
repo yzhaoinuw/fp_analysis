@@ -190,10 +190,15 @@ def make_analysis_plots(
     mat_name = os.path.splitext(os.path.basename(filepath))[0]
     fp_data = loadmat(filepath, squeeze_me=True)
     _, fp_freq = get_cached_runtime_fp_metadata(mat=fp_data)
+    signal_length = len(fp_data[selected_signals[0]]) if selected_signals else None
 
     # Build helpers
     event_utils = Event_Utils(
-        fp_freq, duration, nsec_before=baseline_window, nsec_after=analysis_window
+        fp_freq,
+        duration,
+        nsec_before=baseline_window,
+        nsec_after=analysis_window,
+        signal_length=signal_length,
     )
     analyses = Analyses(fp_freq=fp_freq, baseline_window=baseline_window)
 
@@ -205,6 +210,7 @@ def make_analysis_plots(
     subject_id = mat_name
     cross_correlation_event_exports = {}
     strongest_cross_correlation_event_exports = {}
+    processed_events = []
 
     def build_mean_trace_export(plots, perievent_signals, result):
         return plots.build_mean_trace_export_df(
@@ -261,7 +267,10 @@ def make_analysis_plots(
 
     for i, event in enumerate(sorted(event_time_dict.keys())):
 
-        event_time = event_time_dict[event]
+        event_time = event_utils.filter_event_times(event_time_dict[event])
+        if event_time.size == 0:
+            continue
+        processed_events.append(event)
         perievent_windows = event_utils.make_perievent_windows(event_time)
         perievent_indices = event_utils.get_perievent_indices(perievent_windows)
 
@@ -378,7 +387,7 @@ def make_analysis_plots(
         "selected_signals": tuple(selected_signals),
         "baseline_window": baseline_window,
         "analysis_window": analysis_window,
-        "event_names": sorted(event_time_dict.keys()),
+        "event_names": sorted(processed_events),
         "signal_event_exports": signal_event_exports,
         "cross_correlation_event_exports": cross_correlation_event_exports,
         "strongest_cross_correlation_event_exports": (
@@ -562,9 +571,14 @@ def show_analysis_results(
     tab_children = []
     for tab in tabs:
         event = tab["event"]
-        children = components._fill_tab(
-            event, perievent_signals_fig_paths, analyses_fig_paths, corr_fig_paths
-        )
+        if event in perievent_signals_fig_paths:
+            children = components._fill_tab(
+                event, perievent_signals_fig_paths, analyses_fig_paths, corr_fig_paths
+            )
+        else:
+            children = html.Div(
+                "No events remain after applying the selected analysis window."
+            )
         tab_children.append(children)
 
     status_message = (
@@ -725,7 +739,8 @@ def import_annotation_file(annotation_filepath):
     mat = loadmat(mat_path, squeeze_me=True)
     signal_names, fp_freq = get_cached_runtime_fp_metadata(mat=mat)
     duration = cache.get("duration")
-    event_utils = Event_Utils(fp_freq, duration)
+    signal_length = len(mat[signal_names[0]]) if signal_names else None
+    event_utils = Event_Utils(fp_freq, duration, signal_length=signal_length)
     event_time_dict = event_utils.read_events(event_file=annotation_filepath)
     cache.set("event_time_dict", event_time_dict)
     event_count_records = event_utils.count_events(event_time_dict)
@@ -784,7 +799,7 @@ def create_visualization(ready):
 
     if has_embedded_event_data(event_data):
         signal_names = fp_signal_names
-        event_utils = Event_Utils(fp_freq, duration)
+        event_utils = Event_Utils(fp_freq, duration, signal_length=signal_length)
         df_events = event_utils.eventdata_to_df(event_data)
         event_time_dict = event_utils.read_events(df_events=df_events)
         cache.set("event_time_dict", event_time_dict)

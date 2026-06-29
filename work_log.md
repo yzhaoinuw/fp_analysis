@@ -4,6 +4,20 @@ Prepend new session notes to this file. The live log holds at most the five most
 
 If today's date already appears at the top, add another `###` session under it rather than creating a duplicate date heading. Each substantive session needs compact model metadata and a `- Verification:` subsection containing commands that were actually run.
 
+## 2026-06-29
+
+### Fix perievent sample-boundary filtering (gpt-5)
+
+- Reproduced the `M67_RS-new.mat` / `M67_RS_Transitions_from_SleepBouts.xlsx` crash as an event at the inclusive upper time boundary whose generated sample indices ran past the final MAT sample.
+- Added optional signal-length-aware event filtering so imported and cached event times are checked against the exact perievent sample indices before analysis.
+- Passed the signal length through the active desktop annotation import, embedded-event import, and `Show Results` analysis paths.
+- Added regression coverage for fractional-frequency recordings where an event can pass the old second-based boundary but still exceed the available samples.
+- Verification:
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis` - 32 tests passed.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -c "import fp_analysis_app.analysis_export, fp_analysis_app.event_analysis, fp_analysis_app.mat_utils; print('import ok')"` - printed `import ok`.
+  - `C:\Users\yzhao\python_projects\agent_collab_treaty\.venv\Scripts\treaty.exe validate .` - passed.
+  - `git diff --check` - clean apart from Git line-ending conversion warnings.
+
 ## 2026-06-19
 
 ### Handle MAT files with an empty event field (gpt-5)

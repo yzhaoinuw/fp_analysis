@@ -119,6 +119,28 @@ class TestSleepBoutTableImport(unittest.TestCase):
         )
 
 
+class TestEventBoundaryFiltering(unittest.TestCase):
+    def test_filters_event_times_that_exceed_available_signal_samples(self):
+        fp_freq = 1017.2526245117188
+        signal_length = 15496205
+        duration = 15234
+        event_utils = Event_Utils(
+            fp_freq=fp_freq,
+            duration=duration,
+            nsec_before=30,
+            nsec_after=60,
+            signal_length=signal_length,
+        )
+        df_events = pd.DataFrame({"sws_MA": [15173, 15174, 15202]})
+
+        events = event_utils.read_events(df_events=df_events)
+
+        self.assertEqual({"sws_MA": [15173]}, {k: v.tolist() for k, v in events.items()})
+        perievent_windows = event_utils.make_perievent_windows(events["sws_MA"])
+        perievent_indices = event_utils.get_perievent_indices(perievent_windows)
+        self.assertLess(int(perievent_indices.max()), signal_length)
+
+
 class TestMakeFigureFallbacks(unittest.TestCase):
     def test_embedded_event_detection_rejects_missing_and_empty_payloads(self):
         self.assertFalse(has_embedded_event_data(None))

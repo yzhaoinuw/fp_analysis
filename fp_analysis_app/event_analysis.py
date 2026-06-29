@@ -23,11 +23,19 @@ from fp_analysis_app.sleep_event_import import (
 
 class Event_Utils:
 
-    def __init__(self, fp_freq, duration, nsec_before=30, nsec_after=60):
+    def __init__(
+        self,
+        fp_freq,
+        duration,
+        nsec_before=30,
+        nsec_after=60,
+        signal_length=None,
+    ):
         self.fp_freq = fp_freq
         self.duration = duration
         self.nsec_before = nsec_before
         self.nsec_after = nsec_after
+        self.signal_length = None if signal_length is None else int(signal_length)
 
     @staticmethod
     def _round_to_significant_digits(array, sig_figs=2):
@@ -63,6 +71,33 @@ class Event_Utils:
         )
         return df_event
 
+    def _valid_event_time_mask(self, event_times):
+        event_times = np.asarray(event_times, dtype=float)
+        min_time = self.nsec_before
+        max_time = self.duration - self.nsec_after
+        valid_mask = (event_times >= min_time) & (event_times <= max_time)
+
+        if self.signal_length is None:
+            return valid_mask
+
+        window_duration = self.nsec_before + self.nsec_after
+        window_sample_count = int(np.ceil(window_duration * self.fp_freq))
+        window_start_indices = np.ceil(
+            (event_times - self.nsec_before) * self.fp_freq
+        )
+        window_end_indices = window_start_indices + window_sample_count - 1
+        return (
+            valid_mask
+            & (window_start_indices >= 0)
+            & (window_end_indices < self.signal_length)
+        )
+
+    def filter_event_times(self, event_times):
+        event_times = np.asarray(event_times)
+        if event_times.size == 0:
+            return event_times
+        return event_times[self._valid_event_time_mask(event_times)]
+
     def read_events(self, event_file=None, df_events=None):
         """
         read in spreadsheet, drop nan, and remove events near the start or end.
@@ -73,11 +108,16 @@ class Event_Utils:
         if df_events is None:
             df_events = pd.read_excel(event_file)
         if is_sleep_bout_table(df_events):
-            return sleep_bout_table_to_event_time_dict(
+            event_time_dict = sleep_bout_table_to_event_time_dict(
                 df_events,
                 min_time=min_time,
                 max_time=max_time,
             )
+            return {
+                event: filtered_times
+                for event, times in event_time_dict.items()
+                if (filtered_times := self.filter_event_times(times)).size
+            }
 
         event_time_dict = {}
         for event in df_events.columns:
@@ -86,7 +126,11 @@ class Event_Utils:
             df_event = df_event[(df_event >= min_time) & (df_event <= max_time)]
             if df_event.empty:
                 continue
-            event_time_dict[event] = df_event.round().astype(int).to_numpy()
+            event_times = df_event.round().astype(int).to_numpy()
+            event_times = self.filter_event_times(event_times)
+            if event_times.size == 0:
+                continue
+            event_time_dict[event] = event_times
         return event_time_dict
 
     def count_events(self, event_time_dict):
