@@ -6,6 +6,30 @@ If today's date already appears at the top, add another `###` session under it r
 
 ## 2026-06-30
 
+### Prototype startup auto-update (gpt-5)
+
+- Created the `auto-update` branch for a code-only startup update experiment.
+- Added a launcher bootstrap that checks a GitHub Release-style source update zip before importing the active Dash app and applies only manifest-verified runtime files.
+- Replaced the initial Git transport with a custom release-asset format so distributed users do not need Git installed.
+- Added version-specific hash-baseline checks so one latest release asset can jump users forward from multiple compatible older versions while still detecting local source edits without a Git checkout.
+- Added `tools/build_update_asset.py` for maintainers to build `fp_analysis_app_update_<version>.zip` assets from one or more `--from-ref` Git refs.
+- Added focused unit tests using local release zips for runtime-code updates, skipped-release jump-ahead updates, release metadata discovery, dependency-change blocking, same-version skips, missing-baseline refusal, local-edit safety, and multi-baseline asset building.
+- Verification:
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_startup_update` - 9 tests passed.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m py_compile startup_update.py tools\build_update_asset.py` - passed.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe tools\build_update_asset.py --help` - printed usage.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis tests.test_startup_update` - 41 tests passed.
+  - `$env:FP_ANALYSIS_SKIP_UPDATE='1'; C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -c "import run_desktop_app; import fp_analysis_app.analysis_export, fp_analysis_app.event_analysis, fp_analysis_app.mat_utils, startup_update; print('import ok')"` - printed `import ok`.
+  - `git diff --check` - clean apart from Git line-ending conversion warnings.
+  - `C:\Users\yzhao\python_projects\agent_collab_treaty\.venv\Scripts\treaty.exe validate .` - passed.
+
+### Document Windows Git execution guidance (gpt-5)
+
+- Added `AGENTS.md` guidance to run mutating Git commands outside the sandbox by default on this Windows checkout because pushes, tags, merges, branch operations, and safe-directory updates commonly hit credential or lock-file failures inside the sandbox.
+- Verification:
+  - `git diff --check AGENTS.md work_log.md` - clean apart from Git line-ending conversion warnings.
+  - `C:\Users\yzhao\python_projects\agent_collab_treaty\.venv\Scripts\treaty.exe validate .` - passed.
+
 ### Prepare v0.5.0 release tag (gpt-5)
 
 - Bumped the active app version from `v0.5.0-beta` to `v0.5.0`.

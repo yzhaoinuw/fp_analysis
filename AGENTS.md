@@ -109,6 +109,15 @@ If Git reports dubious ownership:
 git config --global --add safe.directory C:/Users/yzhao/python_projects/fp_analysis
 ```
 
+On this Windows checkout, mutating Git commands often fail inside the sandbox with
+credential, safe-directory, or lock-file errors (`cannot spawn sh`,
+`ORIG_HEAD.lock`, `.git/objects`, etc.). For Git commands that write repository
+state or contact the remote, such as `git push`, `git tag`, `git merge`, branch
+operations, and `git config --global --add safe.directory`, request outside-
+sandbox execution immediately instead of retrying the same command in the
+sandbox. Read-only commands such as `git status`, `git diff`, `git log`, and
+`git worktree list` can run normally unless they fail.
+
 ## Documentation Map
 
 - `project_overview.md`

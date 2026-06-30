@@ -23,6 +23,16 @@ else:
 # Insert base_path FIRST so that fp_analysis_app/ next to .exe overrides bundled version
 sys.path.insert(0, base_path)
 
+try:
+    from startup_update import format_startup_update_message, run_startup_update
+
+    update_result = run_startup_update(base_path)
+    update_message = format_startup_update_message(update_result)
+    if update_message:
+        print(f"[startup-update] {update_message}", flush=True)
+except Exception as exc:
+    print(f"[startup-update] skipped: {exc}", flush=True)
+
 
 def run_dash():
     app.run(
