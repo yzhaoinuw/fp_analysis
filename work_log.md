@@ -4,6 +4,26 @@ Prepend new session notes to this file. The live log holds at most the five most
 
 If today's date already appears at the top, add another `###` session under it rather than creating a duplicate date heading. Each substantive session needs compact model metadata and a `- Verification:` subsection containing commands that were actually run.
 
+## 2026-06-30
+
+### Prepare v0.5.0 release tag (gpt-5)
+
+- Bumped the active app version from `v0.5.0-beta` to `v0.5.0`.
+- Added `CHANGELOG.md` release notes for sample-boundary filtering, accepted annotation spreadsheet formats, and the M67 demo-script update.
+- Verification:
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis` - 32 tests passed.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -c "import fp_analysis_app; import fp_analysis_app.analysis_export, fp_analysis_app.event_analysis, fp_analysis_app.mat_utils, fp_analysis_app.app_dev; print(fp_analysis_app.VERSION)"` - printed `v0.5.0`.
+  - `C:\Users\yzhao\python_projects\agent_collab_treaty\.venv\Scripts\treaty.exe validate .` - passed.
+  - `git diff --check` - clean apart from Git line-ending conversion warnings.
+
+### Document accepted annotation spreadsheet formats (gpt-5)
+
+- Added README guidance that annotation `.xlsx` files may be transition tables or sleep-bout tables.
+- Reflected the same two-format contract in `project_overview.md`.
+- Verification:
+  - `git diff --check README.md project_overview.md work_log.md` - clean.
+  - `C:\Users\yzhao\python_projects\agent_collab_treaty\.venv\Scripts\treaty.exe validate .` - passed.
+
 ## 2026-06-29
 
 ### Fix perievent sample-boundary filtering (gpt-5)

@@ -178,6 +178,13 @@ Other optional fields, such as sleep labels and video timing metadata, are used 
 
 Verified annotation input is `.xlsx`. The desktop dialog also offers `.csv`, but the current file-path reader calls `pandas.read_excel()`; CSV should be treated as an unresolved contract/implementation mismatch until it is tested and fixed.
 
+Two annotation spreadsheet formats are supported:
+
+```text
+transition table -> event names as columns -> event times in seconds
+sleep-bout table -> sleep_scores/start/end/duration -> transition events
+```
+
 Event-table format uses one column per event type with event times in seconds. Empty cells are ignored, and events outside the valid baseline/analysis boundaries are filtered.
 
 Sleep-bout tables are detected by case-insensitive columns:

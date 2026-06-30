@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.5.0
+
+- skip event times whose selected analysis window would exceed the available signal samples
+- document the two accepted annotation spreadsheet formats: transition tables and sleep-bout tables
+- keep the M67 demo script path aligned with current example data
+
 ## v0.5.0-beta
 
 - separate analysis generation from spreadsheet export with a dedicated `Save Spreadsheets` flow

@@ -262,19 +262,18 @@ if __name__ == "__main__":
 
     io.renderers.default = "browser"
     DATA_PATH = "../data/"
-    fp_name = "F268"
+    fp_name = "M67_RS-new"
     fp_file = os.path.join(DATA_PATH, f"{fp_name}.mat")
     fp_data = loadmat(fp_file, squeeze_me=True)
     # biosignal_names = fp_data["fp_signal_names"]
-    biosignal_name = "NE2m"
-    biosignal = fp_data[biosignal_name]
+    fp_signal_names, fp_signals, fp_freq = get_visualization_signal_data(fp_data)
+    biosignal = fp_signals[0]
 
-    event_file = os.path.join(DATA_PATH, "Transitions_F268.xlsx")
+    event_file = os.path.join(DATA_PATH, "M67_RS_Transitions_from_SleepBouts.xlsx")
     fp_freq = fp_data["fp_frequency"]
-    window_len = 120
     duration = int(np.ceil(len(biosignal) / fp_freq))
 
-    event_utils = Event_Utils(fp_freq, duration, window_len=window_len)
+    event_utils = Event_Utils(fp_freq, duration)
     perievent_label_dict = event_utils.make_perievent_labels(event_file)
     fig = make_figure(fp_data, plot_name=fp_name, label_dict=perievent_label_dict)
-    fig.show_dash(config={"scrollZoom": True})
+    fig.show_dash(config={"scrollZoom": True}, mode="external")

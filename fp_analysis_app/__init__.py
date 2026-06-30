@@ -5,5 +5,5 @@ Created on Mon Aug 12 11:50:57 2024
 @author: yzhao
 """
 
-VERSION = "v0.5.0-beta"
+VERSION = "v0.5.0"
 DOWNSAMPLE_FACTOR = 100

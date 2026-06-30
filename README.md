@@ -38,6 +38,23 @@ Spreadsheet exports are grouped into a setup-specific subfolder based on:
 
 For the same analysis setup, different subjects append into the same workbook set. If the same subject is exported again with the same setup, that subject's columns are updated instead of duplicated. Each export folder also includes a `data_description.txt` file that records the analyzed data source, setup details, and saved analysis types.
 
+### Annotation Spreadsheet Formats
+Annotation spreadsheets should be `.xlsx` files. The app accepts two event formats:
+
+```text
+Transition table
+  columns = event names
+  cells   = event times in seconds
+  example = wake_sws, sws_REM, REM_wake
+
+Sleep-bout table
+  columns = sleep_scores, start, end, duration
+  action  = converted internally into transition events
+  example = wake_nrem, nrem_rem, rem_wake
+```
+
+In both formats, empty cells are ignored and events too close to the beginning or end of the signal are skipped based on the selected baseline and analysis windows.
+
 ### Known Issues
 1. When adding a second or removing a second signal, clicking Show Results may not update the results even when the analyses are done (indicated by the Show Results button becomes available again), when this happens, switch to any other tab. That should help update the results. Fix to this issue is in progress.
 
