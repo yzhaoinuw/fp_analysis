@@ -9,6 +9,50 @@ from dash import dcc, html, page_container, dash_table
 from dash_extensions import EventListener
 from dash_extensions.pages import setup_page_components
 
+MAX_ANALYSIS_SIGNALS = 2
+BASE_SIGNAL_SELECT_WRAPPER_STYLE = {
+    "display": "flex",
+    "alignItems": "center",
+    "gap": "8px",
+    "padding": "4px",
+    "borderRadius": "6px",
+    "transition": "border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease",
+}
+
+
+def normalize_analysis_signal_selection(selected_signals):
+    if selected_signals is None:
+        return []
+    if isinstance(selected_signals, str):
+        return [selected_signals]
+    return list(selected_signals)
+
+
+def is_valid_analysis_signal_selection(selected_signals):
+    selected_signals = normalize_analysis_signal_selection(selected_signals)
+    return 1 <= len(selected_signals) <= MAX_ANALYSIS_SIGNALS
+
+
+def get_analysis_signal_select_style(selected_signals):
+    style = dict(BASE_SIGNAL_SELECT_WRAPPER_STYLE)
+    if is_valid_analysis_signal_selection(selected_signals):
+        style.update(
+            {
+                "border": "2px solid transparent",
+                "boxShadow": "none",
+                "backgroundColor": "transparent",
+            }
+        )
+    else:
+        style.update(
+            {
+                "border": "2px solid #c62828",
+                "boxShadow": "0 0 0 3px rgba(198, 40, 40, 0.14)",
+                "backgroundColor": "#fff7f7",
+            }
+        )
+    return style
+
 
 # %% home div
 
@@ -332,7 +376,13 @@ class Components:
             # from saving spreadsheets.
             # ################################################################
             html.Div(
-                style={"display": "flex", "marginLeft": "10px", "gap": "10px"},
+                id="analysis-controls-row",
+                style={
+                    "display": "flex",
+                    "alignItems": "center",
+                    "marginLeft": "10px",
+                    "gap": "10px",
+                },
                 children=[
                     html.Label(["Baseline Window Size"]),
                     dcc.Dropdown(
@@ -352,15 +402,23 @@ class Components:
                         searchable=False,
                         clearable=False,
                     ),
-                    html.Label(["Select 1 - 2 Signals"]),
-                    dcc.Dropdown(
-                        id="signal-select-dropdown",
-                        options=[{"label": s, "value": s} for s in signal_names],
-                        multi=True,
-                        placeholder="Choose up to two…",
-                        value=[],
-                        style={"width": "300px"},
-                        clearable=True,
+                    html.Div(
+                        id="signal-select-wrapper",
+                        style=get_analysis_signal_select_style([]),
+                        children=[
+                            html.Label(["Select 1 - 2 Signals"]),
+                            dcc.Dropdown(
+                                id="signal-select-dropdown",
+                                options=[
+                                    {"label": s, "value": s} for s in signal_names
+                                ],
+                                multi=True,
+                                placeholder="Choose up to two…",
+                                value=[],
+                                style={"width": "300px"},
+                                clearable=True,
+                            ),
+                        ],
                     ),
                     html.Button(
                         "Show Results",

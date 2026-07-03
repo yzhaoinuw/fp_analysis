@@ -33,7 +33,11 @@ import numpy as np
 from scipy.io import loadmat
 
 from fp_analysis_app import VERSION
-from fp_analysis_app.components_dev import Components
+from fp_analysis_app.components_dev import (
+    Components,
+    get_analysis_signal_select_style,
+    is_valid_analysis_signal_selection,
+)
 from fp_analysis_app.make_figure import get_padded_labels, make_figure
 from fp_analysis_app.event_analysis import Event_Utils, Perievent_Plots, Analyses
 from fp_analysis_app.analysis_export import (
@@ -542,7 +546,7 @@ def show_analysis_results(
 ):
     if not n_clicks:  # None or 0 → do nothing
         raise PreventUpdate
-    if not selected_signals:
+    if not is_valid_analysis_signal_selection(selected_signals):
         raise PreventUpdate
 
     for file in FIGURE_DIR.iterdir():
@@ -591,6 +595,7 @@ def show_analysis_results(
 @app.callback(
     Output("save-spreadsheets-button", "disabled", allow_duplicate=True),
     Output("show-results-button", "disabled", allow_duplicate=True),
+    Output("signal-select-wrapper", "style"),
     Output("analysis-save-status", "children", allow_duplicate=True),
     Input("signal-select-dropdown", "value"),
     Input("baseline-window-dropdown", "value"),
@@ -603,11 +608,19 @@ def clear_export_payload_after_analysis_setting_change(
     analysis_window,
 ):
     clear_analysis_export_payload()
-    show_results_disabled = not selected_signals
+    signal_selection_is_valid = is_valid_analysis_signal_selection(selected_signals)
+    show_results_disabled = not signal_selection_is_valid
+    signal_select_style = get_analysis_signal_select_style(selected_signals)
+    status_message = (
+        "Run analysis to prepare spreadsheet exports for these settings."
+        if signal_selection_is_valid
+        else ""
+    )
     return (
         True,
         show_results_disabled,
-        "Run analysis to prepare spreadsheet exports for these settings.",
+        signal_select_style,
+        status_message,
     )
 
 

@@ -4,6 +4,32 @@ Prepend new session notes to this file. The live log holds at most the five most
 
 If today's date already appears at the top, add another `###` session under it rather than creating a duplicate date heading. Each substantive session needs compact model metadata and a `- Verification:` subsection containing commands that were actually run.
 
+## 2026-07-03
+
+### Implement analysis-page signal dropdown highlight (gpt-5)
+
+- Reverted the text callout for signal selection and replaced it with a red visual highlight around the existing signal dropdown while the selection is invalid.
+- Kept `Show Results` disabled when no signal is selected and when more than two signals are selected; the highlight clears when one or two signals are selected.
+- Center-aligned the analysis controls row so the baseline and analysis-window labels sit vertically with the dropdowns and buttons.
+- Marked item 1 accepted after the user confirmed the visual treatment and alignment.
+- Added focused UI-helper coverage for the dropdown highlight and signal-selection validation.
+- Verification:
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis.TestAnalysisPageSignalHighlight` - 2 tests passed.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis` - 34 tests passed.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -c "import fp_analysis_app.analysis_export, fp_analysis_app.event_analysis, fp_analysis_app.mat_utils, fp_analysis_app.app_dev; print('import ok')"` - printed `import ok`.
+  - `Get-Date -Format yyyy-MM-dd` - printed `2026-07-03`.
+  - `git diff --check` - clean apart from Git line-ending conversion warnings.
+  - `C:\Users\yzhao\python_projects\agent_collab_treaty\.venv\Scripts\treaty.exe validate .` - passed.
+
+### Plan gated analysis workflow update (gpt-5)
+
+- Converted the recent user-feedback TODOs into a gated `next_steps.md` implementation plan covering a signal selection cue, README plot explanations, main-plot event timestamp lines, period removal and save behavior, validated window inputs, heatmap dividers, and positive/negative peak-value exports.
+- Recorded the clarified product decisions: right-click period selection on existing labeled periods, closest-center resolution for overlapping periods, temporary removals before analysis, saved MAT annotation edits, all-event timestamp lines, positive-integer window validation, and `NaN` peak values when `find_peaks` finds no peak.
+- Verification:
+  - `Get-Date -Format yyyy-MM-dd` - printed `2026-07-03`.
+  - `git diff --check next_steps.md work_log.md` - clean apart from Git line-ending conversion warnings.
+  - `C:\Users\yzhao\python_projects\agent_collab_treaty\.venv\Scripts\treaty.exe validate .` - passed.
+
 ## 2026-06-30
 
 ### Prototype startup auto-update (gpt-5)

@@ -4,10 +4,80 @@ Use this checklist alongside `work_log.md`. Keep only actionable engineering thr
 
 ## Currently Hot
 
+- [Analysis workflow feedback update](#analysis-workflow-feedback-update-gpt-5) - implement the recent user-feedback TODOs as gated, item-by-item analysis-page improvements.
 - [v0.5.0-beta stabilization](#v050-beta-stabilization-gpt-5) - reproduce and fix the stale analysis-result refresh reported after changing a second signal.
 - [Startup auto-update prototype](#startup-auto-update-prototype-gpt-5) - package-smoke the release-zip updater against a realistic distributable folder.
 - [Desktop runtime convergence](#desktop-runtime-convergence-gpt-5) - decide whether the manual annotation save flow in `app.py` belongs in the active desktop runtime.
 - [Packaging reproducibility](#packaging-reproducibility-gpt-5) - remove or document machine-specific packaging assumptions before the next distributable build.
+
+## Analysis Workflow Feedback Update (gpt-5)
+
+Status: item 1 accepted; ready for item 2 when requested.
+
+Product goal: make the analysis flow clearer, make exclusions visible and respected by analysis, and fix peak metrics so plotted/exported values match detected positive and negative peaks.
+
+Implementation boundaries:
+
+- Work in the active desktop runtime: `fp_analysis_app/app_dev.py`, `fp_analysis_app/components_dev.py`, `fp_analysis_app/make_figure.py`, `fp_analysis_app/event_analysis.py`, `fp_analysis_app/analysis_export.py`, and focused tests in `tests/test_perievent_analysis.py`.
+- Do not broadly sync behavior from secondary `fp_analysis_app/app.py` unless a specific item requires reusing a small helper.
+- After each item, run the narrowest useful verification plus `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis` when numeric analysis, exports, or event filtering changed.
+- After each user gate, update this section's status/checklist and add a compact `work_log.md` note with the commands actually run.
+
+Gated implementation checklist:
+
+1. [x] Analysis-page signal selection cue.
+   - Highlight the signal selection dropdown so users' attention is directed there before results can be shown.
+   - Preserve the disabled `Show Results` behavior while no signal is selected, and keep it disabled if more than two signals are selected.
+   - Acceptance gate: accepted after visual check; users can reach `/analysis`, notice the selector, select one or two signals, and then run analysis.
+
+2. README plot explanations.
+   - Add a concise README section explaining each analysis plot and metric: raw perievent traces, mean trace, perievent heatmap, normalized perievent traces, AUC, positive peak value, negative peak value, first peak time, decay time, and cross-correlation when two signals are selected.
+   - Explain that peak values are based on detected peaks and become `NaN` when no peak is found.
+   - Acceptance gate: user-facing wording is scientifically accurate without overloading the README.
+
+3. Event timestamp lines on the main full-recording visualization.
+   - Show all imported event timestamps at once on the main Plotly full-recording graph after annotations are loaded.
+   - Use visible vertical lines or equivalent markers that remain clear when many events are present.
+   - Remove or hide event lines immediately when their event timestamps are excluded by a removed period.
+   - Acceptance gate: loaded annotation events are visible on the main graph and disappear when excluded.
+
+4. Existing-period selection and temporary removal before analysis.
+   - Add right-click selection on the interactive full-recording plot for existing labeled periods only; do not support arbitrary dragged ranges in this pass.
+   - A selected period is the contiguous segment with the clicked label. If multiple labeled periods overlap at the click time, select the period whose center is closest to the click.
+   - Add a clearly placed removal control near the graph. Pressing it removes the selected period from the visualization and excludes events inside that period from downstream analysis.
+   - Store removals in session/runtime state first. Removed periods should become blank/unlabeled, and all event timestamp lines inside removed periods should disappear.
+   - Acceptance gate: user can right-click a labeled period, remove it, see it disappear, and run analysis with contained events excluded.
+
+5. Save modified annotations back to the MAT file.
+   - Add or reposition a lower-left `Save Annotations` button below the graph for persisting the currently modified period/event state.
+   - Treat overwriting the current MAT file as acceptable for now, but include an explicit confirmation or otherwise make the target unmistakable before writing.
+   - Persist removed periods and event exclusions so reopening the MAT reflects the edited annotations.
+   - Acceptance gate: user can remove a period, save, reload the MAT, and see the saved annotation state.
+
+6. Positive-integer baseline and analysis window inputs.
+   - Replace baseline/analysis window dropdowns with numeric text inputs.
+   - Validate positive integers only.
+   - Reject values greater than or equal to one quarter of the full recording duration.
+   - Keep `Show Results` disabled, or show a clear inline error, when inputs are invalid.
+   - Acceptance gate: invalid values cannot launch analysis; valid integer values do.
+
+7. Perievent heatmap row dividers.
+   - Add visible dividers between event-occurrence rows in the perievent heatmap generated by `Perievent_Plots.plot_perievent_heatmaps`.
+   - Keep labels readable and avoid crowding on high-count events.
+   - Acceptance gate: heatmap rows are easier to distinguish without obscuring signal intensity.
+
+8. Negative peak row in analysis plots.
+   - Extend analysis results with negative peak detection by flipping reaction signals around `y=0` and reusing the same `find_peaks` settings.
+   - Add a row or clearly separated plot area for negative peak values in the analysis plots.
+   - Negative peak values should remain negative in plots and exports.
+   - Acceptance gate: positive and negative peak summaries are both visible and correspond to detected peaks.
+
+9. Rename and correct peak-value exports.
+   - Replace the old `max_peak_magnitude` behavior with peak-value metrics based on detected peak indices.
+   - Positive peak value is the signal value at the first detected positive peak; `NaN` if no positive peak is detected.
+   - Negative peak value is the signal value at the first detected negative peak; `NaN` if no negative peak is detected.
+   - Rename labels, export type names, workbook names, tests, and README wording away from "max peak magnitude" toward `positive_peak_value` and `negative_peak_value`.
+   - Acceptance gate: spreadsheets use the new names, missing peaks export as `NaN`, and tests cover positive/negative/no-peak cases.
 
 ## v0.5.0-beta Stabilization (gpt-5)
 

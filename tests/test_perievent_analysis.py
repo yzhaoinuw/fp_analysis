@@ -11,6 +11,11 @@ from fp_analysis_app.analysis_export import (
     get_analysis_type_checklist_values,
     write_analysis_workbooks,
 )
+from fp_analysis_app.components_dev import (
+    Components,
+    get_analysis_signal_select_style,
+    is_valid_analysis_signal_selection,
+)
 from fp_analysis_app.export_settings import (
     build_analysis_config_dirname,
     build_analysis_description_text,
@@ -32,6 +37,62 @@ F268_PATH = DATA_DIR / "F268.mat"
 TRANSITIONS_F268_PATH = DATA_DIR / "Transitions_F268.xlsx"
 BASELINE_WINDOW = 30
 ANALYSIS_WINDOW = 60
+
+
+def find_component_by_id(component, component_id):
+    if isinstance(component, (list, tuple)):
+        for child in component:
+            result = find_component_by_id(child, component_id)
+            if result is not None:
+                return result
+        return None
+
+    if getattr(component, "id", None) == component_id:
+        return component
+
+    children = getattr(component, "children", None)
+    if children is None:
+        return None
+    return find_component_by_id(children, component_id)
+
+
+class TestAnalysisPageSignalHighlight(unittest.TestCase):
+    def test_analysis_page_highlights_signal_dropdown_and_disables_results(self):
+        children = Components().fill_analysis_page(
+            event_names=["wake_nrem"],
+            event_count_records=[{"event": "wake_nrem", "count": 3}],
+            signal_names=["NE2m", "mClY"],
+        )
+
+        removed_text_callout = find_component_by_id(children, "analysis-signal-prompt")
+        controls_row = find_component_by_id(children, "analysis-controls-row")
+        wrapper = find_component_by_id(children, "signal-select-wrapper")
+        show_results_button = find_component_by_id(children, "show-results-button")
+
+        self.assertIsNone(removed_text_callout)
+        self.assertIsNotNone(controls_row)
+        self.assertEqual("center", controls_row.style["alignItems"])
+        self.assertIsNotNone(wrapper)
+        self.assertEqual("2px solid #c62828", wrapper.style["border"])
+        self.assertIsNotNone(show_results_button)
+        self.assertTrue(show_results_button.disabled)
+
+    def test_signal_selection_validation_accepts_only_one_or_two_signals(self):
+        self.assertFalse(is_valid_analysis_signal_selection(None))
+        self.assertFalse(is_valid_analysis_signal_selection([]))
+        self.assertTrue(is_valid_analysis_signal_selection(["NE2m"]))
+        self.assertTrue(is_valid_analysis_signal_selection(["NE2m", "mClY"]))
+        self.assertFalse(
+            is_valid_analysis_signal_selection(["NE2m", "mClY", "GCaMP"])
+        )
+        self.assertEqual(
+            "2px solid transparent",
+            get_analysis_signal_select_style(["NE2m"])["border"],
+        )
+        self.assertEqual(
+            "2px solid #c62828",
+            get_analysis_signal_select_style(["NE2m", "mClY", "GCaMP"])["border"],
+        )
 
 
 class TestSleepBoutTableImport(unittest.TestCase):
