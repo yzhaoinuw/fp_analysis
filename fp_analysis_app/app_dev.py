@@ -103,11 +103,20 @@ background_callback_manager = DiskcacheManager(background_callback_cache)
 # %%
 
 
-def create_fig(mat, mat_name, label_dict={}, default_n_shown_samples=2048):
+def create_fig(
+    mat,
+    mat_name,
+    label_dict=None,
+    event_time_dict=None,
+    show_period_labels=True,
+    default_n_shown_samples=2048,
+):
     fig = make_figure(
         mat,
         mat_name,
         label_dict=label_dict,
+        event_time_dict=event_time_dict,
+        show_period_labels=show_period_labels,
         default_n_shown_samples=default_n_shown_samples,
     )
     return fig
@@ -764,7 +773,14 @@ def import_annotation_file(annotation_filepath):
     perievent_label_dict = event_utils.make_perievent_labels(
         event_file=annotation_filepath
     )
-    fig = create_fig(mat, os.path.basename(mat_path), label_dict=perievent_label_dict)
+    fig = create_fig(
+        mat,
+        os.path.basename(mat_path),
+        label_dict=perievent_label_dict,
+        event_time_dict=event_time_dict,
+        show_period_labels=False,
+    )
+    cache.set("fig_resampler", fig)
     return analysis_page_content, fig, {"visibility": "visible"}
 
 
@@ -799,6 +815,7 @@ def create_visualization(ready):
     num_signals = len(fp_signal_names)
     # duration = cache.get("duration")
     event_data = mat.get("event")
+    event_time_dict = {}
 
     signal_lengths = [len(fp_signals[k]) for k in range(num_signals)]
     if not all(length == signal_lengths[0] for length in signal_lengths):
@@ -834,7 +851,13 @@ def create_visualization(ready):
         np.place(labels, labels == -1, [np.nan])
         labels_history.append(labels)
 
-    fig = create_fig(mat, mat_name, label_dict=label_dict)
+    fig = create_fig(
+        mat,
+        mat_name,
+        label_dict=label_dict,
+        event_time_dict=event_time_dict,
+        show_period_labels=not event_time_dict,
+    )
     video_path = mat.get("video_path", "")
     video_name = mat.get("video_name", "")
     time_ax = fig["data"][0]["x"]
@@ -886,7 +909,13 @@ def change_sampling_level(sampling_level):
     if labels_history:
         mat["labels"] = labels_history[-1]
 
-    fig = create_fig(mat, mat_name, default_n_shown_samples=n_samples)
+    fig = create_fig(
+        mat,
+        mat_name,
+        event_time_dict=cache.get("event_time_dict"),
+        default_n_shown_samples=n_samples,
+    )
+    cache.set("fig_resampler", fig)
     return fig
 
 

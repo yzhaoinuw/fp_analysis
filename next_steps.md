@@ -12,7 +12,7 @@ Use this checklist alongside `work_log.md`. Keep only actionable engineering thr
 
 ## Analysis Workflow Feedback Update (gpt-5)
 
-Status: item 2 accepted; ready for item 3 when requested.
+Status: item 3 implemented; awaiting user gate/check before item 4.
 
 Product goal: make the analysis flow clearer, make exclusions visible and respected by analysis, and fix peak metrics so plotted/exported values match detected positive and negative peaks.
 
@@ -35,11 +35,12 @@ Gated implementation checklist:
    - Explain that peak values are based on detected peaks and become `NaN` when no peak is found.
    - Acceptance gate: accepted after user review; wording is concise enough for the README.
 
-3. Event timestamp lines on the main full-recording visualization.
+3. [x] Event timestamp lines on the main full-recording visualization.
    - Show all imported event timestamps at once on the main Plotly full-recording graph after annotations are loaded.
-   - Use visible vertical lines or equivalent markers that remain clear when many events are present.
+   - Use palette-colored vertical line traces with one legend entry per event type.
+   - Suppress expanded perievent-window coloring in the active event-annotation visualization path, while keeping it available behind a figure toggle.
    - Remove or hide event lines immediately when their event timestamps are excluded by a removed period.
-   - Acceptance gate: loaded annotation events are visible on the main graph and disappear when excluded.
+   - Acceptance gate: implemented, awaiting user check that loaded annotation event timestamps are visible on the main graph without expanded-window coloring.
 
 4. Existing-period selection and temporary removal before analysis.
    - Add right-click selection on the interactive full-recording plot for existing labeled periods only; do not support arbitrary dragged ranges in this pass.

@@ -7,6 +7,7 @@ import pandas as pd
 from scipy.io import loadmat
 
 from fp_analysis_app.event_analysis import Analyses, Event_Utils, Perievent_Plots
+from fp_analysis_app.make_figure import EVENT_TIMESTAMP_TRACE_PREFIX, make_figure
 from fp_analysis_app.analysis_export import (
     get_analysis_type_checklist_values,
     write_analysis_workbooks,
@@ -92,6 +93,181 @@ class TestAnalysisPageSignalHighlight(unittest.TestCase):
         self.assertEqual(
             "2px solid #c62828",
             get_analysis_signal_select_style(["NE2m", "mClY", "GCaMP"])["border"],
+        )
+
+
+class TestFullRecordingEventTimestampLines(unittest.TestCase):
+    def _make_synthetic_mat(self):
+        time = np.linspace(0, 2 * np.pi, 100)
+        return {
+            "fp_signal_names": ["NE2m", "mClY"],
+            "fp_frequency": 1,
+            "NE2m": np.sin(time),
+            "mClY": np.cos(time),
+        }
+
+    def _event_timestamp_traces(self, fig):
+        return [
+            trace
+            for trace in fig.data
+            if str(trace.name).startswith(EVENT_TIMESTAMP_TRACE_PREFIX)
+        ]
+
+    def _event_legend_traces(self, fig):
+        return [
+            trace
+            for trace in fig.data
+            if trace.showlegend
+            and not str(trace.name).startswith(EVENT_TIMESTAMP_TRACE_PREFIX)
+        ]
+
+    def _event_legend_annotations(self, fig):
+        return [
+            annotation
+            for annotation in fig.layout.annotations
+            if annotation.text
+            and "&#9632;" in annotation.text
+        ]
+
+    def test_full_recording_figure_shows_all_imported_event_times(self):
+        fig = make_figure(
+            self._make_synthetic_mat(),
+            event_time_dict={
+                "wake_nrem": np.array([20, 45]),
+                "nrem_rem": np.array([60]),
+            },
+        )
+
+        event_traces = self._event_timestamp_traces(fig)
+
+        self.assertEqual(4, len(event_traces))
+        self.assertEqual(
+            {
+                f"{EVENT_TIMESTAMP_TRACE_PREFIX}wake_nrem",
+                f"{EVENT_TIMESTAMP_TRACE_PREFIX}nrem_rem",
+            },
+            {trace.name for trace in event_traces},
+        )
+        self.assertTrue(
+            any(
+                np.allclose(
+                    trace.x,
+                    [20.0, 20.0, np.nan, 45.0, 45.0, np.nan],
+                    equal_nan=True,
+                )
+                for trace in event_traces
+                if trace.name == f"{EVENT_TIMESTAMP_TRACE_PREFIX}wake_nrem"
+            )
+        )
+        legend_traces = self._event_legend_traces(fig)
+        legend_annotations = self._event_legend_annotations(fig)
+        self.assertEqual(
+            [],
+            legend_traces,
+        )
+        self.assertEqual(2, len(legend_annotations))
+        self.assertEqual(
+            {"wake_nrem", "nrem_rem"},
+            {
+                next(
+                    event_name
+                    for event_name in ("wake_nrem", "nrem_rem")
+                    if event_name in annotation.text
+                )
+                for annotation in legend_annotations
+            },
+        )
+        self.assertTrue(
+            all("<span" in annotation.text for annotation in legend_annotations)
+        )
+        self.assertTrue(all(trace.showlegend is False for trace in event_traces))
+
+    def test_event_legend_keeps_three_foot_shock_labels_on_one_row(self):
+        fig = make_figure(
+            self._make_synthetic_mat(),
+            event_time_dict={
+                "foot_shock_0.1s": np.array([20]),
+                "foot_shock_0.5s": np.array([45]),
+                "foot_shock_1.0s": np.array([60]),
+            },
+        )
+
+        legend_annotations = self._event_legend_annotations(fig)
+
+        self.assertEqual(3, len(legend_annotations))
+        self.assertEqual(
+            {"foot_shock_0.1s", "foot_shock_0.5s", "foot_shock_1.0s"},
+            {
+                next(
+                    event_name
+                    for event_name in (
+                        "foot_shock_0.1s",
+                        "foot_shock_0.5s",
+                        "foot_shock_1.0s",
+                    )
+                    if event_name in annotation.text
+                )
+                for annotation in legend_annotations
+            },
+        )
+        self.assertEqual({legend_annotations[0].y}, {a.y for a in legend_annotations})
+        self.assertLess(
+            max(a.x for a in legend_annotations) - min(a.x for a in legend_annotations),
+            0.17,
+        )
+
+    def test_full_recording_figure_omits_removed_event_times(self):
+        fig = make_figure(
+            self._make_synthetic_mat(),
+            event_time_dict={"wake_nrem": np.array([45])},
+        )
+
+        event_traces = self._event_timestamp_traces(fig)
+
+        self.assertEqual(2, len(event_traces))
+        self.assertTrue(
+            all(
+                np.allclose(trace.x, [45.0, 45.0, np.nan], equal_nan=True)
+                for trace in event_traces
+            )
+        )
+
+    def test_can_toggle_expanded_event_window_coloring(self):
+        labels = np.full(99, np.nan)
+        labels[10:20] = 0
+        label_dict = {"label_names": ["wake_nrem"], "labels": labels}
+
+        hidden_fig = make_figure(
+            self._make_synthetic_mat(),
+            label_dict=label_dict,
+            event_time_dict={"wake_nrem": np.array([15])},
+            show_period_labels=False,
+        )
+        shown_fig = make_figure(
+            self._make_synthetic_mat(),
+            label_dict=label_dict,
+            event_time_dict={"wake_nrem": np.array([15])},
+            show_period_labels=True,
+        )
+
+        hidden_period_traces = [
+            trace for trace in hidden_fig.data if trace.name == "Period Labels"
+        ]
+        shown_period_traces = [
+            trace for trace in shown_fig.data if trace.name == "Period Labels"
+        ]
+
+        self.assertTrue(
+            all(
+                np.isnan(np.asarray(trace.z, dtype=float)).all()
+                for trace in hidden_period_traces
+            )
+        )
+        self.assertTrue(
+            any(
+                not np.isnan(np.asarray(trace.z, dtype=float)).all()
+                for trace in shown_period_traces
+            )
         )
 
 

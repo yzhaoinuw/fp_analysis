@@ -11,6 +11,8 @@ Notes
 """
 
 import math
+from html import escape
+
 import numpy as np
 
 import plotly.graph_objects as go
@@ -46,6 +48,18 @@ def get_colorscale(num_class):
 RANGE_QUANTILE = 0.99
 HEATMAP_WIDTH = 40
 RANGE_PADDING_PERCENT = 0.2
+EVENT_TIMESTAMP_TRACE_PREFIX = "Event timestamp: "
+EVENT_TIMESTAMP_LINE_OPACITY = 0.55
+EVENT_TIMESTAMP_LINE_WIDTH = 1.25
+EVENT_TIMESTAMP_LEGEND_X = 0.6
+EVENT_TIMESTAMP_LEGEND_MIN_X = 0.03
+EVENT_TIMESTAMP_LEGEND_Y = 1.035
+EVENT_TIMESTAMP_LEGEND_CHAR_WIDTH = 0.006
+EVENT_TIMESTAMP_LEGEND_ITEM_GAP = 0.025
+EVENT_TIMESTAMP_LEGEND_ITEM_INDENT = -0.05
+EVENT_TIMESTAMP_LEGEND_MIN_ITEM_WIDTH = 0.045
+EVENT_TIMESTAMP_LEGEND_LINE_HEIGHT = 0.035
+EVENT_TIMESTAMP_LEGEND_MAX_X = 0.98
 
 
 def get_padded_labels(labels: np.ndarray, duration: int) -> np.ndarray:
@@ -66,10 +80,114 @@ def get_padded_labels(labels: np.ndarray, duration: int) -> np.ndarray:
     return labels
 
 
+def _build_event_timestamp_trace(event_name, event_times, y_range, color):
+    event_times = np.asarray(event_times, dtype=float).ravel()
+    if event_times.size == 0:
+        return None
+
+    x_values = []
+    y_values = []
+    for event_time in event_times:
+        x_values.extend([event_time, event_time, None])
+        y_values.extend([y_range[0], y_range[1], None])
+
+    return go.Scatter(
+        x=x_values,
+        y=y_values,
+        mode="lines",
+        name=f"{EVENT_TIMESTAMP_TRACE_PREFIX}{event_name}",
+        line=dict(color=color, width=EVENT_TIMESTAMP_LINE_WIDTH),
+        opacity=EVENT_TIMESTAMP_LINE_OPACITY,
+        hovertemplate=(
+            f"<b>{event_name}</b><br>"
+            "event time: %{x:.2f} s<extra></extra>"
+        ),
+        showlegend=False,
+    )
+
+
+def add_event_timestamp_traces(fig, event_time_dict, signal_ranges, num_signals):
+    if not event_time_dict:
+        return []
+
+    legend_items = []
+    for event_index, event_name in enumerate(sorted(event_time_dict.keys())):
+        color = LABEL_COLORS[event_index % len(LABEL_COLORS)]
+        legend_items.append((event_name, color))
+        for signal_index in range(num_signals):
+            signal_range = signal_ranges[signal_index] * (1 + RANGE_PADDING_PERCENT)
+            if signal_range == 0:
+                signal_range = 1
+            trace = _build_event_timestamp_trace(
+                event_name=event_name,
+                event_times=event_time_dict[event_name],
+                y_range=(-signal_range, signal_range),
+                color=color,
+            )
+            if trace is None:
+                continue
+            fig.add_trace(trace, row=signal_index + 1, col=1)
+    return legend_items
+
+
+def _get_event_timestamp_legend_item_width(event_name):
+    return max(
+        EVENT_TIMESTAMP_LEGEND_MIN_ITEM_WIDTH,
+        (
+            (len(str(event_name)) + 2) * EVENT_TIMESTAMP_LEGEND_CHAR_WIDTH
+            + EVENT_TIMESTAMP_LEGEND_ITEM_GAP
+            + EVENT_TIMESTAMP_LEGEND_ITEM_INDENT
+        ),
+    )
+
+
+def _get_event_timestamp_legend_start_x(legend_items):
+    total_width = sum(
+        _get_event_timestamp_legend_item_width(event_name)
+        for event_name, _ in legend_items
+    )
+    return max(
+        EVENT_TIMESTAMP_LEGEND_MIN_X,
+        min(EVENT_TIMESTAMP_LEGEND_X, EVENT_TIMESTAMP_LEGEND_MAX_X - total_width),
+    )
+
+
+def add_event_timestamp_legend_annotations(fig, legend_items):
+    row_start_x = _get_event_timestamp_legend_start_x(legend_items)
+    x = row_start_x
+    y = EVENT_TIMESTAMP_LEGEND_Y
+    for event_name, color in legend_items:
+        item_width = _get_event_timestamp_legend_item_width(event_name)
+        if (
+            x > row_start_x
+            and x + item_width > EVENT_TIMESTAMP_LEGEND_MAX_X
+        ):
+            x = row_start_x
+            y -= EVENT_TIMESTAMP_LEGEND_LINE_HEIGHT
+
+        fig.add_annotation(
+            x=x,
+            y=y,
+            xref="paper",
+            yref="paper",
+            text=(
+                f'<span style="color:{color}">&#9632;</span>'
+                f'&nbsp;{escape(str(event_name))}'
+            ),
+            showarrow=False,
+            xanchor="left",
+            yanchor="middle",
+            font=dict(size=10, color="black"),
+        )
+        x += item_width
+
+
 def make_figure(
     mat,
     plot_name="",
-    label_dict={},
+    label_dict=None,
+    event_time_dict=None,
+    show_period_labels=True,
     default_n_shown_samples=2048,
 ):
     # Time span and frequencies
@@ -87,7 +205,7 @@ def make_figure(
         (signal_length - 1) / fp_freq
     )  # need to round duration to an int for later
 
-    if label_dict:
+    if show_period_labels and label_dict:
         label_names = label_dict["label_names"]
         labels = label_dict["labels"]
     else:
@@ -199,6 +317,13 @@ def make_figure(
             col=1,
         )
 
+    event_timestamp_legend_items = add_event_timestamp_traces(
+        fig,
+        event_time_dict,
+        signal_ranges,
+        num_signals,
+    )
+
     fig.update_layout(
         autosize=True,
         margin=dict(t=50, l=10, r=5, b=20),
@@ -249,6 +374,7 @@ def make_figure(
 
     fig.update_annotations(font_size=14)  # subplot title size
     fig["layout"]["annotations"][-1]["font"]["size"] = 14
+    add_event_timestamp_legend_annotations(fig, event_timestamp_legend_items)
 
     return fig
 
