@@ -14,6 +14,7 @@ If today's date already appears at the top, add another `###` session under it r
 - Disabled expanded perievent-window coloring for active event-annotation visualization paths so event timestamp lines are not drowned in the previous window heatmap.
 - Added focused tests for palette/legend event-line behavior and the expanded-window coloring toggle.
 - Expanded the GitHub Actions perievent-test dependency install to include Dash, Dash Extensions, Plotly, Plotly Resampler, and XlsxWriter after recent UI and figure tests made those imports part of test collection.
+- Marked item 3 accepted after final visual check.
 - Archived the previous five live work-log dates into `work_log_archive/work_log_2026-06-18_to_2026-07-03.md` before adding this July 4 entry.
 - Verification:
   - `Get-Date -Format yyyy-MM-dd` - printed `2026-07-04`.
