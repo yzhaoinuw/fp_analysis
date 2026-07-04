@@ -6,6 +6,18 @@ If today's date already appears at the top, add another `###` session under it r
 
 ## 2026-07-03
 
+### Add README analysis plot guide (gpt-5)
+
+- Added a concise README guide to the analysis-page plots and metrics, including raw traces, mean trace, heatmap, normalized traces, AUC, peak values, first peak time, decay time, and two-signal cross-correlation.
+- Documented the intended positive/negative detected-peak contract and noted that pre-metric-update builds may still show the older `Max Peak Magnitude` label.
+- Marked item 2 accepted after user review.
+- Verification:
+  - `Get-Date -Format yyyy-MM-dd` - printed `2026-07-03`.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis` - 34 tests passed.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -c "import fp_analysis_app.analysis_export, fp_analysis_app.event_analysis, fp_analysis_app.mat_utils; print('import ok')"` - printed `import ok`.
+  - `git diff --check README.md next_steps.md work_log.md` - clean apart from Git line-ending conversion warnings.
+  - `C:\Users\yzhao\python_projects\agent_collab_treaty\.venv\Scripts\treaty.exe validate .` - passed.
+
 ### Implement analysis-page signal dropdown highlight (gpt-5)
 
 - Reverted the text callout for signal selection and replaced it with a red visual highlight around the existing signal dropdown while the selection is invalid.

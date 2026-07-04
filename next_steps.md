@@ -12,7 +12,7 @@ Use this checklist alongside `work_log.md`. Keep only actionable engineering thr
 
 ## Analysis Workflow Feedback Update (gpt-5)
 
-Status: item 1 accepted; ready for item 2 when requested.
+Status: item 2 accepted; ready for item 3 when requested.
 
 Product goal: make the analysis flow clearer, make exclusions visible and respected by analysis, and fix peak metrics so plotted/exported values match detected positive and negative peaks.
 
@@ -30,10 +30,10 @@ Gated implementation checklist:
    - Preserve the disabled `Show Results` behavior while no signal is selected, and keep it disabled if more than two signals are selected.
    - Acceptance gate: accepted after visual check; users can reach `/analysis`, notice the selector, select one or two signals, and then run analysis.
 
-2. README plot explanations.
+2. [x] README plot explanations.
    - Add a concise README section explaining each analysis plot and metric: raw perievent traces, mean trace, perievent heatmap, normalized perievent traces, AUC, positive peak value, negative peak value, first peak time, decay time, and cross-correlation when two signals are selected.
    - Explain that peak values are based on detected peaks and become `NaN` when no peak is found.
-   - Acceptance gate: user-facing wording is scientifically accurate without overloading the README.
+   - Acceptance gate: accepted after user review; wording is concise enough for the README.
 
 3. Event timestamp lines on the main full-recording visualization.
    - Show all imported event timestamps at once on the main Plotly full-recording graph after annotations are loaded.

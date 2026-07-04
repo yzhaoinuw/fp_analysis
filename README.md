@@ -28,6 +28,23 @@ After annotations are loaded, go to the analysis page, choose the signal(s) and 
 
 To export spreadsheets, click `Save Spreadsheets`, check the analysis types to save, and confirm. The app writes only the selected workbook types.
 
+#### Analysis Plots And Metrics
+
+Each event tab shows the selected event type over the chosen baseline and analysis windows:
+
+- Raw perievent traces: one trace per event occurrence, aligned to the event at time 0.
+- Mean trace: the average raw perievent response across all included occurrences.
+- Perievent heatmap: one row per included event occurrence, with color showing signal amplitude over time.
+- Normalized perievent traces: baseline-normalized traces used for the metric plots and spreadsheet values.
+- AUC: the app's post-event response summary, currently calculated as the mean normalized signal value across the analysis window.
+- Positive peak value: the signal value at the first detected positive peak. If no positive peak is detected, the value is `NaN`.
+- Negative peak value: the signal value at the first detected negative peak. If no negative peak is detected, the value is `NaN`.
+- First peak time: seconds from the event to the first detected positive peak.
+- Decay time: seconds from the first detected positive peak until the response returns below its baseline mean; if that return is not found, the last analysis-window time is used.
+- Cross-correlation: when two signals are selected, the app also plots their mean normalized cross-correlation across event occurrences.
+
+The positive and negative peak-value labels describe the feedback-update metric contract. Builds before that metric update may still label the older positive-only value as `Max Peak Magnitude`.
+
 The app first tries to save the spreadsheets next to the selected `.mat` file. If that location is not writable, it saves them to the app spreadsheet folder under `fp_analysis_app/assets/spreadsheets/`.
 
 Spreadsheet exports are grouped into a setup-specific subfolder based on:
