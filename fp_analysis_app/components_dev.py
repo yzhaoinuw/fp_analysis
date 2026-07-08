@@ -128,6 +128,8 @@ home_page = html.Div(
         ),
         dcc.Store(id="visualization-ready-store"),
         dcc.Store(id="annotation-uploaded-store"),
+        dcc.Store(id="event-time-store", data={}),
+        dcc.Store(id="event-time-sync-store"),
         # dcc.Store(id="net-annotation-count-store"),
         dcc.Store(id="num-signals-store"),
     ],
@@ -364,10 +366,10 @@ class Components:
                 )
             ], "none"
         tabs = [self._build_event_tab(event_name) for event_name in event_names]
-        return tabs
+        return tabs, event_names[0]
 
     def fill_analysis_page(self, event_names, event_count_records, signal_names):
-        event_tabs = self._build_event_tabs(event_names)
+        event_tabs, active_tab = self._build_event_tabs(event_names)
         children = [
             html.H3("Analysis Page"),
             html.Div(dcc.Link(children="← Back", href="/")),
@@ -453,6 +455,6 @@ class Components:
                 },
             ),
             html.Br(),
-            dcc.Tabs(id="event-tabs", children=event_tabs, value=event_names[0]),
+            dcc.Tabs(id="event-tabs", children=event_tabs, value=active_tab),
         ]
         return children

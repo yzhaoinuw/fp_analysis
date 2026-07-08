@@ -12,7 +12,7 @@ Use this checklist alongside `work_log.md`. Keep only actionable engineering thr
 
 ## Analysis Workflow Feedback Update (gpt-5)
 
-Status: item 3 accepted; ready for item 4 when requested.
+Status: item 4 implemented with clientside rectangle-based deletion; awaiting user acceptance gate.
 
 Product goal: make the analysis flow clearer, make exclusions visible and respected by analysis, and fix peak metrics so plotted/exported values match detected positive and negative peaks.
 
@@ -42,12 +42,15 @@ Gated implementation checklist:
    - Remove or hide event lines immediately when their event timestamps are excluded by a removed period.
    - Acceptance gate: accepted after visual check; loaded annotation event timestamps are visible on the main graph without expanded-window coloring.
 
-4. Existing-period selection and temporary removal before analysis.
-   - Add right-click selection on the interactive full-recording plot for existing labeled periods only; do not support arbitrary dragged ranges in this pass.
-   - A selected period is the contiguous segment with the clicked label. If multiple labeled periods overlap at the click time, select the period whose center is closest to the click.
-   - Add a clearly placed removal control near the graph. Pressing it removes the selected period from the visualization and excludes events inside that period from downstream analysis.
-   - Store removals in session/runtime state first. Removed periods should become blank/unlabeled, and all event timestamp lines inside removed periods should disappear.
-   - Acceptance gate: user can right-click a labeled period, remove it, see it disappear, and run analysis with contained events excluded.
+4. Annotation-rectangle event deletion before analysis.
+   - In annotation mode, let the user draw a rectangle on the interactive full-recording plot.
+   - When a rectangle span is selected and the user presses `Delete` or `Backspace`, remove event timestamps whose times fall inside the rectangle's x/time span.
+   - Keep the selection/delete interaction clientside for responsive visual updates; use the event-time store as the bridge back to server-side analysis.
+   - Do not add a dedicated removal button for this flow.
+   - Store removals in session/runtime state first. Removed event timestamps should disappear from the vertical event lines and be excluded from downstream analysis/export payloads.
+   - Leave photometry signal arrays untouched; only the cached event-time arrays are edited in this pass.
+   - Keep only the most recently drawn selection rectangle if the user draws boxes in multiple subplots.
+   - Acceptance gate: user can enter annotation mode, draw a rectangle spanning event timestamp lines, press `Delete` or `Backspace`, see those vertical lines disappear, and run analysis with contained events excluded.
 
 5. Save modified annotations back to the MAT file.
    - Add or reposition a lower-left `Save Annotations` button below the graph for persisting the currently modified period/event state.

@@ -45,6 +45,10 @@ from fp_analysis_app.analysis_export import (
     get_analysis_type_checklist_values,
     write_analysis_workbooks,
 )
+from fp_analysis_app.event_editing import (
+    event_time_dict_to_store_data,
+    store_data_to_event_time_dict,
+)
 from fp_analysis_app.mat_utils import (
     get_fp_signal_names,
     get_visualization_signal_data,
@@ -74,6 +78,7 @@ SPREADSHEET_DIR.mkdir(parents=True, exist_ok=True)
 EXPORT_DOWNSAMPLE_FACTOR = 100
 ANALYSIS_EXPORT_PAYLOAD_CACHE_KEY = "analysis_export_payload"
 REMEMBERED_ANALYSIS_EXPORT_TYPES_CACHE_KEY = "remembered_analysis_export_types"
+SAMPLING_LEVEL_TO_N_SAMPLES = {"x1": 2048, "x2": 4096, "x4": 8192}
 
 components = Components()
 app.layout = html.Div(
@@ -138,6 +143,46 @@ def get_cached_runtime_fp_metadata(mat=None):
     return signal_names, float(fp_freq)
 
 
+def get_n_samples_for_sampling_level(sampling_level):
+    return SAMPLING_LEVEL_TO_N_SAMPLES.get(sampling_level, 2048)
+
+
+def build_analysis_page_content(event_time_dict):
+    event_time_dict = event_time_dict or {}
+    event_count_records = [
+        {"Event": event, "Count": len(event_times)}
+        for event, event_times in event_time_dict.items()
+    ]
+    signal_names = cache.get("fp_signal_names") or []
+    return components.fill_analysis_page(
+        list(event_time_dict.keys()),
+        event_count_records,
+        signal_names,
+    )
+
+
+def build_current_full_recording_figure(default_n_shown_samples=2048):
+    filepath = cache.get("filepath")
+    if not filepath:
+        return None
+
+    mat_name = os.path.splitext(os.path.basename(filepath))[0]
+    mat = loadmat(filepath, squeeze_me=True)
+    labels_history = cache.get("labels_history")
+    if labels_history:
+        mat["labels"] = labels_history[-1]
+
+    fig = create_fig(
+        mat,
+        mat_name,
+        event_time_dict=cache.get("event_time_dict"),
+        show_period_labels=False,
+        default_n_shown_samples=default_n_shown_samples,
+    )
+    cache.set("fig_resampler", fig)
+    return fig
+
+
 def open_mat_dialog():
     """
     Open a native file dialog (pywebview) that ONLY shows .mat files.
@@ -190,6 +235,12 @@ def get_preferred_spreadsheet_dir(filepath):
 
 def clear_analysis_export_payload():
     cache.set(ANALYSIS_EXPORT_PAYLOAD_CACHE_KEY, None)
+
+
+def is_selection_relayout(relayoutdata):
+    if not relayoutdata:
+        return False
+    return any(str(key).startswith("selections") for key in relayoutdata)
 
 
 def make_analysis_plots(
@@ -513,6 +564,195 @@ clientside_callback(
 )
 
 
+# store_annotation_selection_span
+app.clientside_callback(
+    """
+    function(relayoutData, keyboardEvents, figure) {
+        const no_update = dash_clientside.no_update;
+        const triggered = (
+            dash_clientside.callback_context &&
+            dash_clientside.callback_context.triggered
+        ) || [];
+        const triggeredByRelayout = triggered.some(
+            item => item.prop_id === "graph.relayoutData"
+        );
+        if (!triggeredByRelayout) {
+            return [no_update, no_update, no_update];
+        }
+        const hasSelectionRelayout = relayoutData && Object.keys(relayoutData).some(
+            key => key.startsWith("selections")
+        );
+        if (!hasSelectionRelayout) {
+            return [no_update, no_update, no_update];
+        }
+        if (!figure || !figure.layout) {
+            return [null, no_update, no_update];
+        }
+        let selections = figure.layout.selections;
+        if ((!selections || selections.length === 0) && Array.isArray(relayoutData.selections)) {
+            selections = relayoutData.selections;
+        }
+        let latest = selections && selections.length ? selections[selections.length - 1] : null;
+        if (!latest) {
+            const keyedSelections = {};
+            for (const [key, value] of Object.entries(relayoutData || {})) {
+                const match = key.match(/^selections\\[(\\d+)\\]\\.(.+)$/);
+                if (!match) continue;
+                const index = match[1];
+                const property = match[2];
+                keyedSelections[index] = keyedSelections[index] || {};
+                keyedSelections[index][property] = value;
+            }
+            const indices = Object.keys(keyedSelections).map(Number);
+            if (indices.length > 0) {
+                latest = keyedSelections[String(Math.max(...indices))];
+            }
+        }
+        if (!latest) {
+            return [null, no_update, no_update];
+        }
+        if (latest.x0 === undefined || latest.x1 === undefined) {
+            return [no_update, no_update, no_update];
+        }
+        const start = Math.min(Number(latest.x0), Number(latest.x1));
+        const end = Math.max(Number(latest.x0), Number(latest.x1));
+        if (!Number.isFinite(start) || !Number.isFinite(end)) {
+            return [no_update, no_update, no_update];
+        }
+
+        const updatedFigure = JSON.parse(JSON.stringify(figure));
+        updatedFigure.layout.selections = [latest];
+        updatedFigure.layout.shapes = null;
+        return [
+            {start: start, end: end},
+            updatedFigure,
+            `Selected event deletion span [${start.toFixed(1)}, ${end.toFixed(1)}] s.`
+        ];
+    }
+    """,
+    Output("box-select-store", "data"),
+    Output("graph", "figure", allow_duplicate=True),
+    Output("debug-message", "children"),
+    Input("graph", "relayoutData"),
+    Input("keyboard", "n_events"),
+    State("graph", "figure"),
+    prevent_initial_call=True,
+)
+
+
+# update_event_annotations
+app.clientside_callback(
+    """
+    function(keyboardEvents, selectedSpan, keyboardEvent, eventTimes, figure) {
+        const no_update = dash_clientside.no_update;
+        const triggered = (
+            dash_clientside.callback_context &&
+            dash_clientside.callback_context.triggered
+        ) || [];
+        const triggeredByKeyboard = triggered.some(
+            item => item.prop_id === "keyboard.n_events"
+        );
+        if (!triggeredByKeyboard) {
+            return [no_update, no_update, no_update, no_update];
+        }
+        if (!keyboardEvents || !keyboardEvent) {
+            return [no_update, no_update, no_update, no_update];
+        }
+        const key = keyboardEvent.key;
+        if (key !== "Delete" && key !== "Backspace") {
+            return [no_update, no_update, no_update, no_update];
+        }
+        if (!selectedSpan) {
+            return [
+                no_update,
+                no_update,
+                no_update,
+                "Draw an annotation rectangle before deleting event timestamps."
+            ];
+        }
+        if (!figure || !figure.layout || !eventTimes) {
+            return [no_update, no_update, no_update, no_update];
+        }
+        if (
+            figure.layout.dragmode !== "select" ||
+            !figure.layout.selections ||
+            figure.layout.selections.length === 0
+        ) {
+            return [no_update, no_update, no_update, no_update];
+        }
+
+        const start = Math.min(Number(selectedSpan.start), Number(selectedSpan.end));
+        const end = Math.max(Number(selectedSpan.start), Number(selectedSpan.end));
+        if (!Number.isFinite(start) || !Number.isFinite(end)) {
+            return [no_update, no_update, no_update, no_update];
+        }
+
+        const nextEvents = {};
+        let removedCount = 0;
+        for (const [eventName, times] of Object.entries(eventTimes || {})) {
+            const kept = [];
+            for (const rawTime of times || []) {
+                const time = Number(rawTime);
+                if (time >= start && time <= end) {
+                    removedCount += 1;
+                } else {
+                    kept.push(rawTime);
+                }
+            }
+            if (kept.length > 0) nextEvents[eventName] = kept;
+        }
+
+        if (removedCount === 0) {
+            return [
+                no_update,
+                selectedSpan,
+                no_update,
+                `No event timestamps found in [${start.toFixed(1)}, ${end.toFixed(1)}] s.`
+            ];
+        }
+
+        const prefix = "Event timestamp: ";
+        const updatedFigure = JSON.parse(JSON.stringify(figure));
+        for (const trace of updatedFigure.data || []) {
+            if (!trace.name || !String(trace.name).startsWith(prefix)) continue;
+            const eventName = String(trace.name).slice(prefix.length);
+            const keptTimes = nextEvents[eventName] || [];
+            const originalY = trace.y || [];
+            let y0 = originalY.length > 0 ? originalY[0] : -1;
+            let y1 = originalY.length > 1 ? originalY[1] : 1;
+            const x = [];
+            const y = [];
+            for (const time of keptTimes) {
+                x.push(time, time, null);
+                y.push(y0, y1, null);
+            }
+            trace.x = x;
+            trace.y = y;
+        }
+        updatedFigure.layout.selections = null;
+        updatedFigure.layout.shapes = null;
+
+        return [
+            nextEvents,
+            null,
+            updatedFigure,
+            `Removed ${removedCount} event timestamp(s) in [${start.toFixed(1)}, ${end.toFixed(1)}] s.`
+        ];
+    }
+    """,
+    Output("event-time-store", "data", allow_duplicate=True),
+    Output("box-select-store", "data", allow_duplicate=True),
+    Output("graph", "figure", allow_duplicate=True),
+    Output("debug-message", "children", allow_duplicate=True),
+    Input("keyboard", "n_events"),
+    Input("box-select-store", "data"),
+    State("keyboard", "event"),
+    State("event-time-store", "data"),
+    State("graph", "figure"),
+    prevent_initial_call=True,
+)
+
+
 # show_save_annotation_status
 clientside_callback(
     """
@@ -538,6 +778,7 @@ clientside_callback(
     State("signal-select-dropdown", "value"),
     State("baseline-window-dropdown", "value"),
     State("analysis-window-dropdown", "value"),
+    State("event-time-store", "data"),
     State({"type": "tab", "event": ALL}, "id"),
     background=True,
     manager=background_callback_manager,
@@ -551,6 +792,7 @@ def show_analysis_results(
     selected_signals,
     baseline_window,
     analysis_window,
+    event_time_store,
     tabs,
 ):
     if not n_clicks:  # None or 0 → do nothing
@@ -562,8 +804,7 @@ def show_analysis_results(
         if file.is_file() and file.suffix == ".png":
             file.unlink()
 
-    # annotation_filepath = cache.get("annotation_filepath")
-    event_time_dict = cache.get("event_time_dict")
+    event_time_dict = store_data_to_event_time_dict(event_time_store)
     duration = cache.get("duration")
     (
         perievent_signals_fig_paths,
@@ -588,10 +829,13 @@ def show_analysis_results(
             children = components._fill_tab(
                 event, perievent_signals_fig_paths, analyses_fig_paths, corr_fig_paths
             )
-        else:
+        elif event in event_time_dict:
             children = html.Div(
-                "No events remain after applying the selected analysis window."
+                "No event timestamps for this event remain after applying the "
+                "selected baseline and analysis windows."
             )
+        else:
+            children = html.Div("This event type no longer has event timestamps.")
         tab_children.append(children)
 
     status_message = (
@@ -609,12 +853,14 @@ def show_analysis_results(
     Input("signal-select-dropdown", "value"),
     Input("baseline-window-dropdown", "value"),
     Input("analysis-window-dropdown", "value"),
+    Input("event-time-store", "data"),
     prevent_initial_call=True,
 )
 def clear_export_payload_after_analysis_setting_change(
     selected_signals,
     baseline_window,
     analysis_window,
+    event_time_store,
 ):
     clear_analysis_export_payload()
     signal_selection_is_valid = is_valid_analysis_signal_selection(selected_signals)
@@ -714,6 +960,7 @@ def save_selected_analysis_spreadsheets(n_clicks, selected_analysis_types):
     Output("upload-container", "children", allow_duplicate=True),
     Output("analysis-link", "style", allow_duplicate=True),
     Output("analysis-page", "children", allow_duplicate=True),
+    Output("event-time-store", "data", allow_duplicate=True),
     Input("vis-data-upload-button", "n_clicks"),
     prevent_initial_call=True,
 )
@@ -729,7 +976,7 @@ def choose_mat(n_clicks):
     message = (
         "File uploaded. Creating visualizations... This may take up to 30 seconds."
     )
-    return message, True, components.vis_upload_button, {"visibility": "hidden"}, []
+    return message, True, components.vis_upload_button, {"visibility": "hidden"}, [], {}
 
 
 @app.callback(
@@ -752,6 +999,7 @@ def choose_annotation(n_clicks):
     Output("analysis-page", "children"),
     Output("graph", "figure", allow_duplicate=True),
     Output("analysis-link", "style"),
+    Output("event-time-store", "data", allow_duplicate=True),
     Input("annotation-uploaded-store", "data"),
     prevent_initial_call=True,
 )
@@ -781,7 +1029,12 @@ def import_annotation_file(annotation_filepath):
         show_period_labels=False,
     )
     cache.set("fig_resampler", fig)
-    return analysis_page_content, fig, {"visibility": "visible"}
+    return (
+        analysis_page_content,
+        fig,
+        {"visibility": "visible"},
+        event_time_dict_to_store_data(event_time_dict),
+    )
 
 
 @app.callback(
@@ -790,6 +1043,7 @@ def import_annotation_file(annotation_filepath):
     Output("data-upload-message", "children", allow_duplicate=True),
     Output("analysis-page", "children", allow_duplicate=True),
     Output("analysis-link", "style", allow_duplicate=True),
+    Output("event-time-store", "data", allow_duplicate=True),
     Input("visualization-ready-store", "data"),
     prevent_initial_call=True,
 )
@@ -808,7 +1062,14 @@ def create_visualization(ready):
         fp_signal_names, fp_signals, fp_freq = get_visualization_signal_data(mat)
     except KeyError:
         message = " ".join(["No FP signal found.", message])
-        return message, dash.no_update, "", analysis_page_content, analysis_link_style
+        return (
+            message,
+            dash.no_update,
+            "",
+            analysis_page_content,
+            analysis_link_style,
+            {},
+        )
     cache.set("fp_signal_names", fp_signal_names)
     cache.set("fp_frequency", float(fp_freq))
 
@@ -820,7 +1081,14 @@ def create_visualization(ready):
     signal_lengths = [len(fp_signals[k]) for k in range(num_signals)]
     if not all(length == signal_lengths[0] for length in signal_lengths):
         message = " ".join(["Not all FP signals are of the same length.", message])
-        return message, dash.no_update, "", analysis_page_content, analysis_link_style
+        return (
+            message,
+            dash.no_update,
+            "",
+            analysis_page_content,
+            analysis_link_style,
+            {},
+        )
 
     signal_length = signal_lengths[0]
     duration = math.ceil(
@@ -887,6 +1155,7 @@ def create_visualization(ready):
         "",
         analysis_page_content,
         analysis_link_style,
+        event_time_dict_to_store_data(event_time_dict),
     )
 
 
@@ -898,8 +1167,7 @@ def create_visualization(ready):
 def change_sampling_level(sampling_level):
     if sampling_level is None:
         return dash.no_update
-    sampling_level_map = {"x1": 2048, "x2": 4096, "x4": 8192}
-    n_samples = sampling_level_map[sampling_level]
+    n_samples = get_n_samples_for_sampling_level(sampling_level)
     filepath = cache.get("filepath")
     mat_name = os.path.splitext(os.path.basename(filepath))[0]
     mat = loadmat(filepath, squeeze_me=True)
@@ -920,6 +1188,26 @@ def change_sampling_level(sampling_level):
 
 
 @app.callback(
+    Output("event-time-sync-store", "data"),
+    Output("analysis-page", "children", allow_duplicate=True),
+    Input("event-time-store", "data"),
+    prevent_initial_call=True,
+)
+def sync_event_time_store(event_time_store):
+    event_time_dict = store_data_to_event_time_dict(event_time_store)
+    cache.set("event_time_dict", event_time_dict)
+    clear_analysis_export_payload()
+    sync_data = {
+        "event_count": int(
+            sum(len(event_times) for event_times in event_time_dict.values())
+        )
+    }
+    if not cache.get("fp_signal_names"):
+        return sync_data, dash.no_update
+    return sync_data, build_analysis_page_content(event_time_dict)
+
+
+@app.callback(
     Output("graph", "figure", allow_duplicate=True),
     Input("graph", "relayoutData"),
     State("num-signals-store", "data"),
@@ -929,6 +1217,10 @@ def change_sampling_level(sampling_level):
 def update_fig(relayoutdata, num_signals):
     fig = cache.get("fig_resampler")
     if fig is None:
+        return dash.no_update
+    if not relayoutdata:
+        return dash.no_update
+    if is_selection_relayout(relayoutdata):
         return dash.no_update
 
     # manually supply xaxis4.range[0] and xaxis4.range[1] after clicking

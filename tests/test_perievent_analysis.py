@@ -7,6 +7,13 @@ import pandas as pd
 from scipy.io import loadmat
 
 from fp_analysis_app.event_analysis import Analyses, Event_Utils, Perievent_Plots
+from fp_analysis_app.event_editing import (
+    event_time_dict_to_store_data,
+    is_remove_event_key,
+    remove_event_times_in_span,
+    selected_data_to_x_span,
+    store_data_to_event_time_dict,
+)
 from fp_analysis_app.make_figure import EVENT_TIMESTAMP_TRACE_PREFIX, make_figure
 from fp_analysis_app.analysis_export import (
     get_analysis_type_checklist_values,
@@ -94,6 +101,18 @@ class TestAnalysisPageSignalHighlight(unittest.TestCase):
             "2px solid #c62828",
             get_analysis_signal_select_style(["NE2m", "mClY", "GCaMP"])["border"],
         )
+
+    def test_analysis_page_can_render_after_all_events_are_removed(self):
+        children = Components().fill_analysis_page(
+            event_names=[],
+            event_count_records=[],
+            signal_names=["NE2m"],
+        )
+
+        event_tabs = find_component_by_id(children, "event-tabs")
+
+        self.assertIsNotNone(event_tabs)
+        self.assertEqual("none", event_tabs.value)
 
 
 class TestFullRecordingEventTimestampLines(unittest.TestCase):
@@ -268,6 +287,65 @@ class TestFullRecordingEventTimestampLines(unittest.TestCase):
                 not np.isnan(np.asarray(trace.z, dtype=float)).all()
                 for trace in shown_period_traces
             )
+        )
+
+
+class TestAnnotationModeEventDeletion(unittest.TestCase):
+    def test_extracts_x_span_from_rectangle_selection(self):
+        selected_data = {"range": {"x": [42.5, 20.0]}}
+
+        self.assertEqual((20.0, 42.5), selected_data_to_x_span(selected_data))
+
+    def test_extracts_x_span_from_selected_points_when_range_is_missing(self):
+        selected_data = {"points": [{"x": 30}, {"x": 20}, {"x": 25}]}
+
+        self.assertEqual((20.0, 30.0), selected_data_to_x_span(selected_data))
+
+    def test_delete_and_backspace_remove_event_timestamps(self):
+        self.assertTrue(is_remove_event_key({"key": "Delete"}))
+        self.assertTrue(is_remove_event_key({"key": "Backspace"}))
+        self.assertFalse(is_remove_event_key({"key": "Enter"}))
+        self.assertFalse(is_remove_event_key(None))
+
+    def test_filters_event_times_inside_selected_span(self):
+        event_time_dict = {
+            "wake_nrem": np.array([10, 20, 30, 40]),
+            "nrem_rem": np.array([15, 35]),
+        }
+
+        filtered_events, removed_count = remove_event_times_in_span(
+            event_time_dict,
+            (20, 35),
+        )
+
+        self.assertEqual(3, removed_count)
+        self.assertEqual(
+            {"wake_nrem": [10, 40], "nrem_rem": [15]},
+            {event: times.tolist() for event, times in filtered_events.items()},
+        )
+
+    def test_filter_drops_event_names_when_all_times_are_removed(self):
+        filtered_events, removed_count = remove_event_times_in_span(
+            {"wake_nrem": np.array([10, 12])},
+            (0, 20),
+        )
+
+        self.assertEqual(2, removed_count)
+        self.assertEqual({}, filtered_events)
+
+    def test_event_time_store_round_trip_uses_json_friendly_lists(self):
+        event_time_dict = {
+            "wake_nrem": np.array([10, 20]),
+            "nrem_rem": np.array([30]),
+        }
+
+        store_data = event_time_dict_to_store_data(event_time_dict)
+        restored = store_data_to_event_time_dict(store_data)
+
+        self.assertEqual({"wake_nrem": [10, 20], "nrem_rem": [30]}, store_data)
+        self.assertEqual(
+            {"wake_nrem": [10, 20], "nrem_rem": [30]},
+            {event: times.tolist() for event, times in restored.items()},
         )
 
 
