@@ -6,6 +6,42 @@ If today's date already appears at the top, add another `###` session under it r
 
 ## 2026-07-17
 
+### Accept adaptive ticks and prepare analysis-window update for publication (gpt-5)
+
+- Marked the positive-integer analysis-window item and adaptive perievent tick follow-up accepted after the user's visual check.
+- Traced the repeated `python.exe` `0xC06D007E` dialogs to temporary headless Matplotlib diagnostic subprocesses that failed while loading a delayed native DLL; the accepted desktop-app run and MAT data were not the source.
+- Prepared the validated analysis-window controls and adaptive plot labeling changes for a focused commit and push on `dev`.
+- Verification:
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis` - 56 tests passed.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -c "import fp_analysis_app.analysis_export, fp_analysis_app.event_analysis, fp_analysis_app.event_editing, fp_analysis_app.mat_utils, fp_analysis_app.make_figure, fp_analysis_app.app_dev; print('import ok')"` - printed `import ok`.
+  - `git diff --check` - clean apart from Git line-ending conversion warnings.
+  - `C:\Users\yzhao\python_projects\agent_collab_treaty\.venv\Scripts\treaty.exe validate .` - passed.
+
+### Add adaptive perievent time ticks (gpt-5)
+
+- Marked the positive-integer analysis-window inputs accepted after the user confirmed the new controls work.
+- Replaced fixed 10-second ticks with a shared adaptive time-axis formatter that preserves the familiar default view, reduces tick density for medium windows, and progressively reduces font size and tilts labels for large windows.
+- Applied the formatter to raw, mean, normalized, and heatmap perievent panels; a 30-second baseline plus 120-second analysis window now uses eight labels instead of sixteen.
+- Verification:
+  - `$env:MPLBACKEND='Agg'; C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest -v tests.test_perievent_analysis.TestAdaptivePerieventTimeTicks` - 4 tests passed.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis` - 56 tests passed.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -c "import fp_analysis_app.analysis_export, fp_analysis_app.event_analysis, fp_analysis_app.event_editing, fp_analysis_app.mat_utils, fp_analysis_app.make_figure, fp_analysis_app.app_dev; print('import ok')"` - printed `import ok`.
+  - `git diff --check` - clean apart from Git line-ending conversion warnings.
+  - `C:\Users\yzhao\python_projects\agent_collab_treaty\.venv\Scripts\treaty.exe validate .` - passed.
+
+### Implement positive-integer analysis windows (gpt-5)
+
+- Marked the event annotation save/undo gate accepted when the user advanced to the next analysis-workflow item.
+- Replaced the baseline and analysis-window dropdowns with whole-second number inputs whose defaults and maximum values stay strictly below one quarter of the recording duration.
+- Added shared client/server validation that disables `Show Results`, displays an inline error, clears stale export payloads, and rejects invalid values before analysis begins.
+- Added focused coverage for numeric input constraints, short-recording default capping, positive-integer validation, and the strict quarter-duration boundary.
+- Verification:
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis.TestAnalysisPageSignalHighlight` - 7 tests passed.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis` - 52 tests passed.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -c "import fp_analysis_app.analysis_export, fp_analysis_app.event_analysis, fp_analysis_app.event_editing, fp_analysis_app.mat_utils, fp_analysis_app.make_figure, fp_analysis_app.app_dev; print('import ok')"` - printed `import ok`.
+  - `git diff --check` - clean apart from Git line-ending conversion warnings.
+  - `C:\Users\yzhao\python_projects\agent_collab_treaty\.venv\Scripts\treaty.exe validate .` - passed.
+
 ### Publish event annotation save and undo (gpt-5)
 
 - Prepared the accepted event annotation save/undo UI and MAT persistence changes for commit and push on `dev`.

@@ -10,6 +10,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 
 from scipy.io import loadmat
 from scipy.signal import find_peaks, resample_poly, correlation_lags, correlate
@@ -19,6 +20,41 @@ from fp_analysis_app.sleep_event_import import (
     is_sleep_bout_table,
     sleep_bout_table_to_event_time_dict,
 )
+
+
+def get_adaptive_time_axis_settings(nsec_before, nsec_after):
+    """Choose readable time ticks and label styling for a perievent window."""
+    x_min = -float(nsec_before)
+    x_max = float(nsec_after)
+    window_duration = x_max - x_min
+
+    if window_duration <= 100:
+        max_intervals, font_size, rotation = 9, 10, 0
+    elif window_duration <= 240:
+        max_intervals, font_size, rotation = 8, 9, 0
+    elif window_duration <= 600:
+        max_intervals, font_size, rotation = 7, 8, 25
+    else:
+        max_intervals, font_size, rotation = 6, 8, 45
+
+    locator = MaxNLocator(
+        nbins=max_intervals,
+        steps=[1, 2, 2.5, 5, 10],
+        integer=True,
+        min_n_ticks=3,
+    )
+    ticks = locator.tick_values(x_min, x_max)
+    tolerance = max(window_duration, 1) * 1e-9
+    ticks = ticks[(ticks >= x_min - tolerance) & (ticks <= x_max + tolerance)]
+    if not np.any(np.isclose(ticks, 0)):
+        ticks = np.append(ticks, 0)
+    ticks = np.unique(np.round(ticks, decimals=10))
+
+    return {
+        "ticks": ticks,
+        "font_size": font_size,
+        "rotation": rotation,
+    }
 
 
 class Event_Utils:
@@ -188,6 +224,19 @@ class Perievent_Plots:
         self.nsec_before = nsec_before
         self.nsec_after = nsec_after
 
+    def _format_time_axis(self, ax):
+        settings = get_adaptive_time_axis_settings(
+            self.nsec_before,
+            self.nsec_after,
+        )
+        ax.set_xlim(-self.nsec_before, self.nsec_after)
+        ax.set_xticks(settings["ticks"])
+        ax.tick_params(
+            axis="x",
+            labelsize=settings["font_size"],
+            labelrotation=settings["rotation"],
+        )
+
     def plot_perievent_signals(
         self,
         perievent_signals,
@@ -219,8 +268,7 @@ class Perievent_Plots:
         # Add reference lines
         ax.axhline(0, color="gray", linestyle="--", linewidth=1)  # Horizontal at y = 0
         ax.axvline(0, color="gray", linestyle="--", linewidth=1)  # Vertical at x = 0
-        ax.set_xlim(-self.nsec_before, self.nsec_after)
-        ax.set_xticks(np.arange(-self.nsec_before, self.nsec_after + 1, 10))
+        self._format_time_axis(ax)
         ax.set_ylim(ylim[0], ylim[1])
         ax.set_xlabel("Time (s)", fontsize=10, fontweight="bold")
         ax.set_ylabel(f"{biosignal_name} (dF/F)", fontsize=10, fontweight="bold")
@@ -248,8 +296,7 @@ class Perievent_Plots:
         ax.axvline(0, color="gray", linestyle="--", linewidth=1)
 
         # Axis limits and labels
-        ax.set_xlim(-self.nsec_before, self.nsec_after)
-        ax.set_xticks(np.arange(-self.nsec_before, self.nsec_after + 1, 10))
+        self._format_time_axis(ax)
         ax.set_ylim(ylim[0], ylim[1])
         ax.set_xlabel("Time (s)", fontsize=10, fontweight="bold")
         ax.set_ylabel(f"Mean {biosignal_name}(dF/F)", fontsize=10, fontweight="bold")
@@ -287,6 +334,7 @@ class Perievent_Plots:
             origin="lower",
             extent=[-self.nsec_before, self.nsec_after, 0, event_count],
         )
+        self._format_time_axis(ax)
 
         # Format axis
         # event_labels = [f"{i+1}" for i in range(event_count)]

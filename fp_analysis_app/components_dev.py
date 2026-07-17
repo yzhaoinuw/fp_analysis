@@ -5,11 +5,15 @@ Created on Fri Oct 20 16:27:03 2023
 @author: yzhao
 """
 
+import math
+
 from dash import dcc, html, page_container, dash_table
 from dash_extensions import EventListener
 from dash_extensions.pages import setup_page_components
 
 MAX_ANALYSIS_SIGNALS = 2
+DEFAULT_BASELINE_WINDOW = 30
+DEFAULT_ANALYSIS_WINDOW = 60
 BASE_SIGNAL_SELECT_WRAPPER_STYLE = {
     "display": "flex",
     "alignItems": "center",
@@ -52,6 +56,90 @@ def get_analysis_signal_select_style(selected_signals):
             }
         )
     return style
+
+
+def get_max_analysis_window(recording_duration):
+    """Return the largest whole-second window strictly below 1/4 duration."""
+    if isinstance(recording_duration, bool):
+        return None
+    try:
+        duration = float(recording_duration)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(duration) or duration <= 0:
+        return None
+    return max(math.ceil(duration / 4) - 1, 0)
+
+
+def _normalize_positive_integer(value):
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        numeric_value = float(value)
+    except (TypeError, ValueError):
+        return None
+    if (
+        not math.isfinite(numeric_value)
+        or numeric_value <= 0
+        or not numeric_value.is_integer()
+    ):
+        return None
+    return int(numeric_value)
+
+
+def validate_and_normalize_analysis_windows(
+    baseline_window,
+    analysis_window,
+    recording_duration,
+):
+    """Normalize valid window inputs and return a user-facing validation error."""
+    normalized_baseline = _normalize_positive_integer(baseline_window)
+    normalized_analysis = _normalize_positive_integer(analysis_window)
+    if normalized_baseline is None or normalized_analysis is None:
+        return (
+            normalized_baseline,
+            normalized_analysis,
+            "Baseline and analysis windows must be positive whole numbers of seconds.",
+        )
+
+    max_window = get_max_analysis_window(recording_duration)
+    if max_window is None:
+        return (
+            normalized_baseline,
+            normalized_analysis,
+            "Recording duration is unavailable. Reload the MAT file before running analysis.",
+        )
+    if max_window < 1:
+        return (
+            normalized_baseline,
+            normalized_analysis,
+            "The recording is too short for a positive whole-second analysis window.",
+        )
+
+    oversized_windows = []
+    if normalized_baseline > max_window:
+        oversized_windows.append("Baseline window")
+    if normalized_analysis > max_window:
+        oversized_windows.append("Analysis window")
+    if oversized_windows:
+        names = " and ".join(oversized_windows)
+        return (
+            normalized_baseline,
+            normalized_analysis,
+            f"{names} must be less than one quarter of the recording duration "
+            f"(maximum {max_window} seconds).",
+        )
+
+    return normalized_baseline, normalized_analysis, ""
+
+
+def get_default_analysis_window(preferred_window, recording_duration):
+    max_window = get_max_analysis_window(recording_duration)
+    if max_window is None:
+        return preferred_window
+    if max_window < 1:
+        return None
+    return min(preferred_window, max_window)
 
 
 # %% home div
@@ -375,11 +463,41 @@ class Components:
         tabs = [self._build_event_tab(event_name) for event_name in event_names]
         return tabs, event_names[0]
 
-    def fill_analysis_page(self, event_names, event_count_records, signal_names):
+    def fill_analysis_page(
+        self,
+        event_names,
+        event_count_records,
+        signal_names,
+        recording_duration=None,
+    ):
         event_tabs, active_tab = self._build_event_tabs(event_names)
+        max_window = get_max_analysis_window(recording_duration)
+        baseline_window = get_default_analysis_window(
+            DEFAULT_BASELINE_WINDOW, recording_duration
+        )
+        analysis_window = get_default_analysis_window(
+            DEFAULT_ANALYSIS_WINDOW, recording_duration
+        )
+        _, _, initial_window_error = validate_and_normalize_analysis_windows(
+            baseline_window,
+            analysis_window,
+            recording_duration,
+        )
+        window_input_props = {
+            "type": "number",
+            "min": 1,
+            "step": 1,
+            "style": {"width": "90px"},
+        }
+        if max_window is not None and max_window >= 1:
+            window_input_props["max"] = max_window
         children = [
             html.H3("Analysis Page"),
             html.Div(dcc.Link(children="← Back", href="/")),
+            dcc.Store(
+                id="analysis-recording-duration",
+                data=recording_duration,
+            ),
             # ################################################################
             # Edited component: analysis controls now separate running analysis
             # from saving spreadsheets.
@@ -393,23 +511,35 @@ class Components:
                     "gap": "10px",
                 },
                 children=[
-                    html.Label(["Baseline Window Size"]),
-                    dcc.Dropdown(
-                        options=[30, 60],
-                        value=30,
-                        style={"width": "60px"},
-                        id="baseline-window-dropdown",
-                        searchable=False,
-                        clearable=False,
+                    html.Div(
+                        children=[
+                            html.Label(["Baseline Window (seconds)"]),
+                            dcc.Input(
+                                id="baseline-window-input",
+                                value=baseline_window,
+                                **window_input_props,
+                            ),
+                        ],
+                        style={
+                            "display": "flex",
+                            "flexDirection": "column",
+                            "gap": "4px",
+                        },
                     ),
-                    html.Label(["Analysis Window Size"]),
-                    dcc.Dropdown(
-                        options=list(range(10, 70, 10)),
-                        value=60,
-                        style={"width": "60px"},
-                        id="analysis-window-dropdown",
-                        searchable=False,
-                        clearable=False,
+                    html.Div(
+                        children=[
+                            html.Label(["Analysis Window (seconds)"]),
+                            dcc.Input(
+                                id="analysis-window-input",
+                                value=analysis_window,
+                                **window_input_props,
+                            ),
+                        ],
+                        style={
+                            "display": "flex",
+                            "flexDirection": "column",
+                            "gap": "4px",
+                        },
                     ),
                     html.Div(
                         id="signal-select-wrapper",
@@ -442,6 +572,16 @@ class Components:
                         disabled=True,
                     ),
                 ],
+            ),
+            html.Div(
+                initial_window_error,
+                id="analysis-window-validation-message",
+                style={
+                    "color": "#c62828",
+                    "marginLeft": "10px",
+                    "marginTop": "6px",
+                    "minHeight": "1.2em",
+                },
             ),
             html.Div(
                 id="analysis-save-status",

@@ -38,6 +38,7 @@ from fp_analysis_app.components_dev import (
     Components,
     get_analysis_signal_select_style,
     is_valid_analysis_signal_selection,
+    validate_and_normalize_analysis_windows,
 )
 from fp_analysis_app.make_figure import get_padded_labels, make_figure
 from fp_analysis_app.event_analysis import Event_Utils, Perievent_Plots, Analyses
@@ -198,6 +199,7 @@ def build_analysis_page_content(event_time_dict):
         list(event_time_dict.keys()),
         event_count_records,
         signal_names,
+        recording_duration=cache.get("duration"),
     )
 
 
@@ -861,8 +863,8 @@ clientside_callback(
     Output("analysis-save-status", "children", allow_duplicate=True),
     Input("show-results-button", "n_clicks"),
     State("signal-select-dropdown", "value"),
-    State("baseline-window-dropdown", "value"),
-    State("analysis-window-dropdown", "value"),
+    State("baseline-window-input", "value"),
+    State("analysis-window-input", "value"),
     State("event-time-store", "data"),
     State({"type": "tab", "event": ALL}, "id"),
     background=True,
@@ -885,12 +887,22 @@ def show_analysis_results(
     if not is_valid_analysis_signal_selection(selected_signals):
         raise PreventUpdate
 
+    duration = cache.get("duration")
+    baseline_window, analysis_window, window_error = (
+        validate_and_normalize_analysis_windows(
+            baseline_window,
+            analysis_window,
+            duration,
+        )
+    )
+    if window_error:
+        raise PreventUpdate
+
     for file in FIGURE_DIR.iterdir():
         if file.is_file() and file.suffix == ".png":
             file.unlink()
 
     event_time_dict = store_data_to_event_time_dict(event_time_store)
-    duration = cache.get("duration")
     (
         perievent_signals_fig_paths,
         analyses_fig_paths,
@@ -934,10 +946,12 @@ def show_analysis_results(
     Output("save-spreadsheets-button", "disabled", allow_duplicate=True),
     Output("show-results-button", "disabled", allow_duplicate=True),
     Output("signal-select-wrapper", "style"),
+    Output("analysis-window-validation-message", "children"),
     Output("analysis-save-status", "children", allow_duplicate=True),
     Input("signal-select-dropdown", "value"),
-    Input("baseline-window-dropdown", "value"),
-    Input("analysis-window-dropdown", "value"),
+    Input("baseline-window-input", "value"),
+    Input("analysis-window-input", "value"),
+    Input("analysis-recording-duration", "data"),
     Input("event-time-store", "data"),
     prevent_initial_call=True,
 )
@@ -945,21 +959,29 @@ def clear_export_payload_after_analysis_setting_change(
     selected_signals,
     baseline_window,
     analysis_window,
+    recording_duration,
     event_time_store,
 ):
     clear_analysis_export_payload()
     signal_selection_is_valid = is_valid_analysis_signal_selection(selected_signals)
-    show_results_disabled = not signal_selection_is_valid
+    _, _, window_error = validate_and_normalize_analysis_windows(
+        baseline_window,
+        analysis_window,
+        recording_duration,
+    )
+    settings_are_valid = signal_selection_is_valid and not window_error
+    show_results_disabled = not settings_are_valid
     signal_select_style = get_analysis_signal_select_style(selected_signals)
     status_message = (
         "Run analysis to prepare spreadsheet exports for these settings."
-        if signal_selection_is_valid
+        if settings_are_valid
         else ""
     )
     return (
         True,
         show_results_disabled,
         signal_select_style,
+        window_error,
         status_message,
     )
 
@@ -1101,7 +1123,10 @@ def import_annotation_file(annotation_filepath):
     event_count_records = event_utils.count_events(event_time_dict)
     event_names = list(event_time_dict.keys())
     analysis_page_content = components.fill_analysis_page(
-        event_names, event_count_records, signal_names
+        event_names,
+        event_count_records,
+        signal_names,
+        recording_duration=duration,
     )
     perievent_label_dict = event_utils.make_perievent_labels(
         event_file=annotation_filepath
@@ -1187,7 +1212,10 @@ def create_visualization(ready):
         )
         event_names = list(event_time_dict.keys())
         analysis_page_content = components.fill_analysis_page(
-            event_names, event_count_records, fp_signal_names
+            event_names,
+            event_count_records,
+            fp_signal_names,
+            recording_duration=duration,
         )
         analysis_link_style = {"visibility": "visible"}
     elif has_embedded_event_data(event_data):
@@ -1198,7 +1226,10 @@ def create_visualization(ready):
         event_count_records = event_utils.count_events(event_time_dict)
         event_names = list(event_time_dict.keys())
         analysis_page_content = components.fill_analysis_page(
-            event_names, event_count_records, signal_names
+            event_names,
+            event_count_records,
+            signal_names,
+            recording_duration=duration,
         )
         label_dict = event_utils.make_perievent_labels(df_events=df_events)
         analysis_link_style = {"visibility": "visible"}

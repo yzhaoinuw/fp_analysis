@@ -4,9 +4,15 @@ import unittest
 
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 from scipy.io import loadmat, savemat
 
-from fp_analysis_app.event_analysis import Analyses, Event_Utils, Perievent_Plots
+from fp_analysis_app.event_analysis import (
+    Analyses,
+    Event_Utils,
+    Perievent_Plots,
+    get_adaptive_time_axis_settings,
+)
 from fp_analysis_app.event_editing import (
     EVENT_TIME_NAMES_MAT_FIELD,
     EVENT_TIME_VALUES_MAT_FIELD,
@@ -29,7 +35,9 @@ from fp_analysis_app.analysis_export import (
 from fp_analysis_app.components_dev import (
     Components,
     get_analysis_signal_select_style,
+    get_max_analysis_window,
     is_valid_analysis_signal_selection,
+    validate_and_normalize_analysis_windows,
 )
 from fp_analysis_app.export_settings import (
     build_analysis_config_dirname,
@@ -120,6 +128,129 @@ class TestAnalysisPageSignalHighlight(unittest.TestCase):
 
         self.assertIsNotNone(event_tabs)
         self.assertEqual("none", event_tabs.value)
+
+    def test_analysis_windows_are_positive_integer_inputs_capped_by_duration(self):
+        children = Components().fill_analysis_page(
+            event_names=["wake_nrem"],
+            event_count_records=[{"event": "wake_nrem", "count": 3}],
+            signal_names=["NE2m"],
+            recording_duration=400,
+        )
+
+        baseline_input = find_component_by_id(children, "baseline-window-input")
+        analysis_input = find_component_by_id(children, "analysis-window-input")
+        duration_store = find_component_by_id(
+            children, "analysis-recording-duration"
+        )
+
+        self.assertIsNone(
+            find_component_by_id(children, "baseline-window-dropdown")
+        )
+        self.assertIsNone(
+            find_component_by_id(children, "analysis-window-dropdown")
+        )
+        for window_input in (baseline_input, analysis_input):
+            self.assertEqual("number", window_input.type)
+            self.assertEqual(1, window_input.min)
+            self.assertEqual(1, window_input.step)
+            self.assertEqual(99, window_input.max)
+        self.assertEqual(30, baseline_input.value)
+        self.assertEqual(60, analysis_input.value)
+        self.assertEqual(400, duration_store.data)
+
+    def test_analysis_window_default_is_capped_below_one_quarter_duration(self):
+        children = Components().fill_analysis_page(
+            event_names=["wake_nrem"],
+            event_count_records=[{"event": "wake_nrem", "count": 3}],
+            signal_names=["NE2m"],
+            recording_duration=240,
+        )
+
+        analysis_input = find_component_by_id(children, "analysis-window-input")
+
+        self.assertEqual(59, analysis_input.max)
+        self.assertEqual(59, analysis_input.value)
+
+    def test_analysis_window_validation_requires_positive_integers(self):
+        invalid_values = [None, "", 0, -1, 1.5, float("nan"), True]
+
+        for invalid_value in invalid_values:
+            with self.subTest(invalid_value=invalid_value):
+                baseline, analysis, error = (
+                    validate_and_normalize_analysis_windows(
+                        invalid_value,
+                        60,
+                        recording_duration=400,
+                    )
+                )
+                self.assertIsNone(baseline)
+                self.assertEqual(60, analysis)
+                self.assertIn("positive whole numbers", error)
+
+    def test_analysis_window_validation_rejects_quarter_duration_or_larger(self):
+        self.assertEqual(99, get_max_analysis_window(400))
+
+        baseline, analysis, error = validate_and_normalize_analysis_windows(
+            100,
+            60,
+            recording_duration=400,
+        )
+
+        self.assertEqual(100, baseline)
+        self.assertEqual(60, analysis)
+        self.assertIn("maximum 99 seconds", error)
+
+        self.assertEqual(
+            (99, 60, ""),
+            validate_and_normalize_analysis_windows(
+                99,
+                60,
+                recording_duration=400,
+            ),
+        )
+
+
+class TestAdaptivePerieventTimeTicks(unittest.TestCase):
+    def test_default_window_keeps_ten_second_tick_spacing(self):
+        settings = get_adaptive_time_axis_settings(30, 60)
+
+        np.testing.assert_allclose(np.diff(settings["ticks"]), 10)
+        self.assertEqual(10, settings["font_size"])
+        self.assertEqual(0, settings["rotation"])
+
+    def test_120_second_analysis_window_reduces_tick_density(self):
+        settings = get_adaptive_time_axis_settings(30, 120)
+        old_fixed_tick_count = len(np.arange(-30, 121, 10))
+
+        self.assertLess(len(settings["ticks"]), old_fixed_tick_count)
+        self.assertLessEqual(len(settings["ticks"]), 9)
+        self.assertTrue(np.any(np.isclose(settings["ticks"], 0)))
+        self.assertEqual(9, settings["font_size"])
+        self.assertEqual(0, settings["rotation"])
+
+    def test_large_window_uses_fewer_tilted_labels(self):
+        settings = get_adaptive_time_axis_settings(300, 900)
+
+        self.assertLessEqual(len(settings["ticks"]), 7)
+        self.assertEqual(8, settings["font_size"])
+        self.assertEqual(45, settings["rotation"])
+
+    def test_axis_formatter_applies_adaptive_ticks(self):
+        plots = Perievent_Plots(
+            fp_freq=10,
+            event="wake_nrem",
+            nsec_before=30,
+            nsec_after=120,
+        )
+        expected_ticks = get_adaptive_time_axis_settings(30, 120)["ticks"]
+        fig, ax = plt.subplots()
+        try:
+            plots._format_time_axis(ax)
+
+            np.testing.assert_allclose(ax.get_xticks(), expected_ticks)
+            self.assertEqual((-30, 120), tuple(ax.get_xlim()))
+        finally:
+            plt.close(fig)
 
 
 class TestFullRecordingEventTimestampLines(unittest.TestCase):
