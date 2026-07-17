@@ -4,7 +4,47 @@ Prepend new session notes to this file. The live log holds at most the five most
 
 If today's date already appears at the top, add another `###` session under it rather than creating a duplicate date heading. Each substantive session needs compact model metadata and a `- Verification:` subsection containing commands that were actually run.
 
+## 2026-07-17
+
+### Publish event annotation save and undo (gpt-5)
+
+- Prepared the accepted event annotation save/undo UI and MAT persistence changes for commit and push on `dev`.
+- Verified the active desktop runtime imports, callback registration remains collision-free, focused tests pass, and the task-relevant tracked files are the only files being staged.
+- Verification:
+  - `Get-Date -Format yyyy-MM-dd` - printed `2026-07-17`.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis` - 48 tests passed.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -c "import fp_analysis_app.analysis_export, fp_analysis_app.event_analysis, fp_analysis_app.event_editing, fp_analysis_app.mat_utils, fp_analysis_app.make_figure, fp_analysis_app.app_dev; print('import ok')"` - printed `import ok`.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -c "from fp_analysis_app.app_dev import app; keys=[k for k in app.callback_map if 'graph.figure' in k]; print('count', len(keys), 'unique', len(set(keys)))"` - printed `count 7 unique 7`.
+  - `git diff --check` - clean apart from Git line-ending conversion warnings.
+  - `C:\Users\yzhao\python_projects\agent_collab_treaty\.venv\Scripts\treaty.exe validate .` - passed.
+
 ## 2026-07-08
+
+### Polish annotation action row placement (gpt-5)
+
+- Fixed the main action row so `Analysis ->` is right-aligned instead of appearing before `Save Annotations`.
+- Kept `Save Annotations` and `Undo Annotation` grouped on the lower left, and removed the visible status messages emitted by event-span selection, event deletion, and undo.
+- Verification:
+  - `Get-Date -Format yyyy-MM-dd` - printed `2026-07-08`.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -c "import fp_analysis_app.app_dev; print('app import ok')"` - printed `app import ok`.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -c "from fp_analysis_app.app_dev import app; keys=[k for k in app.callback_map if 'graph.figure' in k]; print('count', len(keys), 'unique', len(set(keys)))"` - printed `count 7 unique 7`.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis.TestAnnotationModeEventDeletion` - 9 tests passed.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -c "from fp_analysis_app.components_dev import save_div; children=save_div.children; print(save_div.style); print([getattr(c, 'id', None) for c in children]); print(children[0].children[0].id, children[0].children[1].id, children[2].id, children[2].style)"` - confirmed Save and Undo are in the left group and `analysis-link` has `justifySelf: end`.
+  - `git diff --check` - clean apart from Git line-ending conversion warnings.
+  - `C:\Users\yzhao\python_projects\agent_collab_treaty\.venv\Scripts\treaty.exe validate .` - passed.
+
+### Implement event annotation save and undo (gpt-5)
+
+- Consulted the cookbook undo/crash-recovery and save/export recipes, then applied the minimal active-runtime pieces needed for event timestamp annotations.
+- Moved the main action row so `Save Annotations` sits at the lower left, `Undo Annotation` sits immediately to its right, and `Analysis ->` sits at the lower right.
+- Added a one-step event timestamp undo history, app-owned MAT persistence fields for edited event timestamps, and saved-MAT reload preference for those fields over the original embedded `event` payload.
+- Verification:
+  - `Get-Date -Format yyyy-MM-dd` - printed `2026-07-08`.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis` - 48 tests passed.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -c "import fp_analysis_app.analysis_export, fp_analysis_app.event_analysis, fp_analysis_app.event_editing, fp_analysis_app.mat_utils, fp_analysis_app.make_figure, fp_analysis_app.app_dev; print('import ok')"` - printed `import ok`.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -c "from fp_analysis_app.app_dev import app; keys=[k for k in app.callback_map if 'graph.figure' in k]; print('count', len(keys), 'unique', len(set(keys)))"` - printed `count 7 unique 7`.
+  - `git diff --check` - clean apart from Git line-ending conversion warnings.
+  - `C:\Users\yzhao\python_projects\agent_collab_treaty\.venv\Scripts\treaty.exe validate .` - passed.
 
 ### Publish annotation-rectangle event deletion (gpt-5)
 

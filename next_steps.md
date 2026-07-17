@@ -12,7 +12,7 @@ Use this checklist alongside `work_log.md`. Keep only actionable engineering thr
 
 ## Analysis Workflow Feedback Update (gpt-5)
 
-Status: item 4 implemented with clientside rectangle-based deletion; awaiting user acceptance gate.
+Status: item 5 event-annotation save/undo implemented; awaiting user acceptance gate.
 
 Product goal: make the analysis flow clearer, make exclusions visible and respected by analysis, and fix peak metrics so plotted/exported values match detected positive and negative peaks.
 
@@ -42,7 +42,7 @@ Gated implementation checklist:
    - Remove or hide event lines immediately when their event timestamps are excluded by a removed period.
    - Acceptance gate: accepted after visual check; loaded annotation event timestamps are visible on the main graph without expanded-window coloring.
 
-4. Annotation-rectangle event deletion before analysis.
+4. [x] Annotation-rectangle event deletion before analysis.
    - In annotation mode, let the user draw a rectangle on the interactive full-recording plot.
    - When a rectangle span is selected and the user presses `Delete` or `Backspace`, remove event timestamps whose times fall inside the rectangle's x/time span.
    - Keep the selection/delete interaction clientside for responsive visual updates; use the event-time store as the bridge back to server-side analysis.
@@ -52,11 +52,14 @@ Gated implementation checklist:
    - Keep only the most recently drawn selection rectangle if the user draws boxes in multiple subplots.
    - Acceptance gate: user can enter annotation mode, draw a rectangle spanning event timestamp lines, press `Delete` or `Backspace`, see those vertical lines disappear, and run analysis with contained events excluded.
 
-5. Save modified annotations back to the MAT file.
-   - Add or reposition a lower-left `Save Annotations` button below the graph for persisting the currently modified period/event state.
-   - Treat overwriting the current MAT file as acceptable for now, but include an explicit confirmation or otherwise make the target unmistakable before writing.
-   - Persist removed periods and event exclusions so reopening the MAT reflects the edited annotations.
-   - Acceptance gate: user can remove a period, save, reload the MAT, and see the saved annotation state.
+5. Save and undo modified event annotations.
+   - Move the `Analysis ->` link to the lower-right side of the main page action row.
+   - Place `Save Annotations` at the lower-left side of the action row, with `Undo Annotation` immediately to its right.
+   - Keep one-step undo for event timestamp edits using the runtime event-time history.
+   - Save current event timestamp annotations into app-owned MAT fields via a native Save dialog, using a temp MAT file before copying to the chosen target.
+   - Reopening a saved MAT should prefer the saved app-owned event timestamp fields over the original embedded `event` payload.
+   - Future period-label persistence should reuse this action row once period edit/removal returns to scope.
+   - Acceptance gate: user can delete event timestamps, undo the most recent edit, save a MAT copy, reload it, and see the saved event timestamp state.
 
 6. Positive-integer baseline and analysis window inputs.
    - Replace baseline/analysis window dropdowns with numeric text inputs.

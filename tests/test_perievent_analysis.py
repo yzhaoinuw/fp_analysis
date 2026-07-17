@@ -4,15 +4,22 @@ import unittest
 
 import numpy as np
 import pandas as pd
-from scipy.io import loadmat
+from scipy.io import loadmat, savemat
 
 from fp_analysis_app.event_analysis import Analyses, Event_Utils, Perievent_Plots
 from fp_analysis_app.event_editing import (
+    EVENT_TIME_NAMES_MAT_FIELD,
+    EVENT_TIME_VALUES_MAT_FIELD,
     event_time_dict_to_store_data,
+    event_time_dict_from_mat,
+    event_time_dict_from_mat_arrays,
+    event_time_dict_to_mat_arrays,
     is_remove_event_key,
+    mat_has_saved_event_time_dict,
     remove_event_times_in_span,
     selected_data_to_x_span,
     store_data_to_event_time_dict,
+    write_event_time_dict_to_mat,
 )
 from fp_analysis_app.make_figure import EVENT_TIMESTAMP_TRACE_PREFIX, make_figure
 from fp_analysis_app.analysis_export import (
@@ -347,6 +354,54 @@ class TestAnnotationModeEventDeletion(unittest.TestCase):
             {"wake_nrem": [10, 20], "nrem_rem": [30]},
             {event: times.tolist() for event, times in restored.items()},
         )
+
+    def test_event_time_mat_arrays_round_trip_preserves_event_labels(self):
+        event_time_dict = {
+            "wake_nrem": np.array([10, 20]),
+            "foot_shock_0.1s": np.array([30.5]),
+        }
+
+        event_names, event_times = event_time_dict_to_mat_arrays(event_time_dict)
+        restored = event_time_dict_from_mat_arrays(event_names, event_times)
+
+        self.assertEqual(
+            {"wake_nrem": [10, 20], "foot_shock_0.1s": [30.5]},
+            {event: times.tolist() for event, times in restored.items()},
+        )
+
+    def test_event_time_mat_fields_survive_savemat_loadmat_round_trip(self):
+        with TemporaryDirectory() as temp_dir:
+            mat_path = Path(temp_dir) / "events.mat"
+            mat = {"fp_frequency": np.array(1)}
+            write_event_time_dict_to_mat(
+                mat,
+                {"wake_nrem": np.array([10, 20]), "nrem_rem": np.array([30])},
+            )
+
+            savemat(mat_path, mat)
+            restored_mat = loadmat(mat_path, squeeze_me=True)
+            restored = event_time_dict_from_mat(restored_mat)
+
+        self.assertTrue(mat_has_saved_event_time_dict(restored_mat))
+        self.assertIn(EVENT_TIME_NAMES_MAT_FIELD, restored_mat)
+        self.assertIn(EVENT_TIME_VALUES_MAT_FIELD, restored_mat)
+        self.assertEqual(
+            {"wake_nrem": [10, 20], "nrem_rem": [30]},
+            {event: times.tolist() for event, times in restored.items()},
+        )
+
+    def test_empty_saved_event_time_mat_fields_override_legacy_events(self):
+        with TemporaryDirectory() as temp_dir:
+            mat_path = Path(temp_dir) / "events.mat"
+            mat = {}
+            write_event_time_dict_to_mat(mat, {})
+
+            savemat(mat_path, mat)
+            restored_mat = loadmat(mat_path, squeeze_me=True)
+            restored = event_time_dict_from_mat(restored_mat)
+
+        self.assertTrue(mat_has_saved_event_time_dict(restored_mat))
+        self.assertEqual({}, restored)
 
 
 class TestSleepBoutTableImport(unittest.TestCase):

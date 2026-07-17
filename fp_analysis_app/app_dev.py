@@ -7,6 +7,7 @@ Created on Fri Oct 20 15:45:29 2023
 
 import os
 import math
+import shutil
 import tempfile
 from pathlib import Path
 from collections import deque
@@ -30,7 +31,7 @@ from dash import (
 )
 
 import numpy as np
-from scipy.io import loadmat
+from scipy.io import loadmat, savemat
 
 from fp_analysis_app import VERSION
 from fp_analysis_app.components_dev import (
@@ -46,8 +47,13 @@ from fp_analysis_app.analysis_export import (
     write_analysis_workbooks,
 )
 from fp_analysis_app.event_editing import (
+    copy_event_time_dict,
     event_time_dict_to_store_data,
+    event_time_dict_from_mat,
+    event_time_dicts_equal,
+    mat_has_saved_event_time_dict,
     store_data_to_event_time_dict,
+    write_event_time_dict_to_mat,
 )
 from fp_analysis_app.mat_utils import (
     get_fp_signal_names,
@@ -79,6 +85,8 @@ EXPORT_DOWNSAMPLE_FACTOR = 100
 ANALYSIS_EXPORT_PAYLOAD_CACHE_KEY = "analysis_export_payload"
 REMEMBERED_ANALYSIS_EXPORT_TYPES_CACHE_KEY = "remembered_analysis_export_types"
 SAMPLING_LEVEL_TO_N_SAMPLES = {"x1": 2048, "x2": 4096, "x4": 8192}
+VISIBLE_STYLE = {"visibility": "visible"}
+HIDDEN_STYLE = {"visibility": "hidden"}
 
 components = Components()
 app.layout = html.Div(
@@ -147,6 +155,38 @@ def get_n_samples_for_sampling_level(sampling_level):
     return SAMPLING_LEVEL_TO_N_SAMPLES.get(sampling_level, 2048)
 
 
+def get_event_time_history():
+    history = cache.get("event_time_history")
+    if history is None:
+        history = deque(maxlen=2)
+        cache.set("event_time_history", history)
+    return history
+
+
+def initialize_event_time_history(event_time_dict):
+    event_time_dict = copy_event_time_dict(event_time_dict)
+    history = deque(maxlen=2)
+    history.append(event_time_dict)
+    cache.set("event_time_history", history)
+    cache.set("event_time_dict", event_time_dict)
+
+
+def remember_event_time_store(event_time_store):
+    event_time_dict = store_data_to_event_time_dict(event_time_store)
+    history = get_event_time_history()
+    if not history or not event_time_dicts_equal(history[-1], event_time_dict):
+        history.append(copy_event_time_dict(event_time_dict))
+        cache.set("event_time_history", history)
+    cache.set("event_time_dict", event_time_dict)
+    return event_time_dict, history
+
+
+def get_annotation_action_styles():
+    save_style = VISIBLE_STYLE if cache.get("fp_signal_names") else HIDDEN_STYLE
+    undo_style = VISIBLE_STYLE if len(get_event_time_history()) > 1 else HIDDEN_STYLE
+    return save_style, undo_style
+
+
 def build_analysis_page_content(event_time_dict):
     event_time_dict = event_time_dict or {}
     event_count_records = [
@@ -161,7 +201,10 @@ def build_analysis_page_content(event_time_dict):
     )
 
 
-def build_current_full_recording_figure(default_n_shown_samples=2048):
+def build_current_full_recording_figure(
+    default_n_shown_samples=2048,
+    event_time_dict=None,
+):
     filepath = cache.get("filepath")
     if not filepath:
         return None
@@ -172,15 +215,38 @@ def build_current_full_recording_figure(default_n_shown_samples=2048):
     if labels_history:
         mat["labels"] = labels_history[-1]
 
+    current_event_time_dict = (
+        event_time_dict if event_time_dict is not None else cache.get("event_time_dict")
+    )
     fig = create_fig(
         mat,
         mat_name,
-        event_time_dict=cache.get("event_time_dict"),
-        show_period_labels=False,
+        event_time_dict=current_event_time_dict,
+        show_period_labels=not bool(current_event_time_dict),
         default_n_shown_samples=default_n_shown_samples,
     )
     cache.set("fig_resampler", fig)
     return fig
+
+
+def ensure_mat_suffix(path):
+    path = Path(path)
+    if path.suffix.lower() != ".mat":
+        path = path.with_suffix(".mat")
+    return path
+
+
+def build_mat_with_current_annotations(event_time_dict):
+    filepath = cache.get("filepath")
+    mat = loadmat(filepath, squeeze_me=True)
+
+    labels_history = cache.get("labels_history")
+    if labels_history:
+        labels = np.asarray(labels_history[-1], dtype=float).copy()
+        mat["labels"] = np.nan_to_num(labels, nan=-1)
+
+    write_event_time_dict_to_mat(mat, event_time_dict)
+    return mat
 
 
 def open_mat_dialog():
@@ -206,6 +272,24 @@ def open_mat_dialog():
         return None
 
     return result[0]  # return the selected file as a single string
+
+
+def save_mat_dialog(default_filename, directory=None):
+    if not webview.windows:
+        return None
+
+    window = webview.windows[0]
+    result = window.create_file_dialog(
+        webview.FileDialog.SAVE,
+        directory=str(directory) if directory else "",
+        save_filename=default_filename,
+        file_types=("MAT files (*.mat)",),
+    )
+    if not result:
+        return None
+    if isinstance(result, (list, tuple)):
+        return result[0] if result else None
+    return result
 
 
 def open_annotation_file_dialog():
@@ -473,6 +557,7 @@ def reset_cache(cache, filepath):
     # attempt for salvaging unsaved annotations
     # if prev_filepath is None or prev_filepath != filepath:
     cache.set("labels_history", deque(maxlen=4))
+    cache.set("event_time_history", deque(maxlen=2))
     cache.set("filepath", filepath)
     # cache.set("annotation_filepath", "")
     cache.set("event_time_dict", {})
@@ -626,7 +711,7 @@ app.clientside_callback(
         return [
             {start: start, end: end},
             updatedFigure,
-            `Selected event deletion span [${start.toFixed(1)}, ${end.toFixed(1)}] s.`
+            ""
         ];
     }
     """,
@@ -667,7 +752,7 @@ app.clientside_callback(
                 no_update,
                 no_update,
                 no_update,
-                "Draw an annotation rectangle before deleting event timestamps."
+                ""
             ];
         }
         if (!figure || !figure.layout || !eventTimes) {
@@ -707,7 +792,7 @@ app.clientside_callback(
                 no_update,
                 selectedSpan,
                 no_update,
-                `No event timestamps found in [${start.toFixed(1)}, ${end.toFixed(1)}] s.`
+                ""
             ];
         }
 
@@ -736,7 +821,7 @@ app.clientside_callback(
             nextEvents,
             null,
             updatedFigure,
-            `Removed ${removedCount} event timestamp(s) in [${start.toFixed(1)}, ${end.toFixed(1)}] s.`
+            ""
         ];
     }
     """,
@@ -1012,7 +1097,7 @@ def import_annotation_file(annotation_filepath):
     signal_length = len(mat[signal_names[0]]) if signal_names else None
     event_utils = Event_Utils(fp_freq, duration, signal_length=signal_length)
     event_time_dict = event_utils.read_events(event_file=annotation_filepath)
-    cache.set("event_time_dict", event_time_dict)
+    initialize_event_time_history(event_time_dict)
     event_count_records = event_utils.count_events(event_time_dict)
     event_names = list(event_time_dict.keys())
     analysis_page_content = components.fill_analysis_page(
@@ -1095,12 +1180,21 @@ def create_visualization(ready):
         (signal_length - 1) / fp_freq
     )  # need to round duration to an int for later
 
-    if has_embedded_event_data(event_data):
+    if mat_has_saved_event_time_dict(mat):
+        event_time_dict = event_time_dict_from_mat(mat)
+        event_count_records = Event_Utils(fp_freq, duration).count_events(
+            event_time_dict
+        )
+        event_names = list(event_time_dict.keys())
+        analysis_page_content = components.fill_analysis_page(
+            event_names, event_count_records, fp_signal_names
+        )
+        analysis_link_style = {"visibility": "visible"}
+    elif has_embedded_event_data(event_data):
         signal_names = fp_signal_names
         event_utils = Event_Utils(fp_freq, duration, signal_length=signal_length)
         df_events = event_utils.eventdata_to_df(event_data)
         event_time_dict = event_utils.read_events(df_events=df_events)
-        cache.set("event_time_dict", event_time_dict)
         event_count_records = event_utils.count_events(event_time_dict)
         event_names = list(event_time_dict.keys())
         analysis_page_content = components.fill_analysis_page(
@@ -1108,6 +1202,7 @@ def create_visualization(ready):
         )
         label_dict = event_utils.make_perievent_labels(df_events=df_events)
         analysis_link_style = {"visibility": "visible"}
+    initialize_event_time_history(event_time_dict)
 
     # salvage unsaved annotations
     labels_history = cache.get("labels_history")
@@ -1190,21 +1285,88 @@ def change_sampling_level(sampling_level):
 @app.callback(
     Output("event-time-sync-store", "data"),
     Output("analysis-page", "children", allow_duplicate=True),
+    Output("save-button", "style"),
+    Output("undo-button", "style"),
     Input("event-time-store", "data"),
     prevent_initial_call=True,
 )
 def sync_event_time_store(event_time_store):
-    event_time_dict = store_data_to_event_time_dict(event_time_store)
-    cache.set("event_time_dict", event_time_dict)
+    event_time_dict, history = remember_event_time_store(event_time_store)
     clear_analysis_export_payload()
     sync_data = {
         "event_count": int(
             sum(len(event_times) for event_times in event_time_dict.values())
-        )
+        ),
+        "history_length": len(history),
     }
+    save_style, undo_style = get_annotation_action_styles()
     if not cache.get("fp_signal_names"):
-        return sync_data, dash.no_update
-    return sync_data, build_analysis_page_content(event_time_dict)
+        return sync_data, dash.no_update, HIDDEN_STYLE, HIDDEN_STYLE
+    return sync_data, build_analysis_page_content(event_time_dict), save_style, undo_style
+
+
+@app.callback(
+    Output("event-time-store", "data", allow_duplicate=True),
+    Output("graph", "figure", allow_duplicate=True),
+    Output("debug-message", "children", allow_duplicate=True),
+    Input("undo-button", "n_clicks"),
+    State("n-sample-dropdown", "value"),
+    prevent_initial_call=True,
+)
+def undo_event_annotation(n_clicks, sampling_level):
+    if not n_clicks:
+        raise PreventUpdate
+
+    history = get_event_time_history()
+    if len(history) <= 1:
+        raise PreventUpdate
+
+    history.pop()
+    event_time_dict = copy_event_time_dict(history[-1])
+    cache.set("event_time_history", history)
+    cache.set("event_time_dict", event_time_dict)
+    clear_analysis_export_payload()
+
+    n_samples = get_n_samples_for_sampling_level(sampling_level)
+    fig = build_current_full_recording_figure(
+        default_n_shown_samples=n_samples,
+        event_time_dict=event_time_dict,
+    )
+    return (
+        event_time_dict_to_store_data(event_time_dict),
+        fig,
+        "",
+    )
+
+
+@app.callback(
+    Output("debug-message", "children", allow_duplicate=True),
+    Input("save-button", "n_clicks"),
+    State("event-time-store", "data"),
+    prevent_initial_call=True,
+)
+def save_annotations(n_clicks, event_time_store):
+    if not n_clicks:
+        raise PreventUpdate
+
+    filepath = cache.get("filepath")
+    if not filepath:
+        return "Load a MAT file before saving annotations."
+
+    event_time_dict = store_data_to_event_time_dict(event_time_store)
+    source_path = Path(filepath)
+    default_filename = f"{source_path.stem}_annotated.mat"
+    temp_mat_path = Path(TEMP_PATH) / default_filename
+    mat = build_mat_with_current_annotations(event_time_dict)
+    savemat(temp_mat_path, mat)
+
+    save_path = save_mat_dialog(default_filename, directory=source_path.parent)
+    if not save_path:
+        return "Save canceled."
+
+    save_path = ensure_mat_suffix(save_path)
+    shutil.copy(temp_mat_path, save_path)
+    return f"Saved annotations to {save_path}."
 
 
 @app.callback(

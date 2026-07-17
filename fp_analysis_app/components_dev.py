@@ -81,30 +81,38 @@ vis_upload_button = html.Button(
 
 save_div = html.Div(
     style={
-        "display": "flex",
-        "marginRight": "10px",
-        "marginLeft": "10px",
+        "alignItems": "center",
+        "columnGap": "12px",
+        "display": "grid",
+        "gridTemplateColumns": "auto minmax(0, 1fr) auto",
+        "marginLeft": "15px",
+        "marginRight": "15px",
         "marginBottom": "10px",
+        "width": "calc(100% - 30px)",
     },
     children=[
-        dcc.Location(id="page-url"),
+        html.Div(
+            style={"alignItems": "center", "display": "flex", "gap": "10px"},
+            children=[
+                html.Button(
+                    "Save Annotations",
+                    id="save-button",
+                    style={"visibility": "hidden"},
+                ),
+                html.Button(
+                    "Undo Annotation",
+                    id="undo-button",
+                    style={"visibility": "hidden"},
+                ),
+                dcc.Download(id="download-annotations"),
+                dcc.Download(id="download-spreadsheet"),
+            ],
+        ),
+        html.Div(id="debug-message"),
         html.Div(
             id="analysis-link",
             children=[dcc.Link(children="Analysis ->", href="/analysis")],
-            style={"visibility": "hidden"},
-        ),
-        # html.A(html.Button("Run Analysis"), href="/analysis"),
-        html.Button(
-            "Save Annotations",
-            id="save-button",
-            style={"visibility": "hidden"},
-        ),
-        dcc.Download(id="download-annotations"),
-        dcc.Download(id="download-spreadsheet"),
-        html.Button(
-            "Undo Annotation",
-            id="undo-button",
-            style={"visibility": "hidden"},
+            style={"justifySelf": "end", "visibility": "hidden"},
         ),
     ],
 )
@@ -118,12 +126,11 @@ home_page = html.Div(
         ),
         html.Div(id="data-upload-message", style={"marginLeft": "10px"}),
         html.Div(id="visualization-container", style={"marginLeft": "10px"}),
+        dcc.Location(id="page-url"),
         html.Div(
-            style={"display": "flex", "marginLeft": "15px"},
+            style={"display": "flex", "width": "100%"},
             children=[
                 save_div,
-                # html.Div(id="annotation-message"),
-                html.Div(id="debug-message"),
             ],
         ),
         dcc.Store(id="visualization-ready-store"),
