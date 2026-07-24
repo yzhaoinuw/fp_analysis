@@ -142,6 +142,12 @@ def get_default_analysis_window(preferred_window, recording_duration):
     return min(preferred_window, max_window)
 
 
+def get_analysis_settings_prompt(settings_are_valid):
+    if not settings_are_valid:
+        return ""
+    return "Click Show Results to see the analysis results"
+
+
 # %% home div
 
 upload_box_style = {
@@ -579,13 +585,12 @@ class Components:
                 style={
                     "color": "#c62828",
                     "marginLeft": "10px",
-                    "marginTop": "6px",
-                    "minHeight": "1.2em",
+                    "marginTop": "2px",
                 },
             ),
             html.Div(
                 id="analysis-save-status",
-                style={"marginLeft": "10px", "marginTop": "8px"},
+                style={"marginLeft": "10px", "marginTop": "2px"},
             ),
             build_save_spreadsheets_modal(),
             html.Br(),

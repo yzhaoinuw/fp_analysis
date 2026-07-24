@@ -246,14 +246,11 @@ def write_analysis_workbooks(
         export_all_workbooks(config_dir)
         return (
             config_dir,
-            "Analysis spreadsheets saved next to the input MAT file in "
-            f"'{config_dir}'.",
+            f"Spreadsheets are saved to '{config_dir}'.",
         )
     except OSError:
         export_all_workbooks(fallback_config_dir)
         return (
             fallback_config_dir,
-            "Could not save analysis spreadsheets next to the input MAT file. "
-            "Saved them to the app spreadsheet folder instead: "
-            f"'{fallback_config_dir}'.",
+            f"Spreadsheets are saved to '{fallback_config_dir}'.",
         )

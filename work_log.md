@@ -6,6 +6,19 @@ If today's date already appears at the top, add another `###` session under it r
 
 ## 2026-07-24
 
+### Tighten analysis-page status messaging (gpt-5)
+
+- Removed the empty validation row's reserved height and reduced the status margins so analysis guidance sits directly below the controls.
+- Reworded the valid-settings prompt to `Click Show Results to see the analysis results`.
+- Simplified both primary and fallback save confirmations to `Spreadsheets are saved to '<path>'.`
+- Verification:
+  - Local Dash component preview - confirmed the prompt renders 2 px below the controls with the requested wording.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis.TestAnalysisPageSignalHighlight tests.test_perievent_analysis.TestSelectiveAnalysisWorkbookExport.test_selective_export_creates_only_selected_workbooks` - 9 tests passed.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis` - 65 tests passed.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -c "import fp_analysis_app.app_dev, fp_analysis_app.analysis_export, fp_analysis_app.components_dev; print('import ok')"` - printed `import ok`.
+  - `git diff --check` - clean apart from Git line-ending conversion warnings.
+  - `C:\Users\yzhao\python_projects\agent_collab_treaty\.venv\Scripts\treaty.exe validate .` - passed.
+
 ### Accept and publish detected peak-value spreadsheet exports (gpt-5)
 
 - Marked the final analysis-workflow item accepted after the user confirmed the new positive- and negative-peak spreadsheet exports work.

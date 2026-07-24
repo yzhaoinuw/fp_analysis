@@ -36,6 +36,7 @@ from scipy.io import loadmat, savemat
 from fp_analysis_app import VERSION
 from fp_analysis_app.components_dev import (
     Components,
+    get_analysis_settings_prompt,
     get_analysis_signal_select_style,
     is_valid_analysis_signal_selection,
     validate_and_normalize_analysis_windows,
@@ -981,11 +982,7 @@ def clear_export_payload_after_analysis_setting_change(
     settings_are_valid = signal_selection_is_valid and not window_error
     show_results_disabled = not settings_are_valid
     signal_select_style = get_analysis_signal_select_style(selected_signals)
-    status_message = (
-        "Run analysis to prepare spreadsheet exports for these settings."
-        if settings_are_valid
-        else ""
-    )
+    status_message = get_analysis_settings_prompt(settings_are_valid)
     return (
         True,
         show_results_disabled,

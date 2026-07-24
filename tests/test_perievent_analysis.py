@@ -38,6 +38,7 @@ from fp_analysis_app.analysis_export import (
 )
 from fp_analysis_app.components_dev import (
     Components,
+    get_analysis_settings_prompt,
     get_analysis_signal_select_style,
     get_max_analysis_window,
     is_valid_analysis_signal_selection,
@@ -95,6 +96,11 @@ class TestAnalysisPageSignalHighlight(unittest.TestCase):
         controls_row = find_component_by_id(children, "analysis-controls-row")
         wrapper = find_component_by_id(children, "signal-select-wrapper")
         show_results_button = find_component_by_id(children, "show-results-button")
+        validation_message = find_component_by_id(
+            children,
+            "analysis-window-validation-message",
+        )
+        save_status = find_component_by_id(children, "analysis-save-status")
 
         self.assertIsNone(removed_text_callout)
         self.assertIsNotNone(controls_row)
@@ -103,6 +109,19 @@ class TestAnalysisPageSignalHighlight(unittest.TestCase):
         self.assertEqual("2px solid #c62828", wrapper.style["border"])
         self.assertIsNotNone(show_results_button)
         self.assertTrue(show_results_button.disabled)
+        self.assertEqual("2px", validation_message.style["marginTop"])
+        self.assertNotIn("minHeight", validation_message.style)
+        self.assertEqual("2px", save_status.style["marginTop"])
+
+    def test_analysis_settings_prompt_names_the_show_results_button(self):
+        self.assertEqual(
+            "Click Show Results to see the analysis results",
+            get_analysis_settings_prompt(settings_are_valid=True),
+        )
+        self.assertEqual(
+            "",
+            get_analysis_settings_prompt(settings_are_valid=False),
+        )
 
     def test_signal_selection_validation_accepts_only_one_or_two_signals(self):
         self.assertFalse(is_valid_analysis_signal_selection(None))
@@ -1634,7 +1653,7 @@ class TestSelectiveAnalysisWorkbookExport(unittest.TestCase):
     def test_selective_export_creates_only_selected_workbooks(self):
         with TemporaryDirectory() as tmpdir:
             export_payload = self._build_export_payload(Path("C:/data/F268.mat"))
-            write_analysis_workbooks(
+            saved_dir, status_message = write_analysis_workbooks(
                 primary_dir=Path(tmpdir),
                 fallback_dir=Path(tmpdir) / "fallback",
                 export_payload=export_payload,
@@ -1651,6 +1670,11 @@ class TestSelectiveAnalysisWorkbookExport(unittest.TestCase):
                 (export_dir / "NE2m_negative_peak_value_bw30_aw60.xlsx").exists()
             )
             self.assertFalse((export_dir / "NE2m_decay_time_bw30_aw60.xlsx").exists())
+            self.assertEqual(export_dir, saved_dir)
+            self.assertEqual(
+                f"Spreadsheets are saved to '{export_dir}'.",
+                status_message,
+            )
 
     def test_peak_value_exports_use_new_names_and_preserve_missing_peaks(self):
         with TemporaryDirectory() as tmpdir:
