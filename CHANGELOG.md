@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.6.0
+## v0.6.0-dev
 
 - check for safe source-only updates before desktop startup while preserving the
   installed version if validation or replacement fails
