@@ -1,6 +1,7 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import Mock
 
 import numpy as np
 import pandas as pd
@@ -12,6 +13,8 @@ from fp_analysis_app.event_analysis import (
     Event_Utils,
     Perievent_Plots,
     get_adaptive_time_axis_settings,
+    get_heatmap_event_index_ticks,
+    get_heatmap_row_divider_style,
 )
 from fp_analysis_app.event_editing import (
     EVENT_TIME_NAMES_MAT_FIELD,
@@ -251,6 +254,55 @@ class TestAdaptivePerieventTimeTicks(unittest.TestCase):
             self.assertEqual((-30, 120), tuple(ax.get_xlim()))
         finally:
             plt.close(fig)
+
+
+class TestPerieventHeatmapRowDividers(unittest.TestCase):
+    def test_sparse_heatmap_labels_every_event_row(self):
+        tick_positions, tick_labels = get_heatmap_event_index_ticks(3)
+
+        np.testing.assert_array_equal(tick_positions, [0.5, 1.5, 2.5])
+        self.assertEqual(["1", "2", "3"], tick_labels)
+
+    def test_dense_heatmap_limits_event_index_label_count(self):
+        tick_positions, tick_labels = get_heatmap_event_index_ticks(100)
+
+        self.assertLessEqual(len(tick_positions), 15)
+        self.assertEqual(len(tick_positions), len(tick_labels))
+        self.assertEqual("1", tick_labels[0])
+
+    def test_row_dividers_are_black_and_between_occurrence_rows(self):
+        plots = Perievent_Plots(
+            fp_freq=10,
+            event="wake_nrem",
+            nsec_before=30,
+            nsec_after=60,
+        )
+        ax = Mock()
+
+        plots._add_heatmap_row_dividers(ax, event_count=4)
+
+        divider_positions = ax.hlines.call_args.args[0]
+        np.testing.assert_array_equal(divider_positions, [1, 2, 3])
+        self.assertEqual(-30, ax.hlines.call_args.kwargs["xmin"])
+        self.assertEqual(60, ax.hlines.call_args.kwargs["xmax"])
+        self.assertEqual("black", ax.hlines.call_args.kwargs["colors"])
+        self.assertEqual("solid", ax.hlines.call_args.kwargs["linestyles"])
+        self.assertEqual(2, ax.hlines.call_args.kwargs["zorder"])
+
+    def test_single_occurrence_does_not_add_a_divider(self):
+        plots = Perievent_Plots(fp_freq=10, event="wake_nrem")
+        ax = Mock()
+
+        plots._add_heatmap_row_dividers(ax, event_count=1)
+
+        ax.hlines.assert_not_called()
+
+    def test_row_dividers_become_lighter_and_thinner_for_dense_heatmaps(self):
+        sparse_style = get_heatmap_row_divider_style(10)
+        dense_style = get_heatmap_row_divider_style(150)
+
+        self.assertGreater(sparse_style["linewidths"], dense_style["linewidths"])
+        self.assertGreater(sparse_style["alpha"], dense_style["alpha"])
 
 
 class TestFullRecordingEventTimestampLines(unittest.TestCase):

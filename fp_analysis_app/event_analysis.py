@@ -57,6 +57,28 @@ def get_adaptive_time_axis_settings(nsec_before, nsec_after):
     }
 
 
+def get_heatmap_row_divider_style(event_count):
+    """Keep black row dividers visible without overwhelming dense heatmaps."""
+    if event_count <= 20:
+        return {"linewidths": 0.65, "alpha": 0.75}
+    if event_count <= 50:
+        return {"linewidths": 0.45, "alpha": 0.6}
+    if event_count <= 100:
+        return {"linewidths": 0.3, "alpha": 0.45}
+    return {"linewidths": 0.2, "alpha": 0.3}
+
+
+def get_heatmap_event_index_ticks(event_count, max_labels=15):
+    """Label every sparse row and sample readable indices on dense heatmaps."""
+    if event_count <= 0:
+        return np.array([], dtype=float), []
+    label_step = max(1, int(np.ceil(event_count / max_labels)))
+    event_indices = np.arange(0, event_count, label_step)
+    tick_positions = event_indices + 0.5
+    tick_labels = [str(event_index + 1) for event_index in event_indices]
+    return tick_positions, tick_labels
+
+
 class Event_Utils:
 
     def __init__(
@@ -237,6 +259,20 @@ class Perievent_Plots:
             labelrotation=settings["rotation"],
         )
 
+    def _add_heatmap_row_dividers(self, ax, event_count):
+        if event_count <= 1:
+            return
+        divider_style = get_heatmap_row_divider_style(event_count)
+        ax.hlines(
+            np.arange(1, event_count),
+            xmin=-self.nsec_before,
+            xmax=self.nsec_after,
+            colors="black",
+            linestyles="solid",
+            zorder=2,
+            **divider_style,
+        )
+
     def plot_perievent_signals(
         self,
         perievent_signals,
@@ -334,15 +370,15 @@ class Perievent_Plots:
             origin="lower",
             extent=[-self.nsec_before, self.nsec_after, 0, event_count],
         )
+        self._add_heatmap_row_dividers(ax, event_count)
         self._format_time_axis(ax)
 
         # Format axis
-        # event_labels = [f"{i+1}" for i in range(event_count)]
-        ax.set_yticks(np.arange(event_count) + 0.5)
-        event_labels = [
-            str(i + 1 * (i // 5 < 1)) if i % 5 == 0 else "" for i in range(event_count)
-        ]
-        ax.set_yticklabels(event_labels)
+        event_tick_positions, event_tick_labels = get_heatmap_event_index_ticks(
+            event_count
+        )
+        ax.set_yticks(event_tick_positions)
+        ax.set_yticklabels(event_tick_labels)
         ax.set_ylabel("Event Index", fontsize=10, fontweight="bold")
         ax.set_xlabel("Time (s)", fontsize=10, fontweight="bold")
         if title is None:
