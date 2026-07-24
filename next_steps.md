@@ -5,7 +5,7 @@ Use this checklist alongside `work_log.md`. Keep only actionable engineering thr
 ## Currently Hot
 
 - [v0.5.0-beta stabilization](#v050-beta-stabilization-gpt-5) - reproduce and fix the stale analysis-result refresh reported after changing a second signal.
-- [Startup auto-update integration](#startup-auto-update-integration-gpt-5) - publish a clean full-package baseline, then smoke-test a later source-only release.
+- [Startup auto-update integration](#startup-auto-update-integration-gpt-5) - use the published `v0.6.0-dev` full-package baseline to smoke-test the next source-only release.
 - [Desktop runtime convergence](#desktop-runtime-convergence-gpt-5) - decide whether the manual annotation save flow in `app.py` belongs in the active desktop runtime.
 
 ## v0.5.0-beta Stabilization (gpt-5)
@@ -24,19 +24,19 @@ Remaining work:
 
 ## Startup Auto-Update Integration (gpt-5)
 
-Status: the app-local prototype has been migrated to the pinned `desktop_app_source_updater` package, and the lean full-package pipeline has passed a dirty-worktree rehearsal; clean baseline publication and a real later source update remain.
+Status: the app-local prototype has been migrated to the pinned `desktop_app_source_updater` package, and the clean `v0.6.0-dev` Windows package is published as the updater test baseline; a real later source update remains.
 
 The launcher delegates source-update discovery, manifest validation, hash/baseline checks, config merging, and rollback to the shared package before importing the active app. `startup_update_config.py` holds only the `fp_analysis` release URL, environment-variable names, allowed `fp_analysis_app/` payload boundary, and generated-data exclusions. `tools/build_update_asset.py` is now a thin app-specific wrapper around the shared builder.
 
-`packaging/windows/` now provides a portable PyInstaller spec, exact tracked-byte export of the side-by-side `fp_analysis_app/` tree, packaged and fresh-extraction smoke checks, an unblock-and-start helper, and ZIP/hash/manifest/environment outputs. The rehearsal built and smoke-tested an updater-enabled Windows ZIP; because it intentionally used `-AllowDirty`, it is evidence for the pipeline rather than a release candidate.
+`packaging/windows/` now provides a portable PyInstaller spec, exact tracked-byte export of the side-by-side `fp_analysis_app/` tree, packaged and fresh-extraction smoke checks, an unblock-and-start helper, and ZIP/hash/manifest/environment outputs. The `v0.6.0-dev` prerelease was built from clean `main` commit `f8a65b9`, and its full package, hash, manifest, and build-environment snapshot are published together.
 
-Because this integration adds a dependency and removes the copied updater, it must first ship in a normal full packaged release from a clean commit. A later release containing additional source-only changes can then provide `fp_analysis_app_update_<version>.zip` and test the real update path.
+Because this integration added a dependency and removed the copied updater, `v0.6.0-dev` is a full package rather than a source-only update. A later release containing additional source-only changes can provide `fp_analysis_app_update_<version>.zip` and test the real update path from this installed baseline.
 
 Remaining work:
 
-- Commit the updater and packaging work, then rerun `packaging/windows/make_full_app_zip.ps1` without `-AllowDirty`.
-- Review and publish that clean full package as the first compatible updater baseline.
-- Add a later source-only change, build a multi-baseline asset with `tools/build_update_asset.py`, attach it to a test GitHub Release, and confirm the packaged app updates its external `fp_analysis_app/` folder before import.
+- Keep an extracted copy of the published `v0.6.0-dev` package unchanged as the installed-user test baseline.
+- Add a later source-only change, build an asset from `v0.6.0-dev` with `tools/build_update_asset.py`, attach it to the next GitHub Release, and confirm the baseline executable updates its external `fp_analysis_app/` folder before import.
+- Run the baseline executable with `--check-update`, then run `--smoke` and the normal desktop launch from the updated folder.
 - Decide how much update status should be visible in the GUI versus console output.
 
 ## Desktop Runtime Convergence (gpt-5)

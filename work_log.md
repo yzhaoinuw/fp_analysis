@@ -6,6 +6,22 @@ If today's date already appears at the top, add another `###` session under it r
 
 ## 2026-07-24
 
+### Publish the `v0.6.0-dev` updater baseline (gpt-5)
+
+- Committed and pushed the shared-updater migration and lean Windows packaging pipeline, then fast-forwarded `auto-update`, `dev`, and `main` to the verified release commit.
+- Used `v0.6.0-dev` as a deliberately temporary full-package baseline so the next source-changing release can exercise the real startup updater.
+- Built the full Windows package from clean `main` commit `f8a65b9`, including exact Git-blob runtime bytes, packaged startup validation, and a fresh-extraction `unblock_app.cmd --smoke` check.
+- Published the annotated `v0.6.0-dev` tag and GitHub prerelease with the Windows ZIP, SHA-256 sidecar, manifest, and build-environment snapshot.
+- Verification:
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis tests.test_startup_update tests.test_packaging` - 78 tests passed.
+  - `$env:FP_ANALYSIS_SKIP_UPDATE='1'; C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe run_desktop_app.py --smoke` - printed `smoke ok: v0.6.0-dev`.
+  - Updater version comparison check - confirmed a later `v0.6.2`-style release compares newer than `v0.6.0-dev`.
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\packaging\windows\make_full_app_zip.ps1` - passed dependency checks, 78 tests with 8 private-fixture cases skipped in the release worktree, PyInstaller, structural smoke, packaged smoke, fresh-extraction smoke, hashing, and sidecar generation.
+  - Artifact SHA-256 recomputation matched `ACC77CFF862BEBE96B00741A1AFFE583555D59EA09841CF52AA03123E1F2BE27`.
+  - GitHub release inspection - confirmed a published, non-draft prerelease with all four assets uploaded and the ZIP digest matching the local artifact.
+  - Remote-ref inspection - confirmed the release tag peels to `f8a65b9` and `main`, `dev`, and `auto-update` matched that commit at publication.
+  - `git diff --check` and `C:\Users\yzhao\python_projects\agent_collab_treaty\.venv\Scripts\treaty.exe validate .` - passed.
+
 ### Build a lean Windows packaging pipeline on `auto-update` (gpt-5)
 
 - Fast-forwarded the existing `auto-update` branch to the current `dev` tip at `8606bfb` and switched the main checkout there without disturbing the uncommitted updater migration.
