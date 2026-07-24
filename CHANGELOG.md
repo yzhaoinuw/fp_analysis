@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.6.0
+
+- check for safe source-only updates before desktop startup while preserving the
+  installed version if validation or replacement fails
+- distribute a repeatable Windows package with an unblock-and-start helper and
+  verified fresh-extraction startup
+- detect and plot negative peaks alongside positive peaks, and include both peak
+  values in spreadsheet exports
+- show event timestamps on the full recording and support rectangle deletion,
+  save, and undo for event annotations
+- improve analysis-window controls, heatmap labels, signal-selection guidance,
+  and analysis status messages
+
 ## v0.5.0
 
 - skip event times whose selected analysis window would exceed the available signal samples
