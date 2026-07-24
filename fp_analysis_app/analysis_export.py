@@ -10,7 +10,8 @@ from fp_analysis_app.export_settings import (
 SIGNAL_ANALYSIS_EXPORT_TYPES = (
     "mean_trace",
     "auc",
-    "max_peak_magnitude",
+    "positive_peak_value",
+    "negative_peak_value",
     "first_peak_time",
     "decay_time",
 )
@@ -28,7 +29,8 @@ ANALYSIS_EXPORT_TYPE_ORDER = (
 ANALYSIS_EXPORT_TYPE_LABELS = {
     "mean_trace": "Mean trace",
     "auc": "AUC",
-    "max_peak_magnitude": "Max peak magnitude",
+    "positive_peak_value": "Positive peak value",
+    "negative_peak_value": "Negative peak value",
     "first_peak_time": "First peak time",
     "decay_time": "Decay time",
     "cross_correlation": "Mean cross-correlation",
@@ -54,9 +56,14 @@ def get_signal_export_workbook_name(
         return f"{signal_name}_bw{baseline_window}_aw{analysis_window}.xlsx"
     if analysis_type == "auc":
         return f"{signal_name}_auc_bw{baseline_window}_aw{analysis_window}.xlsx"
-    if analysis_type == "max_peak_magnitude":
+    if analysis_type == "positive_peak_value":
         return (
-            f"{signal_name}_max_peak_magnitude_"
+            f"{signal_name}_positive_peak_value_"
+            f"bw{baseline_window}_aw{analysis_window}.xlsx"
+        )
+    if analysis_type == "negative_peak_value":
+        return (
+            f"{signal_name}_negative_peak_value_"
             f"bw{baseline_window}_aw{analysis_window}.xlsx"
         )
     if analysis_type == "first_peak_time":

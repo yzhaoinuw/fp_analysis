@@ -43,8 +43,6 @@ Each event tab shows the selected event type over the chosen baseline and analys
 - Decay time: seconds from the first detected positive peak until the response returns below its baseline mean; if that return is not found, the last analysis-window time is used.
 - Cross-correlation: when two signals are selected, the app also plots their mean normalized cross-correlation across event occurrences.
 
-The positive and negative peak-value labels describe the feedback-update metric contract. Builds before that metric update may still label the older positive-only value as `Max Peak Magnitude`.
-
 The app first tries to save the spreadsheets next to the selected `.mat` file. If that location is not writable, it saves them to the app spreadsheet folder under `fp_analysis_app/assets/spreadsheets/`.
 
 Spreadsheet exports are grouped into a setup-specific subfolder based on:

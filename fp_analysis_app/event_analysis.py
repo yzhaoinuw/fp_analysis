@@ -700,7 +700,8 @@ class Perievent_Plots:
         """
         stats = [
             "reaction_signal_auc",
-            "max_peak_magnitude",
+            "positive_peak_value",
+            "negative_peak_value",
             "first_peak_time",
             "decay_time",
         ]
@@ -1112,7 +1113,6 @@ class Analyses:
         )
         reaction_signals = self._get_reaction_signals(perievent_signals_normalized)
         reaction_signal_areas = np.mean(reaction_signals, axis=1)
-        max_peaks = np.max(reaction_signals, axis=1)
         first_positive_peak_inds = self.find_first_peaks(reaction_signals)
         first_negative_peak_inds = self.find_first_peaks(-reaction_signals)
         positive_peak_values = self._values_at_peak_indices(
@@ -1137,7 +1137,6 @@ class Analyses:
             "perievent_signals": perievent_signals,
             "perievent_signals_normalized": perievent_signals_normalized,
             "reaction_signal_auc": reaction_signal_areas,
-            "max_peak_magnitude": max_peaks,
             "positive_peak_value": positive_peak_values,
             "negative_peak_value": negative_peak_values,
             "first_peak_time": first_peak_time,

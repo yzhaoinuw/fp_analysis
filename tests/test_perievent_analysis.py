@@ -32,6 +32,7 @@ from fp_analysis_app.event_editing import (
 )
 from fp_analysis_app.make_figure import EVENT_TIMESTAMP_TRACE_PREFIX, make_figure
 from fp_analysis_app.analysis_export import (
+    build_analysis_type_checklist_options,
     get_analysis_type_checklist_values,
     write_analysis_workbooks,
 )
@@ -332,6 +333,7 @@ class TestPerieventPeakAnalysis(unittest.TestCase):
             np.array([-3.0, -2.0, np.nan]),
             equal_nan=True,
         )
+        self.assertNotIn("max_peak_magnitude", result)
 
     def test_analysis_plot_has_separate_positive_and_negative_peak_panels(self):
         result = self._make_analysis_result()
@@ -867,7 +869,7 @@ class TestPerieventAnalysisWithF268(unittest.TestCase):
         self.assertGreaterEqual(int(perievent_indices.min()), 0)
         self.assertLess(int(perievent_indices.max()), self.signal_length)
 
-    def test_auc_analysis_matches_reference_values_for_ne2m_sws_wake(self):
+    def test_perievent_analysis_matches_reference_values_for_ne2m_sws_wake(self):
         _, perievent_indices, perievent_signals = self._get_perievent_signals(
             "sws_wake",
             "NE2m",
@@ -886,9 +888,16 @@ class TestPerieventAnalysisWithF268(unittest.TestCase):
             atol=1e-6,
         )
         np.testing.assert_allclose(
-            result["max_peak_magnitude"][:5],
-            np.array([3.582563, 5.549205, 5.945642, 8.685765, 4.746928]),
+            result["positive_peak_value"][:5],
+            np.array([3.267334, 5.549205, 5.945642, 8.685765, 4.746928]),
             atol=1e-6,
+            equal_nan=True,
+        )
+        np.testing.assert_allclose(
+            result["negative_peak_value"][:5],
+            np.array([np.nan, np.nan, np.nan, np.nan, -1.030403]),
+            atol=1e-6,
+            equal_nan=True,
         )
         np.testing.assert_allclose(
             result["first_peak_time"][:5],
@@ -1027,7 +1036,7 @@ class TestPerieventAnalysisWithF268(unittest.TestCase):
         )
         self.assertTrue(exported["F268_short"].iloc[10:].isna().all())
 
-    def test_max_peak_magnitude_workbook_aligns_event_index_when_subjects_differ(self):
+    def test_peak_value_workbooks_align_event_index_when_subjects_differ(self):
         _, _, perievent_signals = self._get_perievent_signals("wake_sws", "NE2m")
         result = self.analyses.get_perievent_analyses(perievent_signals)
         plots = Perievent_Plots(
@@ -1036,42 +1045,64 @@ class TestPerieventAnalysisWithF268(unittest.TestCase):
             nsec_before=BASELINE_WINDOW,
             nsec_after=ANALYSIS_WINDOW,
         )
-        f268_df = plots.build_occurrence_value_export_df(
-            result["max_peak_magnitude"],
-            subject_id="F268",
-        )
-        short_df = plots.build_occurrence_value_export_df(
-            result["max_peak_magnitude"][:10],
-            subject_id="F268_short",
-        )
+        expected_heads = {
+            "positive_peak_value": np.array([np.nan, np.nan, np.nan]),
+            "negative_peak_value": np.array(
+                [-3.386979, -1.681748, -2.492468]
+            ),
+        }
 
-        with TemporaryDirectory() as tmpdir:
-            workbook_path = Path(tmpdir) / "NE2m_max_peak_magnitude_bw30_aw60.xlsx"
-            Perievent_Plots.export_occurrence_value_workbook(
-                workbook_save_path=workbook_path,
-                event_sheet_dfs={"wake_sws": f268_df},
-                index_column="event_index",
-            )
-            Perievent_Plots.export_occurrence_value_workbook(
-                workbook_save_path=workbook_path,
-                event_sheet_dfs={"wake_sws": short_df},
-                index_column="event_index",
-            )
+        for analysis_type, expected_head in expected_heads.items():
+            with self.subTest(analysis_type=analysis_type):
+                values = result[analysis_type]
+                f268_df = plots.build_occurrence_value_export_df(
+                    values,
+                    subject_id="F268",
+                )
+                short_df = plots.build_occurrence_value_export_df(
+                    values[:10],
+                    subject_id="F268_short",
+                )
 
-            exported = pd.read_excel(
-                workbook_path,
-                sheet_name="wake_sws",
-                engine="openpyxl",
-            )
+                with TemporaryDirectory() as tmpdir:
+                    workbook_path = (
+                        Path(tmpdir)
+                        / f"NE2m_{analysis_type}_bw30_aw60.xlsx"
+                    )
+                    Perievent_Plots.export_occurrence_value_workbook(
+                        workbook_save_path=workbook_path,
+                        event_sheet_dfs={"wake_sws": f268_df},
+                        index_column="event_index",
+                    )
+                    Perievent_Plots.export_occurrence_value_workbook(
+                        workbook_save_path=workbook_path,
+                        event_sheet_dfs={"wake_sws": short_df},
+                        index_column="event_index",
+                    )
 
-        self.assertEqual(["event_index", "F268", "F268_short"], exported.columns.tolist())
-        self.assertEqual(list(range(1, 16)), exported["event_index"].tolist())
-        np.testing.assert_allclose(
-            exported["F268"].head(3),
-            np.array([0.863213, 0.804854, 0.0]),
-            atol=1e-6,
-        )
-        self.assertTrue(exported["F268_short"].iloc[10:].isna().all())
+                    exported = pd.read_excel(
+                        workbook_path,
+                        sheet_name="wake_sws",
+                        engine="openpyxl",
+                    )
+
+                self.assertEqual(
+                    ["event_index", "F268", "F268_short"],
+                    exported.columns.tolist(),
+                )
+                self.assertEqual(
+                    list(range(1, 16)),
+                    exported["event_index"].tolist(),
+                )
+                np.testing.assert_allclose(
+                    exported["F268"].head(3),
+                    expected_head,
+                    atol=1e-6,
+                    equal_nan=True,
+                )
+                self.assertTrue(
+                    exported["F268_short"].iloc[10:].isna().all()
+                )
 
     def test_first_peak_time_workbook_aligns_event_index_when_subjects_differ(self):
         _, _, perievent_signals = self._get_perievent_signals("wake_sws", "NE2m")
@@ -1521,8 +1552,19 @@ class TestAnalysisExportSettings(unittest.TestCase):
 
 
 class TestSelectiveAnalysisWorkbookExport(unittest.TestCase):
-    def _build_export_payload(self, mat_filepath, auc_values=None, decay_values=None):
+    def _build_export_payload(
+        self,
+        mat_filepath,
+        auc_values=None,
+        positive_peak_values=None,
+        negative_peak_values=None,
+        decay_values=None,
+    ):
         auc_values = auc_values or [1.0, 2.0]
+        if positive_peak_values is None:
+            positive_peak_values = [1.5, np.nan]
+        if negative_peak_values is None:
+            negative_peak_values = [-1.5, np.nan]
         decay_values = decay_values or [3.0, 4.0]
         return {
             "mat_filepath": mat_filepath,
@@ -1550,6 +1592,26 @@ class TestSelectiveAnalysisWorkbookExport(unittest.TestCase):
                             {
                                 "event_index": [1, 2],
                                 "F268": auc_values,
+                            }
+                        )
+                    }
+                },
+                "positive_peak_value": {
+                    "NE2m": {
+                        "wake_sws": pd.DataFrame(
+                            {
+                                "event_index": [1, 2],
+                                "F268": positive_peak_values,
+                            }
+                        )
+                    }
+                },
+                "negative_peak_value": {
+                    "NE2m": {
+                        "wake_sws": pd.DataFrame(
+                            {
+                                "event_index": [1, 2],
+                                "F268": negative_peak_values,
                             }
                         )
                     }
@@ -1582,7 +1644,92 @@ class TestSelectiveAnalysisWorkbookExport(unittest.TestCase):
 
             self.assertTrue((export_dir / "NE2m_auc_bw30_aw60.xlsx").exists())
             self.assertFalse((export_dir / "NE2m_bw30_aw60.xlsx").exists())
+            self.assertFalse(
+                (export_dir / "NE2m_positive_peak_value_bw30_aw60.xlsx").exists()
+            )
+            self.assertFalse(
+                (export_dir / "NE2m_negative_peak_value_bw30_aw60.xlsx").exists()
+            )
             self.assertFalse((export_dir / "NE2m_decay_time_bw30_aw60.xlsx").exists())
+
+    def test_peak_value_exports_use_new_names_and_preserve_missing_peaks(self):
+        with TemporaryDirectory() as tmpdir:
+            export_payload = self._build_export_payload(Path("C:/data/F268.mat"))
+            options = build_analysis_type_checklist_options(export_payload)
+            peak_options = [
+                option
+                for option in options
+                if option["value"]
+                in {"positive_peak_value", "negative_peak_value"}
+            ]
+
+            self.assertEqual(
+                [
+                    {
+                        "label": "Positive peak value",
+                        "value": "positive_peak_value",
+                        "disabled": False,
+                    },
+                    {
+                        "label": "Negative peak value",
+                        "value": "negative_peak_value",
+                        "disabled": False,
+                    },
+                ],
+                peak_options,
+            )
+
+            write_analysis_workbooks(
+                primary_dir=Path(tmpdir),
+                fallback_dir=Path(tmpdir) / "fallback",
+                export_payload=export_payload,
+                selected_analysis_types=[
+                    "positive_peak_value",
+                    "negative_peak_value",
+                ],
+            )
+            export_dir = Path(tmpdir) / "NE2m_bw30_aw60"
+            positive_path = (
+                export_dir / "NE2m_positive_peak_value_bw30_aw60.xlsx"
+            )
+            negative_path = (
+                export_dir / "NE2m_negative_peak_value_bw30_aw60.xlsx"
+            )
+
+            self.assertTrue(positive_path.exists())
+            self.assertTrue(negative_path.exists())
+            self.assertFalse(
+                (export_dir / "NE2m_max_peak_magnitude_bw30_aw60.xlsx").exists()
+            )
+
+            positive_export = pd.read_excel(
+                positive_path,
+                sheet_name="wake_sws",
+                engine="openpyxl",
+            )
+            negative_export = pd.read_excel(
+                negative_path,
+                sheet_name="wake_sws",
+                engine="openpyxl",
+            )
+            description_text = (export_dir / "data_description.txt").read_text(
+                encoding="utf-8"
+            )
+
+        np.testing.assert_allclose(
+            positive_export["F268"].to_numpy(),
+            np.array([1.5, np.nan]),
+            equal_nan=True,
+        )
+        np.testing.assert_allclose(
+            negative_export["F268"].to_numpy(),
+            np.array([-1.5, np.nan]),
+            equal_nan=True,
+        )
+        self.assertIn(
+            "Saved analysis types: Positive peak value, Negative peak value",
+            description_text,
+        )
 
     def test_later_export_adds_new_analysis_type_and_updates_description(self):
         with TemporaryDirectory() as tmpdir:

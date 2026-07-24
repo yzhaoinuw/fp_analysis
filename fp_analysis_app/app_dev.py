@@ -375,9 +375,15 @@ def make_analysis_plots(
             subject_id=subject_id,
         )
 
-    def build_max_peak_magnitude_export(plots, perievent_signals, result):
+    def build_positive_peak_value_export(plots, perievent_signals, result):
         return plots.build_occurrence_value_export_df(
-            values=result["max_peak_magnitude"],
+            values=result["positive_peak_value"],
+            subject_id=subject_id,
+        )
+
+    def build_negative_peak_value_export(plots, perievent_signals, result):
+        return plots.build_occurrence_value_export_df(
+            values=result["negative_peak_value"],
             subject_id=subject_id,
         )
 
@@ -400,8 +406,11 @@ def make_analysis_plots(
         "auc": {
             "build_df": build_auc_export,
         },
-        "max_peak_magnitude": {
-            "build_df": build_max_peak_magnitude_export,
+        "positive_peak_value": {
+            "build_df": build_positive_peak_value_export,
+        },
+        "negative_peak_value": {
+            "build_df": build_negative_peak_value_export,
         },
         "first_peak_time": {
             "build_df": build_first_peak_time_export,

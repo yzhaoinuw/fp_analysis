@@ -4,7 +4,34 @@ Prepend new session notes to this file. The live log holds at most the five most
 
 If today's date already appears at the top, add another `###` session under it rather than creating a duplicate date heading. Each substantive session needs compact model metadata and a `- Verification:` subsection containing commands that were actually run.
 
+## 2026-07-24
+
+### Accept and publish detected peak-value spreadsheet exports (gpt-5)
+
+- Marked the final analysis-workflow item accepted after the user confirmed the new positive- and negative-peak spreadsheet exports work.
+- Closed the completed nine-item analysis-workflow thread and removed it from `next_steps.md`; dated implementation and acceptance evidence remains in the work log.
+- Prepared the focused export implementation, tests, README wording, and coordination docs for commit and push on `negative-peaks`.
+- Verification:
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis` - 64 tests passed.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -c "import fp_analysis_app.app_dev, fp_analysis_app.analysis_export, fp_analysis_app.event_analysis, fp_analysis_app.mat_utils; print('import ok')"` - printed `import ok`.
+  - `git diff --check` - clean apart from Git line-ending conversion warnings.
+  - `C:\Users\yzhao\python_projects\agent_collab_treaty\.venv\Scripts\treaty.exe validate .` - passed.
+
 ## 2026-07-23
+
+### Replace legacy max-value export with detected peak values (gpt-5)
+
+- Replaced the active `max_peak_magnitude` export with separate `positive_peak_value` and `negative_peak_value` selections and payloads.
+- Added `*_positive_peak_value_bw<baseline>_aw<analysis>.xlsx` and `*_negative_peak_value_bw<baseline>_aw<analysis>.xlsx` workbook names and matching user-facing checklist labels.
+- Removed the legacy maximum calculation from analysis results; exported values now come from the first detected positive or negative peak index and remain `NaN` when no matching peak is found.
+- Updated the secondary combined spreadsheet helper, README compatibility wording, fixture expectations, workbook alignment coverage, and selective-export coverage.
+- Item 9 remains open for the user spreadsheet acceptance gate on `negative-peaks`.
+- Verification:
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis.TestPerieventPeakAnalysis tests.test_perievent_analysis.TestSelectiveAnalysisWorkbookExport` - 8 tests passed.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis` - 64 tests passed.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -c "import fp_analysis_app.app_dev, fp_analysis_app.analysis_export, fp_analysis_app.event_analysis, fp_analysis_app.mat_utils; print('import ok')"` - printed `import ok`.
+  - `git diff --check` - clean apart from Git line-ending conversion warnings.
+  - `C:\Users\yzhao\python_projects\agent_collab_treaty\.venv\Scripts\treaty.exe validate .` - passed.
 
 ### Accept and publish negative peak analysis plots (gpt-5)
 
