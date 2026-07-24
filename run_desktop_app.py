@@ -23,15 +23,19 @@ else:
 # Insert base_path FIRST so that fp_analysis_app/ next to .exe overrides bundled version
 sys.path.insert(0, base_path)
 
-try:
-    from startup_update import format_startup_update_message, run_startup_update
+def check_for_startup_update():
+    try:
+        from desktop_app_source_updater import format_update_message, run_startup_update
+        from startup_update_config import build_startup_update_config
 
-    update_result = run_startup_update(base_path)
-    update_message = format_startup_update_message(update_result)
-    if update_message:
-        print(f"[startup-update] {update_message}", flush=True)
-except Exception as exc:
-    print(f"[startup-update] skipped: {exc}", flush=True)
+        result = run_startup_update(build_startup_update_config(base_path))
+        update_message = format_update_message(result)
+        if update_message:
+            print(f"[startup-update] {update_message}", flush=True)
+        return result
+    except Exception as exc:
+        print(f"[startup-update] skipped: {exc}", flush=True)
+        return None
 
 
 def run_dash():
@@ -43,12 +47,31 @@ def run_dash():
     )
 
 
-if __name__ == "__main__":
+def main():
+    global app, WINDOW_CONFIG, PORT
+
+    multiprocessing.freeze_support()
+    update_result = check_for_startup_update()
+
+    if "--check-update" in sys.argv[1:]:
+        if update_result is None:
+            return 1
+        print(f"[startup-update] status: {update_result.status}", flush=True)
+        if update_result.status not in {"updated", "up-to-date"}:
+            return 1
+        from fp_analysis_app import VERSION
+
+        print(f"update check ok: {VERSION}", flush=True)
+        return 0
+
     from fp_analysis_app import VERSION
     from fp_analysis_app.app_dev import app
     from fp_analysis_app.config import WINDOW_CONFIG, PORT
 
-    multiprocessing.freeze_support()
+    if "--smoke" in sys.argv[1:]:
+        print(f"smoke ok: {VERSION}", flush=True)
+        return 0
+
     t = threading.Thread(target=run_dash, daemon=True)
     t.start()
 
@@ -64,3 +87,8 @@ if __name__ == "__main__":
         webview.start(gui="edgechromium")
     else:
         webview.start()  # macOS/Linux auto-selects native renderer
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

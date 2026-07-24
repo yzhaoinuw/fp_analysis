@@ -36,7 +36,8 @@ jobs:
             plotly==5.23.0 \
             plotly-resampler==0.11.0 \
             "dash[diskcache]==2.17.1" \
-            dash-extensions==1.0.18
+            dash-extensions==1.0.18 \
+            "desktop-app-source-updater @ git+https://github.com/yzhaoinuw/desktop_app_source_updater.git@adb2221393ab6fab106f7cef19baf6157e039bd3"
 
-      - name: Run perievent unittest suite
-        run: python -m unittest tests.test_perievent_analysis
+      - name: Run focused unittest suites
+        run: python -m unittest tests.test_perievent_analysis tests.test_startup_update tests.test_packaging

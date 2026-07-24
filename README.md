@@ -6,16 +6,22 @@
 1. Go to the [fp_analysis folder](https://uofr-my.sharepoint.com/:f:/r/personal/yzhao38_ur_rochester_edu/Documents/fp_analysis_project?csf=1&web=1&e=JIeIs6) on OneDrive. Contact Yue if you can't access it.
 2. Download **fp_analysis_app_vx.zip** (the "**x**" in the suffix "**vx**" denotes the current version). Note that if you unzip it to the same location where the zip file is, you may end up with a nested folder, ie., a "fp_analysis_app_vx" inside a "fp_analysis_app_vx". If this is the case , it may be better to peel it and move the inner "fp_analysis_app_vx" somewhere else and delete the outer "fp_analysis_app_vx".  
 3. Examine the content of the unzipped "fp_analysis_app_vx". It should contain three folders and an .exe file: 1) **_internal**, 2) **fp_analysis_app**, and 3) **run_fp_analysis_app.exe**.
-4. **NEW!!!**  after you download and unzip, you MUST open PowerShell and run the following command
+4. If the package contains `unblock_app.cmd`, double-click it to unblock the downloaded files and start the app. For an older package without that helper, open PowerShell and run:
 ```bash
 cd PATH_TO_YOUR_APP_FOLDER
 Get-ChildItem -Recurse | Unblock-File
 ```
-The first line navigates to the unzipped app folder. You need to supply the actual path to the app folder on your computer. The second line unblocks the dependencies related to webview, which provides the window to the app interface, as Windows blocks them when the zip file is downloaded from OneDrive. Without unblocking it, you may not be able to run the app.
+The first line navigates to the unzipped app folder. You need to supply the actual path to the app folder on your computer. The second line unblocks the dependencies related to webview, which provides the window to the app interface, as Windows may block them when the zip file is downloaded. Without unblocking them, the app may not start.
 
 
 ## Features And Usage 
 To open the app, double click "run_fp_analysis_app.exe" and it will open the app's home page in a tab in your web browser. You don't need internet connection to run the app. The app only uses the web browser as the interface.
+
+### Startup Source Updates
+
+Starting with the next full package that includes the shared updater dependency, the app checks its latest GitHub Release for a verified source-update zip before loading the interface. Internet access is optional: if GitHub is unavailable or no compatible source asset exists, startup continues with the installed version.
+
+Source-update zips can replace only approved files under `fp_analysis_app/`. They verify downloaded hashes and known installed-file baselines, support jumping over compatible skipped versions, and refuse to overwrite unrecognized local edits. Dependency, packaging, build, generated-data, deletion, and rename changes still require a normal full packaged release.
 
 ### Visualization
 Click "**Click here to select File**". After you select a file, the app will briefly validate the file selected and then show you the figures of the signals. Once the figures are shown, you can navigate and zoom in or out on the figures.

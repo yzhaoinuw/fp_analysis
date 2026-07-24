@@ -5,9 +5,8 @@ Use this checklist alongside `work_log.md`. Keep only actionable engineering thr
 ## Currently Hot
 
 - [v0.5.0-beta stabilization](#v050-beta-stabilization-gpt-5) - reproduce and fix the stale analysis-result refresh reported after changing a second signal.
-- [Startup auto-update prototype](#startup-auto-update-prototype-gpt-5) - package-smoke the release-zip updater against a realistic distributable folder.
+- [Startup auto-update integration](#startup-auto-update-integration-gpt-5) - publish a clean full-package baseline, then smoke-test a later source-only release.
 - [Desktop runtime convergence](#desktop-runtime-convergence-gpt-5) - decide whether the manual annotation save flow in `app.py` belongs in the active desktop runtime.
-- [Packaging reproducibility](#packaging-reproducibility-gpt-5) - remove or document machine-specific packaging assumptions before the next distributable build.
 
 ## v0.5.0-beta Stabilization (gpt-5)
 
@@ -23,16 +22,21 @@ Remaining work:
 - Add a focused regression test where practical.
 - Run the unittest suite and a manual two-signal desktop check before changing release status.
 
-## Startup Auto-Update Prototype (gpt-5)
+## Startup Auto-Update Integration (gpt-5)
 
-Status: release-zip prototype implemented on the `auto-update` branch; not yet package-smoked.
+Status: the app-local prototype has been migrated to the pinned `desktop_app_source_updater` package, and the lean full-package pipeline has passed a dirty-worktree rehearsal; clean baseline publication and a real later source update remain.
 
-The launcher now has a code-only updater that checks for a custom GitHub Release asset named like `fp_analysis_app_update_<version>.zip` before importing the active app. The zip must include a root `manifest.json` with target version, changed runtime files, payload hashes, and version-specific previous-file hashes. One latest asset can support skipped-release jump-ahead updates by listing multiple `from_versions`. The updater applies only verified `fp_analysis_app/` and `startup_update.py` payloads, skips local source edits detected by hash mismatch, and blocks dependency, packaging, build, or local-data paths that require a packaged refresh.
+The launcher delegates source-update discovery, manifest validation, hash/baseline checks, config merging, and rollback to the shared package before importing the active app. `startup_update_config.py` holds only the `fp_analysis` release URL, environment-variable names, allowed `fp_analysis_app/` payload boundary, and generated-data exclusions. `tools/build_update_asset.py` is now a thin app-specific wrapper around the shared builder.
+
+`packaging/windows/` now provides a portable PyInstaller spec, exact tracked-byte export of the side-by-side `fp_analysis_app/` tree, packaged and fresh-extraction smoke checks, an unblock-and-start helper, and ZIP/hash/manifest/environment outputs. The rehearsal built and smoke-tested an updater-enabled Windows ZIP; because it intentionally used `-AllowDirty`, it is evidence for the pipeline rather than a release candidate.
+
+Because this integration adds a dependency and removes the copied updater, it must first ship in a normal full packaged release from a clean commit. A later release containing additional source-only changes can then provide `fp_analysis_app_update_<version>.zip` and test the real update path.
 
 Remaining work:
 
-- Build or stage a realistic distributable folder and confirm the bundled launcher can update the external `fp_analysis_app/` source folder before app import.
-- Attach a real multi-baseline `fp_analysis_app_update_<version>.zip` asset to a test GitHub Release and confirm latest-release asset discovery works outside local fixtures.
+- Commit the updater and packaging work, then rerun `packaging/windows/make_full_app_zip.ps1` without `-AllowDirty`.
+- Review and publish that clean full package as the first compatible updater baseline.
+- Add a later source-only change, build a multi-baseline asset with `tools/build_update_asset.py`, attach it to a test GitHub Release, and confirm the packaged app updates its external `fp_analysis_app/` folder before import.
 - Decide how much update status should be visible in the GUI versus console output.
 
 ## Desktop Runtime Convergence (gpt-5)
@@ -46,19 +50,6 @@ Remaining work:
 - Decide whether manual annotation editing and save/export are still supported product requirements.
 - If yes, migrate the required behavior into `app_dev.py` and `components_dev.py` with focused tests.
 - If no, document the boundary and then retire the secondary path in a separate, reviewable cleanup.
-
-## Packaging Reproducibility (gpt-5)
-
-Status: paused until the next packaging task.
-
-`app.spec` contains absolute paths to this workstation and references an `fp_analysis_dist` environment, while routine development uses `fiber_photometry`. `environment.yml` and `setup.py` also retain historical sleep-scoring metadata.
-
-Remaining work:
-
-- Choose the supported build environment and record an exact build command.
-- Replace hardcoded paths in `app.spec` with paths derived from the build environment or project root.
-- Confirm which assets and external modules must remain outside the executable for patch-style distribution.
-- Build and smoke-test the packaged app on a clean output directory before updating installation instructions.
 
 ## Background / Paused
 

@@ -8,7 +8,8 @@ import zipfile
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from startup_update import run_startup_update
+from desktop_app_source_updater import run_startup_update
+from startup_update_config import build_startup_update_config
 
 
 def sha256(data):
@@ -28,7 +29,9 @@ class ReleaseZipFixture:
     def setup_installed_app(self, version="v0.5.0"):
         self.write_app_file("fp_analysis_app/__init__.py", f'VERSION = "{version}"\n')
         self.write_app_file("fp_analysis_app/app_dev.py", "APP_VALUE = 'old'\n")
-        self.write_app_file("startup_update.py", "# old updater\n")
+
+    def config(self, **overrides):
+        return build_startup_update_config(self.app_root, **overrides)
 
     def write_app_file(self, relative_path, text):
         path = self.app_root / relative_path
@@ -113,13 +116,26 @@ class ReleaseZipFixture:
 
 
 class TestStartupUpdate(unittest.TestCase):
+    def test_uses_fp_analysis_shared_updater_contract(self):
+        with TemporaryDirectory() as temp_dir:
+            fixture = ReleaseZipFixture(temp_dir)
+
+            config = fixture.config()
+
+            self.assertEqual("fp_analysis", config.app_name)
+            self.assertEqual("fp_analysis_app/__init__.py", config.installed_version_file)
+            self.assertEqual(("fp_analysis_app/",), config.allowed_payload_paths)
+            self.assertEqual("fp_analysis_app_update_", config.asset_prefix)
+            self.assertIn("fp_analysis_app/assets/videos/", config.blocked_path_prefixes)
+            self.assertIn(".mat", config.blocked_path_suffixes)
+
     def test_applies_compatible_release_zip(self):
         with TemporaryDirectory() as temp_dir:
             fixture = ReleaseZipFixture(temp_dir)
             fixture.setup_installed_app()
             update_zip = fixture.build_update_zip(from_versions=["v0.5.0"])
 
-            result = run_startup_update(fixture.app_root, update_url=str(update_zip))
+            result = run_startup_update(fixture.config(update_url=str(update_zip)))
 
             self.assertEqual("updated", result.status)
             self.assertEqual(
@@ -164,7 +180,7 @@ class TestStartupUpdate(unittest.TestCase):
                         },
                     )
 
-                    result = run_startup_update(fixture.app_root, update_url=str(update_zip))
+                    result = run_startup_update(fixture.config(update_url=str(update_zip)))
 
                     self.assertEqual("updated", result.status)
                     self.assertEqual(
@@ -185,7 +201,7 @@ class TestStartupUpdate(unittest.TestCase):
                 from_versions=["v0.5.0", "v0.5.1", "v0.5.2"],
             )
 
-            result = run_startup_update(fixture.app_root, update_url=str(update_zip))
+            result = run_startup_update(fixture.config(update_url=str(update_zip)))
 
             self.assertEqual("blocked", result.status)
             self.assertIn("not compatible", result.message)
@@ -199,8 +215,7 @@ class TestStartupUpdate(unittest.TestCase):
             release_metadata = fixture.build_release_metadata(update_zip)
 
             result = run_startup_update(
-                fixture.app_root,
-                release_api_url=str(release_metadata),
+                fixture.config(release_api_url=str(release_metadata))
             )
 
             self.assertEqual("updated", result.status)
@@ -212,7 +227,7 @@ class TestStartupUpdate(unittest.TestCase):
             fixture.setup_installed_app()
             update_zip = fixture.build_update_zip(version="v0.5.0")
 
-            result = run_startup_update(fixture.app_root, update_url=str(update_zip))
+            result = run_startup_update(fixture.config(update_url=str(update_zip)))
 
             self.assertEqual("up-to-date", result.status)
             self.assertEqual("APP_VALUE = 'old'\n", fixture.read_app_file("fp_analysis_app/app_dev.py"))
@@ -242,7 +257,6 @@ class TestBuildUpdateAsset(unittest.TestCase):
 
             self._write(repo, "fp_analysis_app/__init__.py", 'VERSION = "v0.5.3"\n')
             self._write(repo, "fp_analysis_app/app_dev.py", "APP_VALUE = 'new3'\n")
-            self._write(repo, "startup_update.py", "# updater\n")
             self._commit(repo, "v0.5.3")
 
             output_zip = Path(temp_dir) / "fp_analysis_app_update_v0.5.3.zip"
@@ -280,6 +294,47 @@ class TestBuildUpdateAsset(unittest.TestCase):
                 set(app_dev_entry["previous_sha256_by_version"]),
             )
 
+    def test_builder_refuses_dependency_changes(self):
+        if shutil.which("git") is None:
+            self.skipTest("git is not available on PATH")
+
+        with TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir) / "repo"
+            repo.mkdir()
+            self._git(repo, "init", "-b", "main")
+            self._git(repo, "config", "user.email", "test@example.com")
+            self._git(repo, "config", "user.name", "Test User")
+
+            self._write(repo, "fp_analysis_app/__init__.py", 'VERSION = "v0.5.0"\n')
+            self._write(repo, "fp_analysis_app/app_dev.py", "APP_VALUE = 'old'\n")
+            self._write(repo, "requirements.txt", "dash==2\n")
+            self._commit(repo, "v0.5.0")
+            self._git(repo, "tag", "v0.5.0")
+
+            self._write(repo, "fp_analysis_app/__init__.py", 'VERSION = "v0.5.1"\n')
+            self._write(repo, "fp_analysis_app/app_dev.py", "APP_VALUE = 'new'\n")
+            self._write(repo, "requirements.txt", "dash==3\n")
+            self._commit(repo, "v0.5.1")
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(REPO_ROOT / "tools" / "build_update_asset.py"),
+                    "--repo",
+                    str(repo),
+                    "--from-ref",
+                    "v0.5.0",
+                    "--to-ref",
+                    "HEAD",
+                ],
+                capture_output=True,
+                check=False,
+                text=True,
+            )
+
+            self.assertEqual(1, result.returncode)
+            self.assertIn("requirements.txt", result.stderr)
+
     def _write(self, repo, relative_path, text):
         path = repo / relative_path
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -297,19 +352,19 @@ class TestBuildUpdateAsset(unittest.TestCase):
             text=True,
         )
 
-    def test_blocks_dependency_or_packaging_paths(self):
+    def test_runtime_blocks_generated_data_paths(self):
         with TemporaryDirectory() as temp_dir:
             fixture = ReleaseZipFixture(temp_dir)
             fixture.setup_installed_app()
             update_zip = fixture.build_update_zip(
                 payloads={
                     "fp_analysis_app/__init__.py": 'VERSION = "v0.5.1"\n',
-                    "requirements.txt": "dash==9\n",
+                    "fp_analysis_app/assets/videos/output.mat": "generated data\n",
                 },
                 from_versions=["v0.5.0"],
             )
 
-            result = run_startup_update(fixture.app_root, update_url=str(update_zip))
+            result = run_startup_update(fixture.config(update_url=str(update_zip)))
 
             self.assertEqual("blocked", result.status)
             self.assertIn("packaged refresh required", result.message)
@@ -322,7 +377,7 @@ class TestBuildUpdateAsset(unittest.TestCase):
             update_zip = fixture.build_update_zip(from_versions=["v0.5.0"])
             fixture.write_app_file("fp_analysis_app/app_dev.py", "APP_VALUE = 'local edit'\n")
 
-            result = run_startup_update(fixture.app_root, update_url=str(update_zip))
+            result = run_startup_update(fixture.config(update_url=str(update_zip)))
 
             self.assertEqual("skipped", result.status)
             self.assertIn("differ from the update baseline", result.message)
@@ -340,7 +395,7 @@ class TestBuildUpdateAsset(unittest.TestCase):
                 from_versions=["v0.5.0"],
             )
 
-            result = run_startup_update(fixture.app_root, update_url=str(update_zip))
+            result = run_startup_update(fixture.config(update_url=str(update_zip)))
 
             self.assertEqual("skipped", result.status)
             self.assertIn("cannot verify local source state", result.message)

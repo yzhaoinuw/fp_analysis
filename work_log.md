@@ -6,6 +6,40 @@ If today's date already appears at the top, add another `###` session under it r
 
 ## 2026-07-24
 
+### Build a lean Windows packaging pipeline on `auto-update` (gpt-5)
+
+- Fast-forwarded the existing `auto-update` branch to the current `dev` tip at `8606bfb` and switched the main checkout there without disturbing the uncommitted updater migration.
+- Assessed the `sleep_scoring` pipeline and adopted only the portable PyInstaller spec, exact tracked-byte runtime export, full-build orchestration, packaged/fresh-extraction smoke checks, unblock-and-start helper, and ZIP/hash/manifest/environment outputs.
+- Deliberately omitted Torch/model splitting, a manual source-folder replacement ZIP, post-build baseline repair, and automatic GitHub publication because they do not currently solve an `fp_analysis` requirement.
+- Added `--smoke` and `--check-update` launcher modes, packaging regression coverage, and a clean-worktree release gate while retaining `-AllowDirty` for local rehearsals.
+- The first rehearsal caught missing Conda runtime DLLs at packaged startup; the portable spec now collects the seven required core DLLs explicitly, and the rebuilt executable passed.
+- Produced a local dirty-worktree rehearsal artifact at `release_artifacts/fp_analysis_app_v0.5.0-windows.zip` with matching SHA-256 `853785BA1504F72E4F3C032A27FAABBAB83AAE78A4E6266B4D3D4BC27AF43825`. It is ignored local evidence, not a release candidate.
+- Verification:
+  - `git branch -f auto-update dev; git switch auto-update` - switched to `auto-update` at the current `dev` commit with the task changes preserved.
+  - `C:\Users\yzhao\miniconda3\envs\fp_analysis_dist\python.exe -m pip install --no-deps --disable-pip-version-check "desktop-app-source-updater @ git+https://github.com/yzhaoinuw/desktop_app_source_updater.git@adb2221393ab6fab106f7cef19baf6157e039bd3"` - installed the pinned updater in the packaging environment.
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\packaging\windows\make_full_app_zip.ps1 -AllowDirty` - passed environment checks, 76 tests, PyInstaller, structural smoke, packaged `--smoke`, compression, hashing, and sidecar generation after the DLL fix.
+  - Fresh extraction followed by `unblock_app.cmd --smoke` - printed `smoke ok: v0.5.0`.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis tests.test_startup_update tests.test_packaging` - 78 tests passed.
+  - Source and packaged `run_fp_analysis_app.exe --smoke` checks - both printed `smoke ok: v0.5.0`.
+  - Artifact SHA-256 recomputation matched the generated sidecar.
+  - `git diff --check` - clean apart from Git line-ending conversion warnings.
+  - `C:\Users\yzhao\python_projects\agent_collab_treaty\.venv\Scripts\treaty.exe validate .` - passed.
+
+### Integrate the shared startup updater (gpt-5)
+
+- Replaced the copied runtime updater with the pinned `desktop_app_source_updater` dependency at commit `adb2221393ab6fab106f7cef19baf6157e039bd3`.
+- Kept app-specific release settings and generated-data exclusions in `startup_update_config.py`, and reduced `tools/build_update_asset.py` to a thin wrapper around the shared builder.
+- Extended the focused CI job to install the pinned package and run both the perievent and startup-update suites.
+- Documented that this dependency migration needs one normal full packaged release before a later source-only release can exercise the real GitHub Release update path.
+- Verification:
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m pip install --no-deps --disable-pip-version-check --force-reinstall "desktop-app-source-updater @ git+https://github.com/yzhaoinuw/desktop_app_source_updater.git@adb2221393ab6fab106f7cef19baf6157e039bd3"` - installed version `0.1.0` from the pinned commit.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis tests.test_startup_update` - 76 tests passed.
+  - `$env:FP_ANALYSIS_SKIP_UPDATE='1'; C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -c "import run_desktop_app; import desktop_app_source_updater, startup_update_config; import fp_analysis_app.analysis_export, fp_analysis_app.event_analysis, fp_analysis_app.mat_utils; print('import ok')"` - printed `import ok`.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe tools\build_update_asset.py --help` - printed the shared builder options through the app wrapper.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m pip check` - no broken requirements.
+  - `git diff --check` - clean apart from Git line-ending conversion warnings.
+  - `C:\Users\yzhao\python_projects\agent_collab_treaty\.venv\Scripts\treaty.exe validate .` - passed.
+
 ### Tighten analysis-page status messaging (gpt-5)
 
 - Removed the empty validation row's reserved height and reduced the status margins so analysis guidance sits directly below the controls.

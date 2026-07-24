@@ -29,7 +29,7 @@ C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe run_desktop_app.py
 Run the CI-equivalent and full focused test suite:
 
 ```powershell
-C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis
+C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis tests.test_startup_update tests.test_packaging
 ```
 
 The fixture-backed `F268` tests run when `data/F268.mat` and `data/Transitions_F268.xlsx` are available. Synthetic export tests run without those local fixtures.
@@ -73,6 +73,26 @@ For desktop behavior, inspect `app_dev.py` before `app.py`. The two modules are 
 - `app.py` is a secondary browser/upload implementation that still contains manual annotation save behavior not fully migrated to `app_dev.py`.
 
 Do not delete or broadly synchronize the secondary path without confirming the intended product behavior.
+
+## Startup Source-Update Boundary
+
+`run_desktop_app.py` calls the shared `desktop_app_source_updater` package before importing `fp_analysis_app`. App-specific release URLs, environment variables, allowed payload paths, and generated-data exclusions live in `startup_update_config.py`; reusable manifest, hash, download, config-merge, and rollback logic must stay in the shared package.
+
+`tools/build_update_asset.py` is only a thin app-specific argument wrapper around `desktop_app_source_updater.build_update_asset`. Build a later source-only asset with one `--from-ref` per supported packaged baseline:
+
+```powershell
+C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe tools\build_update_asset.py --from-ref <tag-or-commit> --to-ref <tag-or-commit>
+```
+
+The shared dependency is pinned in `requirements.txt` for reproducible packaging. Any change that introduces or upgrades that dependency must ship in a normal full package first. Only releases based on a package that already contains the compatible updater may use source-only assets.
+
+The repeatable full Windows build uses `fp_analysis_dist` and the portable spec under `packaging/windows/`:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\packaging\windows\make_full_app_zip.ps1
+```
+
+Use `-AllowDirty` only for a local packaging rehearsal. Release artifacts must come from a clean tracked worktree so the manifest and side-by-side `fp_analysis_app/` bytes resolve to one commit.
 
 ## Treaty Documentation Workflow
 
@@ -145,6 +165,7 @@ Use a short title line. If a commit contains multiple user-requested changes, ad
 - MAT visualization normally uses `fp_signal_names` plus `fp_frequency`. `mat_utils.py` supports an NE-only fallback using `ne` plus `ne_frequency`.
 - Annotation imports accept ordinary event spreadsheets (`event name` columns containing event times) and sleep-bout tables with `sleep_scores`, `start`, `end`, and `duration`.
 - Generated files under `cache/`, `data/`, `fp_analysis_app/assets/`, `build/`, and `dist/` may be local artifacts. Inspect before changing or deleting them.
-- `app.spec` contains machine-specific absolute paths and an `fp_analysis_dist` packaging environment. Treat it as packaging-specific and verify those paths before building.
+- `packaging/windows/` owns the portable PyInstaller spec, full-build script, release smoke checks, and packaging rationale. Generated `release_artifacts/`, `build/`, and `dist/` content is local output.
 - `environment.yml` and `setup.py` contain historical project naming and dependency metadata. The `fiber_photometry` environment and `requirements.txt` are the practical local runtime references unless a task explicitly modernizes packaging.
+- The startup updater implementation comes from the pinned `desktop_app_source_updater` dependency. Keep only app-specific configuration and CLI defaults in this repo; do not reintroduce a copied updater implementation.
 - This checkout can be intentionally dirty. Never sweep unrelated tracked or untracked files into a focused commit.

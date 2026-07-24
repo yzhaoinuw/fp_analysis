@@ -14,8 +14,10 @@ Users launch a small Python/pywebview desktop wrapper. The UI runs locally in Da
 
 - Starts the Dash server on the configured localhost port in a background thread.
 - Opens the application in a pywebview window.
+- Runs the shared source updater with app-specific settings from `startup_update_config.py` before importing application code.
 - Imports `fp_analysis_app.app_dev`, making that module the active desktop app.
 - Adds the app version to the native window title.
+- Supports headless `--smoke` package-import checks and `--check-update` installed-update checks.
 
 ### 2. Active Dash application
 
@@ -83,6 +85,15 @@ fp_analysis/
 |- README.md
 |- CHANGELOG.md
 |- run_desktop_app.py
+|- startup_update_config.py
+|- tools/
+|  `- build_update_asset.py
+|- packaging/
+|  `- windows/
+|     |- app.spec
+|     |- make_full_app_zip.ps1
+|     |- smoke_check_release.ps1
+|     `- README.md
 |- fp_analysis_app/
 |  |- app_dev.py
 |  |- components_dev.py
@@ -95,11 +106,12 @@ fp_analysis/
 |  |- pages/
 |  `- assets/
 |- tests/
-|  `- test_perievent_analysis.py
+|  |- test_perievent_analysis.py
+|  |- test_startup_update.py
+|  `- test_packaging.py
 |- .github/workflows/perievent-tests.yml
 |- requirements.txt
 |- environment.yml
-|- app.spec
 |- data/
 |- cache/
 |- build/
@@ -118,6 +130,7 @@ fp_analysis/
 - `fp_analysis_app/analysis_export.py`
 - `fp_analysis_app/export_settings.py`
 - `fp_analysis_app/make_figure.py`
+- `packaging/windows/`
 - `fp_analysis_app/mat_utils.py`
 - `fp_analysis_app/sleep_event_import.py`
 - `tests/test_perievent_analysis.py`
@@ -225,7 +238,6 @@ For most product work, read files in this order:
 ## Questions Worth Clarifying Later
 
 - Should manual annotation save/export behavior from `app.py` be migrated into `app_dev.py`, or should the secondary app remain supported?
-- Should packaging be rebuilt around a reproducible environment instead of the absolute paths currently embedded in `app.spec`?
 - Should `environment.yml` and `setup.py` be replaced or corrected to reflect the current `fp_analysis` product rather than its sleep-scoring ancestry?
 - The README documents a stale-results UI workaround after changing the second signal. Is that still reproducible in the current beta, and which callback should own the refresh?
 - Should annotation CSV files be supported as the desktop dialog promises, or should the selector be narrowed to verified Excel input?
