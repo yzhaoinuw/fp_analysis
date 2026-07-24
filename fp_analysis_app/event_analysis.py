@@ -543,7 +543,7 @@ class Perievent_Plots:
         assert (
             n_signals <= 2
         ), "More than two biosignals are detected in analysis results."
-        n_cols = 5
+        n_cols = 6
         fig, axes = plt.subplots(
             n_signals,
             n_cols,
@@ -553,7 +553,8 @@ class Perievent_Plots:
         for i, (biosignal_name, result) in enumerate(analysis_result.items()):
             perievent_signals_normalized = result["perievent_signals_normalized"]
             reaction_signal_auc = result["reaction_signal_auc"]
-            max_peak_magnitude = result["max_peak_magnitude"]
+            positive_peak_value = result["positive_peak_value"]
+            negative_peak_value = result["negative_peak_value"]
             first_peak_time = result["first_peak_time"]
             decay_time = result["decay_time"]
 
@@ -567,20 +568,25 @@ class Perievent_Plots:
             )
             self.plot_distribution(reaction_signal_auc, data_type="AUC", ax=axes[i, 1])
             self.plot_distribution(
-                max_peak_magnitude,
-                data_type="Max Peak Magnitude",
+                positive_peak_value,
+                data_type="Positive Peak Value",
                 ax=axes[i, 2],
+            )
+            self.plot_distribution(
+                negative_peak_value,
+                data_type="Negative Peak Value",
+                ax=axes[i, 3],
             )
             self.plot_distribution(
                 first_peak_time,
                 data_type="First Peak Time",
-                ax=axes[i, 3],
+                ax=axes[i, 4],
                 ylim=(0, self.nsec_after),
             )
             self.plot_distribution(
                 decay_time,
                 data_type="Decay Time",
-                ax=axes[i, 4],
+                ax=axes[i, 5],
                 ylim=(0, self.nsec_after),
             )
 
@@ -1063,6 +1069,15 @@ class Analyses:
                 first_peak_inds.append(np.nan)
         return np.array(first_peak_inds)
 
+    @staticmethod
+    def _values_at_peak_indices(reaction_signals, peak_indices):
+        peak_values = np.full(len(peak_indices), np.nan, dtype=float)
+        valid_peaks = ~np.isnan(peak_indices)
+        row_indices = np.arange(len(peak_indices))[valid_peaks]
+        column_indices = peak_indices[valid_peaks].astype(int)
+        peak_values[valid_peaks] = reaction_signals[row_indices, column_indices]
+        return peak_values
+
     def compute_decay_time(
         self, reaction_signals, baseline_mean_values, first_peak_inds
     ):
@@ -1098,15 +1113,24 @@ class Analyses:
         reaction_signals = self._get_reaction_signals(perievent_signals_normalized)
         reaction_signal_areas = np.mean(reaction_signals, axis=1)
         max_peaks = np.max(reaction_signals, axis=1)
-        first_peak_inds = self.find_first_peaks(reaction_signals)
-        first_peak_time = np.round(first_peak_inds / self.fp_freq)
+        first_positive_peak_inds = self.find_first_peaks(reaction_signals)
+        first_negative_peak_inds = self.find_first_peaks(-reaction_signals)
+        positive_peak_values = self._values_at_peak_indices(
+            reaction_signals,
+            first_positive_peak_inds,
+        )
+        negative_peak_values = self._values_at_peak_indices(
+            reaction_signals,
+            first_negative_peak_inds,
+        )
+        first_peak_time = np.round(first_positive_peak_inds / self.fp_freq)
         baseline_mean_perievent_signals_normalized = self._get_baseline_means(
             perievent_signals_normalized
         )
         decay_time_array = self.compute_decay_time(
             reaction_signals,
             baseline_mean_perievent_signals_normalized,
-            first_peak_inds,
+            first_positive_peak_inds,
         )
 
         return {
@@ -1114,6 +1138,8 @@ class Analyses:
             "perievent_signals_normalized": perievent_signals_normalized,
             "reaction_signal_auc": reaction_signal_areas,
             "max_peak_magnitude": max_peaks,
+            "positive_peak_value": positive_peak_values,
+            "negative_peak_value": negative_peak_values,
             "first_peak_time": first_peak_time,
             "decay_time": decay_time_array,
         }

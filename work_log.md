@@ -6,6 +6,31 @@ If today's date already appears at the top, add another `###` session under it r
 
 ## 2026-07-23
 
+### Accept and publish negative peak analysis plots (gpt-5)
+
+- Marked item 8 accepted after the user confirmed the desktop analysis plots render and work.
+- Negative peaks are found by applying the same `find_peaks` settings to the sign-flipped post-event reaction signal, then reading the detected index from the original signal so the reported value remains negative.
+- Prepared the focused analysis, tests, and coordination docs for commit and push on `negative-peaks`; item 9 export correction remains next on the same branch.
+- Verification:
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis` - 63 tests passed.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -c "import fp_analysis_app.analysis_export, fp_analysis_app.event_analysis, fp_analysis_app.mat_utils; print('import ok')"` - printed `import ok`.
+  - `git diff --check` - clean apart from Git line-ending conversion warnings.
+  - `C:\Users\yzhao\python_projects\agent_collab_treaty\.venv\Scripts\treaty.exe validate .` - passed.
+
+### Implement detected positive and negative peak plots (gpt-5)
+
+- Created and switched to the `negative-peaks` branch from the current `dev` tip so analysis plot work and the following export correction can share one focused branch.
+- Added first-detected positive and negative peak values using the same `find_peaks` settings on the reaction signal and its sign-flipped form.
+- Replaced the legacy max-value analysis panel with separate positive- and negative-peak panels while retaining the legacy export payload until item 9.
+- Added synthetic coverage for positive, negative, and missing peaks plus the six-panel analysis-figure contract.
+- A preview render could not be completed because the current Matplotlib environment exits in layout/render operations for both the unchanged five-panel control and the new six-panel figure; item 8 remains open for the planned user visual gate.
+- Verification:
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis.TestPerieventPeakAnalysis` - 2 tests passed.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis` - 63 tests passed.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -c "import fp_analysis_app.analysis_export, fp_analysis_app.event_analysis, fp_analysis_app.mat_utils; print('import ok')"` - printed `import ok`.
+  - `git diff --check` - clean apart from Git line-ending conversion warnings.
+  - `C:\Users\yzhao\python_projects\agent_collab_treaty\.venv\Scripts\treaty.exe validate .` - passed.
+
 ### Accept and publish perievent heatmap row improvements (gpt-5)
 
 - Marked adaptive black row dividers and corrected event-index labels accepted after the user's visual inspection.

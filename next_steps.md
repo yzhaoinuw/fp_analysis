@@ -12,7 +12,7 @@ Use this checklist alongside `work_log.md`. Keep only actionable engineering thr
 
 ## Analysis Workflow Feedback Update (gpt-5)
 
-Status: item 7 accepted; item 8 negative-peak analysis plots is next.
+Status: item 8 accepted; item 9 peak-value export correction is next on `negative-peaks`.
 
 Product goal: make the analysis flow clearer, make exclusions visible and respected by analysis, and fix peak metrics so plotted/exported values match detected positive and negative peaks.
 
@@ -76,10 +76,11 @@ Gated implementation checklist:
    - Keep labels readable and avoid crowding on high-count events.
    - Acceptance gate: accepted after visual inspection; heatmap rows are easier to distinguish, sparse event indices are correctly labeled from the bottom row upward, and signal intensity remains visible.
 
-8. Negative peak row in analysis plots.
+8. [x] Negative peak row in analysis plots.
    - Extend analysis results with negative peak detection by flipping reaction signals around `y=0` and reusing the same `find_peaks` settings.
    - Add a row or clearly separated plot area for negative peak values in the analysis plots.
    - Negative peak values should remain negative in plots and exports.
+   - Accepted after the user confirmed the desktop analysis plots render and work. Spreadsheet selection/naming remains item 9.
    - Acceptance gate: positive and negative peak summaries are both visible and correspond to detected peaks.
 
 9. Rename and correct peak-value exports.

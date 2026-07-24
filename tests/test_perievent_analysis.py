@@ -1,7 +1,7 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import numpy as np
 import pandas as pd
@@ -303,6 +303,77 @@ class TestPerieventHeatmapRowDividers(unittest.TestCase):
 
         self.assertGreater(sparse_style["linewidths"], dense_style["linewidths"])
         self.assertGreater(sparse_style["alpha"], dense_style["alpha"])
+
+
+class TestPerieventPeakAnalysis(unittest.TestCase):
+    def _make_analysis_result(self):
+        reaction_signals = np.zeros((3, 21), dtype=float)
+        reaction_signals[0, [2, 8]] = [2.0, 4.0]
+        reaction_signals[0, [5, 11]] = [-3.0, -5.0]
+        reaction_signals[1, 4] = -2.0
+        reaction_signals[2, 4] = 3.0
+
+        perievent_signals = np.column_stack(
+            [np.zeros(reaction_signals.shape[0]), reaction_signals]
+        )
+        analyses = Analyses(fp_freq=1, baseline_window=1)
+        return analyses.get_perievent_analyses(perievent_signals)
+
+    def test_analysis_uses_first_detected_positive_and_negative_peak_values(self):
+        result = self._make_analysis_result()
+
+        np.testing.assert_allclose(
+            result["positive_peak_value"],
+            np.array([2.0, np.nan, 3.0]),
+            equal_nan=True,
+        )
+        np.testing.assert_allclose(
+            result["negative_peak_value"],
+            np.array([-3.0, -2.0, np.nan]),
+            equal_nan=True,
+        )
+
+    def test_analysis_plot_has_separate_positive_and_negative_peak_panels(self):
+        result = self._make_analysis_result()
+        plots = Perievent_Plots(
+            fp_freq=1,
+            event="wake_nrem",
+            nsec_before=1,
+            nsec_after=20,
+        )
+        plots.plot_perievent_signals = Mock()
+        plots.plot_distribution = Mock()
+        fig = Mock()
+        axes = np.array([[Mock() for _ in range(6)]], dtype=object)
+
+        with patch(
+            "fp_analysis_app.event_analysis.plt.subplots",
+            return_value=(fig, axes),
+        ) as subplots:
+            plots.make_perievent_analysis_plots({"NE2m": result})
+
+            subplots.assert_called_once_with(1, 6, figsize=(24, 3))
+            data_types = [
+                call.kwargs["data_type"]
+                for call in plots.plot_distribution.call_args_list
+            ]
+            self.assertEqual(
+                [
+                    "AUC",
+                    "Positive Peak Value",
+                    "Negative Peak Value",
+                    "First Peak Time",
+                    "Decay Time",
+                ],
+                data_types,
+            )
+            negative_peak_call = plots.plot_distribution.call_args_list[2]
+            np.testing.assert_allclose(
+                negative_peak_call.args[0],
+                np.array([-3.0, -2.0, np.nan]),
+                equal_nan=True,
+            )
+            fig.tight_layout.assert_called_once_with()
 
 
 class TestFullRecordingEventTimestampLines(unittest.TestCase):
