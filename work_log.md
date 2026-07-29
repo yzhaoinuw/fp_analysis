@@ -6,6 +6,21 @@ If today's date already appears at the top, add another `###` session under it r
 
 ## 2026-07-28
 
+### Publish the `v0.6.0-dev2` updater 0.2.0 baseline (gpt-5)
+
+- Committed the updater integration and release metadata, pushed `auto-update`, and fast-forwarded `dev` and `main` to release commit `d65283828e0fbb55f36e6fb0935dbc26f37b7a75`.
+- Built the full Windows package from clean tracked `main` bytes with updater 0.2.0, then confirmed the provenance manifest records `tracked_worktree_dirty: false` and `source_export: git-blob-bytes`.
+- Published the annotated `v0.6.0-dev2` tag and a non-draft GitHub prerelease with the Windows ZIP, checksum, provenance manifest, and frozen build-environment requirements.
+- Kept the following normal source-update release version undecided because historical tag `v0.6.1` is already taken; the two existing app issues remain deferred for closer review.
+- Verification:
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis tests.test_startup_update tests.test_packaging` - 79 tests passed.
+  - Import and `py_compile` checks for the active analysis modules, launcher, updater config, and version module - passed.
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\packaging\windows\make_full_app_zip.ps1` - passed dependency checks, 79 tests, PyInstaller, structure smoke, packaged smoke, fresh-extraction smoke, hashing, and sidecar generation.
+  - Artifact SHA-256 recomputation matched `902912718AEA3B8C42F1F2EEA5CDB8791937EDE17685F5054D017E6519DA99A6`.
+  - GitHub release inspection - confirmed `v0.6.0-dev2` is a published prerelease with all four assets uploaded and the ZIP digest matching the local artifact.
+  - Remote-ref inspection - confirmed `auto-update`, `dev`, and `main` matched the release commit at publication and the annotated tag exists on origin.
+  - `git diff --check` and `C:\Users\yzhao\python_projects\agent_collab_treaty\.venv\Scripts\treaty.exe validate .` - passed.
+
 ### Adopt durable startup checks from updater 0.2.0 (gpt-5)
 
 - Compared the existing updater pin at `adb2221` with shared-package `main` commit `85bb68e` and adopted only the new downstream requirements: API-free latest-release discovery, an app-specific per-user check-state file, 24-hour throttling and persisted rate-limit backoff, update-available status, and forced explicit checks.
