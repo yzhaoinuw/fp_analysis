@@ -6,6 +6,20 @@ If today's date already appears at the top, add another `###` session under it r
 
 ## 2026-07-29
 
+### Correct the v0.6.0 local handoff and release title (gpt-5)
+
+- Copied the clean `v0.6.0` Windows ZIP and its three sidecars from the
+  dedicated `main_release` worktree into the primary checkout's
+  `release_artifacts/` folder so the distributable is visible in the expected
+  local location.
+- Renamed the GitHub Release title from `FP Analysis v0.6.0` to exactly
+  `v0.6.0` for consistency while leaving the release tag, notes, assets, and
+  package bytes unchanged.
+- Verification:
+  - SHA-256 comparison of all four source/destination artifacts - byte-for-byte matches.
+  - Primary artifact ZIP SHA-256 - `75CD2BEC810B0F1A91601EC3D9BE1EEB870F1993CE84755BD12CCC194386A7E1`.
+  - GitHub release inspection - confirmed title/tag `v0.6.0`, non-draft, non-prerelease, with all four assets still uploaded.
+
 ### Publish the canonical v0.6.0 user release (gpt-5)
 
 - Committed the CSV annotation import, stable major/minor package folder,
