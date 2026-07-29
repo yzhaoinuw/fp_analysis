@@ -6,6 +6,30 @@ If today's date already appears at the top, add another `###` session under it r
 
 ## 2026-07-29
 
+### Publish the canonical v0.6.0 user release (gpt-5)
+
+- Committed the CSV annotation import, stable major/minor package folder,
+  runtime version, release notes, and deferred follow-up plan as release commit
+  `03987f3235c1eb8949f1d9f505e5775d31823160`.
+- Pushed `dev`, fast-forwarded and pushed `main`, replaced the obsolete local
+  `v0.6.0` tag with an annotated tag at the release commit, and removed the
+  obsolete local-only `v0.6.1` tag so that version is available for a future
+  update. Neither legacy tag had a GitHub Release or remote ref.
+- Built the full Windows package from clean tracked `main` bytes. The artifact
+  retains the full `fp_analysis_app_v0.6.0-windows.zip` filename while its only
+  archive root is the update-stable `fp_analysis_app_v0.6` folder.
+- Published a non-draft, non-prerelease GitHub Release with the Windows ZIP,
+  SHA-256 sidecar, provenance manifest, and frozen build-environment
+  requirements. GitHub's latest-release redirect now resolves to `v0.6.0`.
+- Verification:
+  - Clean `powershell -NoProfile -ExecutionPolicy Bypass -File .\packaging\windows\make_full_app_zip.ps1` - passed dependency checks, 84 tests with 8 private-fixture skips, PyInstaller, release-structure smoke, packaged smoke, fresh-extraction smoke, hashing, and sidecar generation.
+  - The clean manifest records `version: v0.6.0`, `package_folder: fp_analysis_app_v0.6`, `git_commit: 03987f3...`, `tracked_worktree_dirty: false`, `source_export: git-blob-bytes`, and updater 0.2.0.
+  - Local SHA-256 recomputation and the uploaded GitHub asset digest matched `75CD2BEC810B0F1A91601EC3D9BE1EEB870F1993CE84755BD12CCC194386A7E1`.
+  - ZIP inspection - confirmed one top-level folder, `fp_analysis_app_v0.6`, containing 3,335 entries.
+  - GitHub release inspection - confirmed all four assets uploaded and release `https://github.com/yzhaoinuw/fp_analysis/releases/tag/v0.6.0` is published, non-draft, and non-prerelease.
+  - Latest-release HEAD request - returned `302` to `https://github.com/yzhaoinuw/fp_analysis/releases/tag/v0.6.0`.
+  - Remote-ref inspection - confirmed `origin/dev`, `origin/main`, and `v0.6.0^{}` matched `03987f3`; no `v0.6.1` remote ref exists.
+
 ### Prepare the canonical v0.6.0 release (gpt-5)
 
 - Set the runtime version to `v0.6.0` and consolidated the final user-facing
