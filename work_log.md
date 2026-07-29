@@ -4,6 +4,67 @@ Prepend new session notes to this file. The live log holds at most the five most
 
 If today's date already appears at the top, add another `###` session under it rather than creating a duplicate date heading. Each substantive session needs compact model metadata and a `- Verification:` subsection containing commands that were actually run.
 
+## 2026-07-29
+
+### Prepare the canonical v0.6.0 release (gpt-5)
+
+- Set the runtime version to `v0.6.0` and consolidated the final user-facing
+  release notes across the updater, annotation, analysis, and package-folder
+  changes.
+- Moved the stale two-signal analysis refresh and first source-only updater
+  trial into explicitly deferred future-update work, with the distributed
+  `v0.6.0` package as the new updater 0.2.0 baseline.
+- Confirmed that the obsolete local `v0.6.0` and `v0.6.1` tags have no matching
+  remote refs or GitHub Releases; release delivery will replace `v0.6.0` and
+  remove `v0.6.1`.
+- Verification:
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis tests.test_startup_update tests.test_packaging` - 84 tests passed.
+  - `$env:FP_ANALYSIS_SKIP_UPDATE='1'; C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe run_desktop_app.py --smoke` - printed `smoke ok: v0.6.0`.
+  - Active analysis-module import smoke - printed `import ok v0.6.0`.
+  - Local/remote tag and GitHub Release inspection - confirmed only local legacy `v0.6.0` and `v0.6.1` tags, with no corresponding GitHub Releases.
+  - `git diff --check` - passed with only line-ending conversion warnings.
+  - `C:\Users\yzhao\python_projects\agent_collab_treaty\.venv\Scripts\treaty.exe validate .` - passed.
+
+### Keep the packaged app folder on the release line (gpt-5)
+
+- Split Windows package naming so full-version artifact files retain release
+  provenance while the extracted and `dist/` app folder uses the stable
+  major/minor release line, such as `fp_analysis_app_v0.6`.
+- Added one shared naming helper used by both the PowerShell builder and
+  PyInstaller spec, recorded the package folder in the manifest, and added
+  regression coverage for stable patch/prerelease naming and invalid versions.
+- Updated the installation, packaging, and changelog wording to distinguish the
+  full-version ZIP name from its major/minor root folder.
+- Produced an ignored dirty-worktree rehearsal artifact at
+  `release_artifacts/fp_analysis_app_v0.6.0-dev2-windows.zip`; its only archive
+  root is `fp_analysis_app_v0.6`, and its manifest records the same package
+  folder. The rehearsal SHA-256 is
+  `E1A2A4309B2C198CDF6A599986ADC02CDE844EA2C5F7C6D5F6AD0FA6519B70E1`.
+- Verification:
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_packaging` - 4 tests passed.
+  - `C:\Users\yzhao\miniconda3\envs\fp_analysis_dist\python.exe packaging\windows\package_folder_name.py v0.6.0-dev2` - printed `fp_analysis_app_v0.6`.
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\packaging\windows\make_full_app_zip.ps1 -AllowDirty` - passed dependency checks, 84 tests, PyInstaller, release-structure smoke, packaged smoke, fresh-extraction smoke, hashing, and sidecar generation.
+  - ZIP root and manifest inspection - confirmed `fp_analysis_app_v0.6` while the artifact retained the full `v0.6.0-dev2` version.
+  - `git diff --check` - passed with only line-ending conversion warnings.
+  - `C:\Users\yzhao\python_projects\agent_collab_treaty\.venv\Scripts\treaty.exe validate .` - passed.
+
+### Support CSV annotation imports (gpt-5)
+
+- Matched the active desktop file-dialog contract by routing `.csv` annotation
+  paths through `pandas.read_csv()` while retaining the existing Excel reader
+  for `.xlsx` paths.
+- Added focused file-backed coverage for transition-table and sleep-bout CSV
+  imports, including case-insensitive extension handling, plus an Excel-reader
+  regression check.
+- Updated the README, changelog, project overview, and active next steps to
+  record CSV as supported and close the annotation-file mismatch.
+- Verification:
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis.TestAnnotationFileImport` - 3 tests passed.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis tests.test_startup_update tests.test_packaging` - 82 tests passed.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -c "import fp_analysis_app.app_dev, fp_analysis_app.analysis_export, fp_analysis_app.event_analysis, fp_analysis_app.mat_utils; print('import ok')"` - passed.
+  - `git diff --check` - passed with only line-ending conversion warnings.
+  - `C:\Users\yzhao\python_projects\agent_collab_treaty\.venv\Scripts\treaty.exe validate .` - passed.
+
 ## 2026-07-28
 
 ### Publish the `v0.6.0-dev2` updater 0.2.0 baseline (gpt-5)

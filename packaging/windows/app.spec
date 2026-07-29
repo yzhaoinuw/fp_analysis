@@ -8,8 +8,10 @@ import sys
 
 ROOT = Path(os.environ.get("FP_ANALYSIS_REPO_ROOT", Path.cwd())).resolve()
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "packaging" / "windows"))
 
 from fp_analysis_app import VERSION  # noqa: E402
+from package_folder_name import get_package_folder_name  # noqa: E402
 
 
 def package_dir(package_name):
@@ -111,5 +113,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name=f"fp_analysis_app_{VERSION}",
+    name=get_package_folder_name(VERSION),
 )

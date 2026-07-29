@@ -94,14 +94,18 @@ $Version = Invoke-NativeCapture -FilePath $BuildPython -CommandArgs @(
 )
 $Version = $Version.Trim()
 
-$DistName = "fp_analysis_app_$Version"
-$DistPath = Join-Path $Repo "dist\$DistName"
-$ZipPath = Join-Path $ArtifactDir "$DistName-windows.zip"
+$PackageFolderName = Invoke-NativeCapture -FilePath $BuildPython -CommandArgs @(
+    "packaging\windows\package_folder_name.py",
+    $Version
+)
+$ArtifactBaseName = "fp_analysis_app_$Version"
+$DistPath = Join-Path $Repo "dist\$PackageFolderName"
+$ZipPath = Join-Path $ArtifactDir "$ArtifactBaseName-windows.zip"
 $SpecPath = Join-Path $ScriptDir "app.spec"
 
 New-Item -ItemType Directory -Force -Path $ArtifactDir | Out-Null
 
-Write-Host "Building $DistName"
+Write-Host "Building $ArtifactBaseName into folder $PackageFolderName"
 Write-Host "Build Python: $BuildPython"
 Write-Host "Test Python:  $TestPython"
 
@@ -195,7 +199,7 @@ $FreshSmokeRoot = Join-Path $Repo "build\release_smoke"
 Remove-RepoBuildPath -Path $FreshSmokeRoot
 try {
     Expand-Archive -LiteralPath $ZipPath -DestinationPath $FreshSmokeRoot
-    $FreshDistPath = Join-Path $FreshSmokeRoot $DistName
+    $FreshDistPath = Join-Path $FreshSmokeRoot $PackageFolderName
     if (-not (Test-Path -LiteralPath $FreshDistPath)) {
         throw "Fresh extraction is missing the expected app folder: $FreshDistPath"
     }
@@ -225,6 +229,7 @@ $Freeze | Set-Content -LiteralPath "$ZipPath.build_env_requirements.txt" -Encodi
 
 $Manifest = [ordered]@{
     version = $Version
+    package_folder = $PackageFolderName
     kind = "full-windows"
     branch = Invoke-NativeCapture -FilePath "git" -CommandArgs @(
         "branch",

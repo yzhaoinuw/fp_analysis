@@ -190,7 +190,9 @@ Other optional fields, such as sleep labels and video timing metadata, are used 
 
 ### Annotation input
 
-Verified annotation input is `.xlsx`. The desktop dialog also offers `.csv`, but the current file-path reader calls `pandas.read_excel()`; CSV should be treated as an unresolved contract/implementation mismatch until it is tested and fixed.
+Annotation input accepts `.xlsx` and `.csv` files. The file extension selects the
+matching pandas reader, and both file types use the same event-format detection
+and filtering rules.
 
 Two annotation spreadsheet formats are supported:
 
@@ -241,4 +243,3 @@ For most product work, read files in this order:
 - Should manual annotation save/export behavior from `app.py` be migrated into `app_dev.py`, or should the secondary app remain supported?
 - Should `environment.yml` and `setup.py` be replaced or corrected to reflect the current `fp_analysis` product rather than its sleep-scoring ancestry?
 - The README documents a stale-results UI workaround after changing the second signal. Is that still reproducible in the current beta, and which callback should own the refresh?
-- Should annotation CSV files be supported as the desktop dialog promises, or should the selector be narrowed to verified Excel input?

@@ -4,8 +4,8 @@
 
 ## Installation
 1. Go to the [fp_analysis folder](https://uofr-my.sharepoint.com/:f:/r/personal/yzhao38_ur_rochester_edu/Documents/fp_analysis_project?csf=1&web=1&e=JIeIs6) on OneDrive. Contact Yue if you can't access it.
-2. Download **fp_analysis_app_vx.zip** (the "**x**" in the suffix "**vx**" denotes the current version). Note that if you unzip it to the same location where the zip file is, you may end up with a nested folder, ie., a "fp_analysis_app_vx" inside a "fp_analysis_app_vx". If this is the case , it may be better to peel it and move the inner "fp_analysis_app_vx" somewhere else and delete the outer "fp_analysis_app_vx".  
-3. Examine the content of the unzipped "fp_analysis_app_vx". It should contain three folders and an .exe file: 1) **_internal**, 2) **fp_analysis_app**, and 3) **run_fp_analysis_app.exe**.
+2. Download the current **fp_analysis_app_vX.Y.Z-windows.zip** package. Note that if you unzip it to the same location where the zip file is, you may end up with a nested folder. If this happens, move the inner app folder somewhere else and delete the empty outer folder.
+3. Examine the unzipped **fp_analysis_app_vX.Y** folder. The folder name stays on the major/minor release line because patch-level source updates are applied in place. It should contain **_internal**, **fp_analysis_app**, **run_fp_analysis_app.exe**, and **unblock_app.cmd**.
 4. If the package contains `unblock_app.cmd`, double-click it to unblock the downloaded files and start the app. For an older package without that helper, open PowerShell and run:
 ```bash
 cd PATH_TO_YOUR_APP_FOLDER
@@ -59,8 +59,8 @@ Spreadsheet exports are grouped into a setup-specific subfolder based on:
 
 For the same analysis setup, different subjects append into the same workbook set. If the same subject is exported again with the same setup, that subject's columns are updated instead of duplicated. Each export folder also includes a `data_description.txt` file that records the analyzed data source, setup details, and saved analysis types.
 
-### Annotation Spreadsheet Formats
-Annotation spreadsheets should be `.xlsx` files. The app accepts two event formats:
+### Annotation File Formats
+Annotation files may be `.xlsx` or `.csv`. The app accepts two event formats:
 
 ```text
 Transition table

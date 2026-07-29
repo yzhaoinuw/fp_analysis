@@ -7,6 +7,47 @@ from tempfile import TemporaryDirectory
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 EXPORT_SCRIPT = REPO_ROOT / "packaging" / "windows" / "export_runtime_from_git.py"
+PACKAGE_FOLDER_NAME_SCRIPT = (
+    REPO_ROOT / "packaging" / "windows" / "package_folder_name.py"
+)
+
+
+class TestPackageFolderName(unittest.TestCase):
+    def test_uses_major_minor_release_line_for_stable_folder_name(self):
+        self.assertEqual(
+            "fp_analysis_app_v0.6",
+            self._get_package_folder_name("v0.6.0"),
+        )
+        self.assertEqual(
+            "fp_analysis_app_v0.6",
+            self._get_package_folder_name("v0.6.9"),
+        )
+        self.assertEqual(
+            "fp_analysis_app_v0.6",
+            self._get_package_folder_name("v0.6.0-dev2"),
+        )
+        self.assertEqual(
+            "fp_analysis_app_v0.3",
+            self._get_package_folder_name("v0.3-dev"),
+        )
+
+    def test_rejects_version_without_major_minor_release_line(self):
+        result = subprocess.run(
+            [sys.executable, str(PACKAGE_FOLDER_NAME_SCRIPT), "not-a-version"],
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("Could not determine", result.stderr)
+
+    def _get_package_folder_name(self, version):
+        return subprocess.run(
+            [sys.executable, str(PACKAGE_FOLDER_NAME_SCRIPT), version],
+            capture_output=True,
+            check=True,
+            text=True,
+        ).stdout.strip()
 
 
 class TestRuntimeExport(unittest.TestCase):

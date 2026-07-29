@@ -39,6 +39,11 @@ fp_analysis_app_vX.Y.Z-windows.zip.sha256.txt
 fp_analysis_app_vX.Y.Z-windows.zip.build_env_requirements.txt
 ```
 
+The artifact filenames retain the full release version for provenance. Inside
+the ZIP, the top-level app folder uses only the major/minor release line:
+`fp_analysis_app_vX.Y`. Patch-level source updates can therefore update the app
+without leaving the installed folder name stale.
+
 The build:
 
 1. checks the build environment and runs the focused unittest suites;
@@ -47,7 +52,8 @@ The build:
 4. adds writable figure, spreadsheet, and video directories;
 5. validates the release layout and runs the packaged executable with
    `--smoke`;
-6. extracts the ZIP afresh and runs `unblock_app.cmd --smoke`;
+6. confirms the fresh ZIP extracts to `fp_analysis_app_vX.Y` and runs
+   `unblock_app.cmd --smoke`;
 7. creates the SHA-256 sidecar, build-environment snapshot, and manifest.
 
 The full ZIP includes `unblock_app.cmd`, which unblocks the extracted files and

@@ -164,7 +164,10 @@ class Event_Utils:
         min_time = self.nsec_before
         max_time = self.duration - self.nsec_after
         if df_events is None:
-            df_events = pd.read_excel(event_file)
+            if Path(event_file).suffix.lower() == ".csv":
+                df_events = pd.read_csv(event_file)
+            else:
+                df_events = pd.read_excel(event_file)
         if is_sleep_bout_table(df_events):
             event_time_dict = sleep_bout_table_to_event_time_dict(
                 df_events,

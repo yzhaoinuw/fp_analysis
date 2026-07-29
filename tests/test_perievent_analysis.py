@@ -764,6 +764,72 @@ class TestSleepBoutTableImport(unittest.TestCase):
         )
 
 
+class TestAnnotationFileImport(unittest.TestCase):
+    def setUp(self):
+        self.event_utils = Event_Utils(
+            fp_freq=1,
+            duration=400,
+            nsec_before=30,
+            nsec_after=60,
+        )
+
+    def test_reads_transition_table_from_csv_file(self):
+        df = pd.DataFrame(
+            {
+                "wake_nrem": [20, 40, 100, None],
+                "nrem_rem": [80, None, None, None],
+            }
+        )
+
+        with TemporaryDirectory() as temp_dir:
+            csv_path = Path(temp_dir) / "annotations.CSV"
+            df.to_csv(csv_path, index=False)
+
+            events = self.event_utils.read_events(event_file=csv_path)
+
+        self.assertEqual(
+            {"wake_nrem": [40, 100], "nrem_rem": [80]},
+            {key: value.tolist() for key, value in events.items()},
+        )
+
+    def test_reads_sleep_bout_table_from_csv_file(self):
+        df = pd.DataFrame(
+            {
+                "sleep_scores": [1, 2, 3, 1],
+                "start": [0, 40, 80, 120],
+                "end": [39, 79, 119, 159],
+                "duration": [40, 40, 40, 40],
+            }
+        )
+
+        with TemporaryDirectory() as temp_dir:
+            csv_path = Path(temp_dir) / "sleep_bouts.csv"
+            df.to_csv(csv_path, index=False)
+
+            events = self.event_utils.read_events(event_file=csv_path)
+
+        self.assertEqual(
+            {
+                "wake_nrem": [40],
+                "nrem_rem": [80],
+                "rem_wake": [120],
+            },
+            {key: value.tolist() for key, value in events.items()},
+        )
+
+    @patch("fp_analysis_app.event_analysis.pd.read_excel")
+    def test_keeps_excel_reader_for_xlsx_file(self, read_excel):
+        read_excel.return_value = pd.DataFrame({"wake_nrem": [40, 100]})
+
+        events = self.event_utils.read_events(event_file=Path("annotations.xlsx"))
+
+        read_excel.assert_called_once_with(Path("annotations.xlsx"))
+        self.assertEqual(
+            {"wake_nrem": [40, 100]},
+            {key: value.tolist() for key, value in events.items()},
+        )
+
+
 class TestEventBoundaryFiltering(unittest.TestCase):
     def test_filters_event_times_that_exceed_available_signal_samples(self):
         fp_freq = 1017.2526245117188

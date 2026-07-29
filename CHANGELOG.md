@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.6.0
+
+- import `.csv` annotation files offered by the desktop file dialog, including
+  transition tables and sleep-bout tables
+- keep the extracted Windows app folder on the major/minor release line so
+  patch-level source updates do not make its name stale
+- check for safe source-only updates before desktop startup with API-free
+  release discovery, durable throttling/backoff, rollback, and forced checks
+- detect and plot positive and negative peaks and export their detected values
+- show event timestamps on the full recording and support rectangle deletion,
+  save, and undo for event annotations
+- improve analysis controls, heatmap labels, signal-selection guidance, and
+  analysis status messages
+
 ## v0.6.0-dev2
 
 - bundle the shared startup updater 0.2.0 in the full Windows package
