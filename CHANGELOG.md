@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.6.0-dev2
+
+- bundle the shared startup updater 0.2.0 in the full Windows package
+- limit ordinary release checks to once per 24 hours while preserving GitHub
+  rate-limit backoff
+- use API-free latest-release discovery and let explicit update checks bypass
+  the normal interval
+
 ## v0.6.0-dev
 
 - check for safe source-only updates before desktop startup while preserving the
