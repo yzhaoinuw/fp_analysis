@@ -76,7 +76,9 @@ Do not delete or broadly synchronize the secondary path without confirming the i
 
 ## Startup Source-Update Boundary
 
-`run_desktop_app.py` calls the shared `desktop_app_source_updater` package before importing `fp_analysis_app`. App-specific release URLs, environment variables, allowed payload paths, and generated-data exclusions live in `startup_update_config.py`; reusable manifest, hash, download, config-merge, and rollback logic must stay in the shared package.
+`run_desktop_app.py` calls the shared `desktop_app_source_updater` package before importing `fp_analysis_app`. App-specific release URLs, per-user check-state location, environment variables, allowed payload paths, and generated-data exclusions live in `startup_update_config.py`; reusable discovery, throttling/backoff, manifest, hash, download, config-merge, and rollback logic must stay in the shared package.
+
+Normal startup uses GitHub's ordinary `/releases/latest` redirect and persists a 24-hour check interval under the user's local application-data folder. `--check-update` must call the updater with `force_check=True`; `FP_ANALYSIS_FORCE_UPDATE_CHECK=1` is the environment-variable equivalent.
 
 `tools/build_update_asset.py` is only a thin app-specific argument wrapper around `desktop_app_source_updater.build_update_asset`. Build a later source-only asset with one `--from-ref` per supported packaged baseline:
 

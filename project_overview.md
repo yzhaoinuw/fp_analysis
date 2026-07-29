@@ -15,9 +15,10 @@ Users launch a small Python/pywebview desktop wrapper. The UI runs locally in Da
 - Starts the Dash server on the configured localhost port in a background thread.
 - Opens the application in a pywebview window.
 - Runs the shared source updater with app-specific settings from `startup_update_config.py` before importing application code.
+- Uses API-free latest-release discovery plus a per-user state file to limit ordinary checks to once per 24 hours and preserve GitHub rate-limit backoff.
 - Imports `fp_analysis_app.app_dev`, making that module the active desktop app.
 - Adds the app version to the native window title.
-- Supports headless `--smoke` package-import checks and `--check-update` installed-update checks.
+- Supports headless `--smoke` package-import checks and forced `--check-update` installed-update checks that bypass the normal interval.
 
 ### 2. Active Dash application
 

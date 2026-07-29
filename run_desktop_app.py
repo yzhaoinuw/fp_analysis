@@ -23,12 +23,24 @@ else:
 # Insert base_path FIRST so that fp_analysis_app/ next to .exe overrides bundled version
 sys.path.insert(0, base_path)
 
-def check_for_startup_update():
+
+def show_update_available(installed_version, target_version):
+    print(
+        f"[startup-update] updating from {installed_version} to {target_version}",
+        flush=True,
+    )
+
+
+def check_for_startup_update(*, force_check=False):
     try:
         from desktop_app_source_updater import format_update_message, run_startup_update
         from startup_update_config import build_startup_update_config
 
-        result = run_startup_update(build_startup_update_config(base_path))
+        config = build_startup_update_config(
+            base_path,
+            on_update_available=show_update_available,
+        )
+        result = run_startup_update(config, force_check=force_check)
         update_message = format_update_message(result)
         if update_message:
             print(f"[startup-update] {update_message}", flush=True)
@@ -51,9 +63,10 @@ def main():
     global app, WINDOW_CONFIG, PORT
 
     multiprocessing.freeze_support()
-    update_result = check_for_startup_update()
+    explicit_update_check = "--check-update" in sys.argv[1:]
+    update_result = check_for_startup_update(force_check=explicit_update_check)
 
-    if "--check-update" in sys.argv[1:]:
+    if explicit_update_check:
         if update_result is None:
             return 1
         print(f"[startup-update] status: {update_result.status}", flush=True)

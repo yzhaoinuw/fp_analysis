@@ -4,6 +4,27 @@ Prepend new session notes to this file. The live log holds at most the five most
 
 If today's date already appears at the top, add another `###` session under it rather than creating a duplicate date heading. Each substantive session needs compact model metadata and a `- Verification:` subsection containing commands that were actually run.
 
+## 2026-07-28
+
+### Adopt durable startup checks from updater 0.2.0 (gpt-5)
+
+- Compared the existing updater pin at `adb2221` with shared-package `main` commit `85bb68e` and adopted only the new downstream requirements: API-free latest-release discovery, an app-specific per-user check-state file, 24-hour throttling and persisted rate-limit backoff, update-available status, and forced explicit checks.
+- Pinned updater 0.2.0 at full commit `85bb68e42155ad8b661f669df8d281fbe683a045` in both the runtime requirements and CI, then installed that exact revision in the `fiber_photometry` and `fp_analysis_dist` environments.
+- Moved normal discovery to GitHub's ordinary `/releases/latest` redirect, stored durable state under the user's local application-data folder, and made `--check-update` pass `force_check=True` so package gates and troubleshooting are never suppressed by the normal interval.
+- Recorded that normal latest-release discovery excludes GitHub prereleases; prerelease-only gates should use the direct update-zip override.
+- Kept `tools/build_update_asset.py` unchanged because it already forwards the shared builder's multiple-baseline and schema-2 arguments. No Python config-merge path was declared because this app has no updater-managed user-editable Python configuration.
+- Confirmed that the published `v0.6.0-dev` package contains updater 0.1.0; updater 0.2.0 therefore requires a new full package before the following source-only release can test it.
+- Produced an ignored dirty-worktree rehearsal ZIP with updater 0.2.0 and matching SHA-256 `AE5A68A7E2A2B8B7A5C303B6B98F2E358A1CD6803199B4753749C8C5FD76EEB9`; it is packaging evidence, not a release candidate.
+- Verification:
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m pip install --no-deps --disable-pip-version-check --force-reinstall "desktop-app-source-updater @ git+https://github.com/yzhaoinuw/desktop_app_source_updater.git@85bb68e42155ad8b661f669df8d281fbe683a045"` - installed updater 0.2.0 from the pinned commit.
+  - The equivalent install command in `fp_analysis_dist` - installed the same updater version and commit in the packaging environment.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis tests.test_startup_update tests.test_packaging` - 79 tests passed.
+  - Import and `py_compile` checks for the active analysis modules, launcher, updater config, and updater tests - passed.
+  - `$env:FP_ANALYSIS_SKIP_UPDATE='1'; C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe run_desktop_app.py --check-update` - returned the expected disabled status and exit code 1.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe tools\build_update_asset.py --help` - exposed the shared multiple-installed-baseline and schema-2 config-merge options.
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\packaging\windows\make_full_app_zip.ps1 -AllowDirty` - passed dependency checks, 79 tests, PyInstaller, structure smoke, packaged smoke, fresh-extraction smoke, hashing, and sidecar generation with updater 0.2.0 in the manifest.
+  - `git diff --check` and `C:\Users\yzhao\python_projects\agent_collab_treaty\.venv\Scripts\treaty.exe validate .` - passed.
+
 ## 2026-07-24
 
 ### Publish the `v0.6.0-dev` updater baseline (gpt-5)

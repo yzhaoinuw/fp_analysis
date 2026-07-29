@@ -7,5 +7,5 @@ openpyxl==3.1.5
 XlsxWriter==3.2.0
 pywebview==6.1
 matplotlib==3.10.7
-desktop-app-source-updater @ git+https://github.com/yzhaoinuw/desktop_app_source_updater.git@adb2221393ab6fab106f7cef19baf6157e039bd3
+desktop-app-source-updater @ git+https://github.com/yzhaoinuw/desktop_app_source_updater.git@85bb68e42155ad8b661f669df8d281fbe683a045
 #packaging==21.3.0

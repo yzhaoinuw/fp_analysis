@@ -19,7 +19,7 @@ To open the app, double click "run_fp_analysis_app.exe" and it will open the app
 
 ### Startup Source Updates
 
-Starting with the next full package that includes the shared updater dependency, the app checks its latest GitHub Release for a verified source-update zip before loading the interface. Internet access is optional: if GitHub is unavailable or no compatible source asset exists, startup continues with the installed version.
+Starting with a full package that includes the shared updater dependency, the app checks its latest GitHub Release for a verified source-update zip before loading the interface. Ordinary launches make at most one release check per 24 hours using a small per-user state file; an explicit `--check-update` run bypasses that interval. Internet access is optional: if GitHub is unavailable or no compatible source asset exists, startup continues with the installed version.
 
 Source-update zips can replace only approved files under `fp_analysis_app/`. They verify downloaded hashes and known installed-file baselines, support jumping over compatible skipped versions, and refuse to overwrite unrecognized local edits. Dependency, packaging, build, generated-data, deletion, and rename changes still require a normal full packaged release.
 

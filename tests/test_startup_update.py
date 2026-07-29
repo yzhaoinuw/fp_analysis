@@ -1,5 +1,6 @@
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -7,9 +8,10 @@ import unittest
 import zipfile
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from desktop_app_source_updater import run_startup_update
-from startup_update_config import build_startup_update_config
+from startup_update_config import LATEST_RELEASE_URL, build_startup_update_config
 
 
 def sha256(data):
@@ -120,10 +122,24 @@ class TestStartupUpdate(unittest.TestCase):
         with TemporaryDirectory() as temp_dir:
             fixture = ReleaseZipFixture(temp_dir)
 
-            config = fixture.config()
+            with patch.dict(os.environ, {"LOCALAPPDATA": temp_dir}):
+                config = fixture.config()
 
             self.assertEqual("fp_analysis", config.app_name)
             self.assertEqual("fp_analysis_app/__init__.py", config.installed_version_file)
+            self.assertEqual(LATEST_RELEASE_URL, config.latest_release_url)
+            self.assertEqual(
+                Path(temp_dir) / "fp_analysis" / "update-check.json",
+                config.check_state_file,
+            )
+            self.assertEqual(
+                "FP_ANALYSIS_UPDATE_LATEST_RELEASE_URL",
+                config.latest_release_env,
+            )
+            self.assertEqual(
+                "FP_ANALYSIS_FORCE_UPDATE_CHECK",
+                config.force_check_env,
+            )
             self.assertEqual(("fp_analysis_app/",), config.allowed_payload_paths)
             self.assertEqual("fp_analysis_app_update_", config.asset_prefix)
             self.assertIn("fp_analysis_app/assets/videos/", config.blocked_path_prefixes)
@@ -215,7 +231,10 @@ class TestStartupUpdate(unittest.TestCase):
             release_metadata = fixture.build_release_metadata(update_zip)
 
             result = run_startup_update(
-                fixture.config(release_api_url=str(release_metadata))
+                fixture.config(
+                    latest_release_url="",
+                    release_api_url=str(release_metadata),
+                )
             )
 
             self.assertEqual("updated", result.status)
@@ -231,6 +250,33 @@ class TestStartupUpdate(unittest.TestCase):
 
             self.assertEqual("up-to-date", result.status)
             self.assertEqual("APP_VALUE = 'old'\n", fixture.read_app_file("fp_analysis_app/app_dev.py"))
+
+    def test_launcher_forces_explicit_update_checks(self):
+        import run_desktop_app
+
+        update_result = object()
+        with (
+            patch(
+                "startup_update_config.build_startup_update_config",
+                return_value="config",
+            ) as build_config,
+            patch(
+                "desktop_app_source_updater.run_startup_update",
+                return_value=update_result,
+            ) as run_update,
+            patch(
+                "desktop_app_source_updater.format_update_message",
+                return_value="",
+            ),
+        ):
+            result = run_desktop_app.check_for_startup_update(force_check=True)
+
+        self.assertIs(update_result, result)
+        self.assertIs(
+            run_desktop_app.show_update_available,
+            build_config.call_args.kwargs["on_update_available"],
+        )
+        run_update.assert_called_once_with("config", force_check=True)
 
 
 class TestBuildUpdateAsset(unittest.TestCase):

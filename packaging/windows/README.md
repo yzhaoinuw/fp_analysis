@@ -7,7 +7,8 @@ an updater-enabled Windows baseline and validate later source-only releases.
 
 Use a full package when dependencies, the launcher, the shared updater,
 PyInstaller settings, file deletions/renames, or the runtime layout changed.
-The updater migration itself therefore requires a full package.
+Adding or upgrading the updater therefore requires a full package before later
+source-only updates can rely on that updater version.
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\packaging\windows\make_full_app_zip.ps1
@@ -67,10 +68,14 @@ to jump to the new version. Attach the generated
 `fp_analysis_app_update_<version>.zip` to the matching GitHub Release.
 
 For the installed-user test, run the baseline executable with
-`--check-update`. The command exits without opening the GUI, reports the updater
-status, imports the resulting side-by-side app version after a successful check,
-and returns a nonzero exit code for failed, blocked, skipped, or disabled
-updates.
+`--check-update`. The command forces a release check even inside the normal
+24-hour interval, exits without opening the GUI, reports the updater status,
+imports the resulting side-by-side app version after a successful check, and
+returns a nonzero exit code for failed, blocked, skipped, or disabled updates.
+Normal discovery follows GitHub's `/releases/latest` redirect, which excludes
+prereleases. Publish the source-update test as a normal release, or point
+`FP_ANALYSIS_UPDATE_ZIP_URL` directly at the test asset during a prerelease-only
+gate.
 
 The full-package exporter writes exact Git-blob bytes into clean release builds,
 so the source-update builder can use Git refs as the installed hash baselines.

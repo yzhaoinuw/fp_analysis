@@ -5,7 +5,7 @@ Use this checklist alongside `work_log.md`. Keep only actionable engineering thr
 ## Currently Hot
 
 - [v0.5.0-beta stabilization](#v050-beta-stabilization-gpt-5) - reproduce and fix the stale analysis-result refresh reported after changing a second signal.
-- [Startup auto-update integration](#startup-auto-update-integration-gpt-5) - use the published `v0.6.0-dev` full-package baseline to smoke-test the next source-only release.
+- [Startup auto-update integration](#startup-auto-update-integration-gpt-5) - ship updater 0.2.0 in a new full-package baseline, then smoke-test the following source-only release.
 - [Desktop runtime convergence](#desktop-runtime-convergence-gpt-5) - decide whether the manual annotation save flow in `app.py` belongs in the active desktop runtime.
 
 ## v0.5.0-beta Stabilization (gpt-5)
@@ -24,18 +24,19 @@ Remaining work:
 
 ## Startup Auto-Update Integration (gpt-5)
 
-Status: the app-local prototype has been migrated to the pinned `desktop_app_source_updater` package, and the clean `v0.6.0-dev` Windows package is published as the updater test baseline; a real later source update remains.
+Status: updater 0.2.0 is pinned and wired with API-free release discovery, durable per-user check throttling/backoff, and forced explicit checks. The focused suite and a dirty full-package rehearsal pass; a clean full-package release remains. The published `v0.6.0-dev` package contains updater 0.1.0 and remains useful historical evidence, but it cannot acquire the updater dependency upgrade through a source-only asset.
 
-The launcher delegates source-update discovery, manifest validation, hash/baseline checks, config merging, and rollback to the shared package before importing the active app. `startup_update_config.py` holds only the `fp_analysis` release URL, environment-variable names, allowed `fp_analysis_app/` payload boundary, and generated-data exclusions. `tools/build_update_asset.py` is now a thin app-specific wrapper around the shared builder.
+The launcher delegates release discovery, durable throttling/backoff, manifest validation, hash/baseline checks, config merging, and rollback to the shared package before importing the active app. `startup_update_config.py` holds only the `fp_analysis` latest-release URL, per-user state path, environment-variable names, allowed `fp_analysis_app/` payload boundary, and generated-data exclusions. `tools/build_update_asset.py` remains a thin app-specific wrapper around the shared builder.
 
-`packaging/windows/` now provides a portable PyInstaller spec, exact tracked-byte export of the side-by-side `fp_analysis_app/` tree, packaged and fresh-extraction smoke checks, an unblock-and-start helper, and ZIP/hash/manifest/environment outputs. The `v0.6.0-dev` prerelease was built from clean `main` commit `f8a65b9`, and its full package, hash, manifest, and build-environment snapshot are published together.
+Updater 0.2.0 discovers the latest release through GitHub's ordinary redirect rather than the unauthenticated REST API, compares the tag before downloading an asset, persists a 24-hour check interval and rate-limit backoff under the user's local application-data folder, and lets `--check-update` bypass that interval explicitly.
 
-Because this integration added a dependency and removed the copied updater, `v0.6.0-dev` is a full package rather than a source-only update. A later release containing additional source-only changes can provide `fp_analysis_app_update_<version>.zip` and test the real update path from this installed baseline.
+Because the updater is bundled inside the executable, this dependency upgrade must ship in another full Windows package. Only a later release based on that new full-package baseline can exercise updater 0.2.0 through `fp_analysis_app_update_<version>.zip`.
 
 Remaining work:
 
-- Keep an extracted copy of the published `v0.6.0-dev` package unchanged as the installed-user test baseline.
-- Add a later source-only change, build an asset from `v0.6.0-dev` with `tools/build_update_asset.py`, attach it to the next GitHub Release, and confirm the baseline executable updates its external `fp_analysis_app/` folder before import.
+- Choose the next non-conflicting app version and publish a clean full Windows package containing updater 0.2.0.
+- Keep an extracted copy of that new full package unchanged as the installed-user test baseline.
+- Add a later source-only change, build an asset from the new baseline with `tools/build_update_asset.py`, attach it to the following non-prerelease GitHub Release, and confirm the baseline executable updates its external `fp_analysis_app/` folder before import. For a prerelease-only gate, point `FP_ANALYSIS_UPDATE_ZIP_URL` directly at the test asset instead.
 - Run the baseline executable with `--check-update`, then run `--smoke` and the normal desktop launch from the updated folder.
 - Decide how much update status should be visible in the GUI versus console output.
 
