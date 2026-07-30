@@ -4,6 +4,27 @@ Prepend new session notes to this file. The live log holds at most the five most
 
 If today's date already appears at the top, add another `###` session under it rather than creating a duplicate date heading. Each substantive session needs compact model metadata and a `- Verification:` subsection containing commands that were actually run.
 
+## 2026-07-30
+
+### Restore the Perievent Tests workflow (gpt-5)
+
+- Traced the repeated GitHub Actions failures to the curated CI dependency
+  install omitting `pywebview`, even though the startup-update tests import
+  `run_desktop_app.py` and therefore its top-level `webview` dependency.
+- Added the runtime's existing `pywebview==6.1` pin to the Perievent Tests
+  workflow without expanding the workflow to the full application dependency
+  set.
+- Pushed workflow fix `65bbd35` to `dev`; GitHub run
+  `30515206787` completed successfully after the preceding runs had failed with
+  `ModuleNotFoundError: No module named 'webview'`.
+- Verification:
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_startup_update.TestStartupUpdate.test_launcher_forces_explicit_update_checks` - 1 test passed.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis tests.test_startup_update tests.test_packaging` - 84 tests passed.
+  - Active-module, launcher, and `webview` import smoke - printed `import ok`.
+  - `git diff --check` - passed.
+  - `C:\Users\yzhao\python_projects\agent_collab_treaty\.venv\Scripts\treaty.exe validate .` - passed.
+  - `gh run watch 30515206787 --exit-status` - Perievent Tests passed on Ubuntu in 45 seconds.
+
 ## 2026-07-29
 
 ### Correct the v0.6.0 local handoff and release title (gpt-5)
