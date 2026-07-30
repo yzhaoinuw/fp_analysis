@@ -6,6 +6,22 @@ If today's date already appears at the top, add another `###` session under it r
 
 ## 2026-07-30
 
+### Prune completed roadmap items (gpt-5)
+
+- Audited `next_steps.md` against the active annotation paths, the preserved
+  v0.6.0 full-package baseline, live GitHub Releases, and registered worktrees.
+- Removed the completed startup-updater implementation narrative and
+  baseline-retention task. Kept the first real source-only release trial as the
+  remaining updater work.
+- Clarified that the active runtime already supports event-time annotation
+  deletion, undo, and MAT saving, while the secondary runtime adds manual
+  sleep-state scoring and sleep-bout/statistics exports.
+- Moved future update-asset naming and status-visibility decisions out of the
+  active queue.
+- Verification:
+  - `git diff --check -- next_steps.md work_log.md` - passed.
+  - `C:\Users\yzhao\python_projects\agent_collab_treaty\.venv\Scripts\treaty.exe validate .` - passed.
+
 ### Move packaged-app installation to GitHub Releases (gpt-5)
 
 - Replaced the OneDrive installation path with direct public GitHub Releases

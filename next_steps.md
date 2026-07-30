@@ -4,15 +4,13 @@ Use this checklist alongside `work_log.md`. Keep only actionable engineering thr
 
 ## Currently Hot
 
-- [Post-v0.6.0 follow-up](#post-v060-follow-up-gpt-5) - reproduce and fix the stale analysis-result refresh in a future update.
-- [Startup auto-update integration](#startup-auto-update-integration-gpt-5) - use the distributed v0.6.0 baseline to smoke-test the following source-only release.
-- [Desktop runtime convergence](#desktop-runtime-convergence-gpt-5) - decide whether the manual annotation save flow in `app.py` belongs in the active desktop runtime.
+- [Post-v0.6.0 refresh fix](#post-v060-refresh-fix-gpt-5) - reproduce and fix the stale analysis-result refresh in a future update.
+- [First source-update release trial](#first-source-update-release-trial-gpt-5) - prove the distributed v0.6.0 baseline updates correctly from the next compatible normal release.
+- [Manual sleep-scoring feature decision](#manual-sleep-scoring-feature-decision-gpt-5) - decide whether the secondary runtime's manual sleep-state workflow remains a product requirement.
 
-## Post-v0.6.0 Follow-up (gpt-5)
+## Post-v0.6.0 Refresh Fix (gpt-5)
 
-Status: deferred to a future update; v0.6.0 ships the accepted analysis workflow, while one user-visible refresh issue remains documented.
-
-The current release separates `Show Results` from `Save Spreadsheets`, remembers export selections, resets controls for new MAT files, and performs workbook saving in a background callback.
+Status: unresolved and documented in the README; v0.6.0 otherwise ships the accepted analysis workflow.
 
 Remaining work:
 
@@ -21,48 +19,36 @@ Remaining work:
 - Add a focused regression test where practical.
 - Run the unittest suite and a manual two-signal desktop check before shipping the fix in a future update.
 
-## Startup Auto-Update Integration (gpt-5)
+## First Source-Update Release Trial (gpt-5)
 
-Status: the clean `v0.6.0` full Windows package is the distributed updater 0.2.0 baseline, with API-free release discovery, durable per-user check throttling/backoff, and forced explicit checks. The focused suite, clean package build, packaged smoke, and fresh-extraction smoke pass.
+Status: the unchanged v0.6.0 full package is published and preserved locally with updater 0.2.0. The updater integration and full-package gates are complete; only a real later-release trial remains.
 
-The launcher delegates release discovery, durable throttling/backoff, manifest validation, hash/baseline checks, config merging, and rollback to the shared package before importing the active app. `startup_update_config.py` holds only the `fp_analysis` latest-release URL, per-user state path, environment-variable names, allowed `fp_analysis_app/` payload boundary, and generated-data exclusions. `tools/build_update_asset.py` remains a thin app-specific wrapper around the shared builder.
-
-Updater 0.2.0 discovers the latest release through GitHub's ordinary redirect rather than the unauthenticated REST API, compares the tag before downloading an asset, persists a 24-hour check interval and rate-limit backoff under the user's local application-data folder, and lets `--check-update` bypass that interval explicitly.
-
-Because the updater is bundled inside the executable, the distributed `v0.6.0` package is the installed baseline for the first updater 0.2.0 source-only trial. A later release based on that package can exercise updater 0.2.0 through `fp_analysis_app_update_<version>.zip`.
-
-Compatibility boundary: keep that prefix-style update filename for the
-distributed `v0.6.0` baseline. Its bundled updater constructs the exact
-`fp_analysis_app_update_<tag>.zip` name during normal API-free discovery, so a
-suffix-style name such as `fp_analysis_app_vX.Y.Z_update.zip` would not be found.
-Adopting suffix-style update discovery requires changing the shared updater,
-pinning and bundling the new updater in the next full package, and using the new
-name only for later releases based on that full-package baseline.
+Compatibility boundary: keep the prefix-style `fp_analysis_app_update_<version>.zip` filename for the distributed v0.6.0 baseline.
 
 Remaining work:
 
-- Keep one extracted `v0.6.0` package unchanged as the user test baseline.
-- Choose the later normal source-update version when its app changes are ready; `v0.6.1` is available again after removal of the obsolete local tag.
-- Add the later source-only change, build an asset from `v0.6.0` with `tools/build_update_asset.py`, attach it to the following non-prerelease GitHub Release, and confirm the baseline executable updates its external `fp_analysis_app/` folder before import. For a prerelease-only gate, point `FP_ANALYSIS_UPDATE_ZIP_URL` directly at the test asset instead.
-- Run the baseline executable with `--check-update`, then run `--smoke` and the normal desktop launch from the updated folder.
-- When the next full-package baseline is planned, decide whether to add
-  suffix-style update discovery to the shared updater and redistribute that
-  capability before renaming any source-update assets.
-- Decide how much update status should be visible in the GUI versus console output.
+- Choose the next compatible app-only change and normal release version.
+- Build its update asset from `v0.6.0` with `tools/build_update_asset.py`, then attach it to the next non-prerelease GitHub Release.
+- From the unchanged v0.6.0 package, run `--check-update`, `--smoke`, and a normal desktop launch; confirm the external `fp_analysis_app/` folder updates before import.
 
-## Desktop Runtime Convergence (gpt-5)
+## Manual Sleep-Scoring Feature Decision (gpt-5)
 
 Status: paused pending a product decision.
 
-`app_dev.py` is the active pywebview desktop runtime. `app.py` is a secondary browser/upload path and still contains manual annotation save/export behavior that is not equivalent in `app_dev.py`.
+The active `app_dev.py` runtime already supports event-time deletion, one-step undo, and saving annotated MAT files. The secondary `app.py` path additionally supports manual sample-level sleep-state scoring and exports an updated MAT file plus sleep-bout and sleep-statistics workbooks.
 
 Remaining work:
 
-- Decide whether manual annotation editing and save/export are still supported product requirements.
-- If yes, migrate the required behavior into `app_dev.py` and `components_dev.py` with focused tests.
+- Decide whether manual sleep-state scoring and its sleep-bout/statistics exports are still product requirements.
+- If yes, migrate that workflow into `app_dev.py` and `components_dev.py` with focused tests.
 - If no, document the boundary and then retire the secondary path in a separate, reviewable cleanup.
 
 ## Background / Paused
+
+### Future updater packaging and status UX
+
+- When the next full-package baseline is planned, decide whether to add suffix-style update discovery to the shared updater and bundle it before renaming any source-update assets.
+- After the first real source-update trial, decide whether console-only update status is sufficient or whether the GUI should show more.
 
 ### Linked worktree cleanup
 
