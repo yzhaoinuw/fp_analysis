@@ -37,6 +37,7 @@ jobs:
             plotly-resampler==0.11.0 \
             "dash[diskcache]==2.17.1" \
             dash-extensions==1.0.18 \
+            pywebview==6.1 \
             "desktop-app-source-updater @ git+https://github.com/yzhaoinuw/desktop_app_source_updater.git@85bb68e42155ad8b661f669df8d281fbe683a045"
 
       - name: Run focused unittest suites
