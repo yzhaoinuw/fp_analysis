@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+import argparse
 import re
-import sys
 
 
 PACKAGE_FOLDER_PREFIX = "fp_analysis_app"
@@ -26,7 +26,20 @@ def get_package_folder_name(version: str) -> str:
     return f"{PACKAGE_FOLDER_PREFIX}_{get_release_line(version)}"
 
 
+def get_full_zip_name(version: str) -> str:
+    return f"{get_package_folder_name(version)}_full.zip"
+
+
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        raise SystemExit("usage: package_folder_name.py <version>")
-    print(get_package_folder_name(sys.argv[1]))
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--full-zip-name",
+        action="store_true",
+        help="print the stable major/minor full-package ZIP name",
+    )
+    parser.add_argument("version")
+    args = parser.parse_args()
+    if args.full_zip_name:
+        print(get_full_zip_name(args.version))
+    else:
+        print(get_package_folder_name(args.version))

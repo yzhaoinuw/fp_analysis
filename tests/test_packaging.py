@@ -41,9 +41,36 @@ class TestPackageFolderName(unittest.TestCase):
         self.assertNotEqual(0, result.returncode)
         self.assertIn("Could not determine", result.stderr)
 
+    def test_full_zip_uses_stable_release_line_and_full_suffix(self):
+        self.assertEqual(
+            "fp_analysis_app_v0.6_full.zip",
+            self._get_full_zip_name("v0.6.0"),
+        )
+        self.assertEqual(
+            "fp_analysis_app_v0.6_full.zip",
+            self._get_full_zip_name("v0.6.9"),
+        )
+        self.assertEqual(
+            "fp_analysis_app_v0.6_full.zip",
+            self._get_full_zip_name("v0.6.0-dev2"),
+        )
+
     def _get_package_folder_name(self, version):
         return subprocess.run(
             [sys.executable, str(PACKAGE_FOLDER_NAME_SCRIPT), version],
+            capture_output=True,
+            check=True,
+            text=True,
+        ).stdout.strip()
+
+    def _get_full_zip_name(self, version):
+        return subprocess.run(
+            [
+                sys.executable,
+                str(PACKAGE_FOLDER_NAME_SCRIPT),
+                "--full-zip-name",
+                version,
+            ],
             capture_output=True,
             check=True,
             text=True,

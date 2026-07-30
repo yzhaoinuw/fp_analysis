@@ -98,9 +98,14 @@ $PackageFolderName = Invoke-NativeCapture -FilePath $BuildPython -CommandArgs @(
     "packaging\windows\package_folder_name.py",
     $Version
 )
-$ArtifactBaseName = "fp_analysis_app_$Version"
+$FullZipName = Invoke-NativeCapture -FilePath $BuildPython -CommandArgs @(
+    "packaging\windows\package_folder_name.py",
+    "--full-zip-name",
+    $Version
+)
+$ArtifactBaseName = [System.IO.Path]::GetFileNameWithoutExtension($FullZipName)
 $DistPath = Join-Path $Repo "dist\$PackageFolderName"
-$ZipPath = Join-Path $ArtifactDir "$ArtifactBaseName-windows.zip"
+$ZipPath = Join-Path $ArtifactDir $FullZipName
 $SpecPath = Join-Path $ScriptDir "app.spec"
 
 New-Item -ItemType Directory -Force -Path $ArtifactDir | Out-Null

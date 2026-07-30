@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- install the packaged Windows app from the public GitHub Releases page using
+  the asset whose filename ends in `_full.zip`, not GitHub's generated source
+  archives
+- name self-contained Windows packages `fp_analysis_app_vX.Y_full.zip` while
+  retaining the stable `fp_analysis_app_vX.Y` extracted folder
+
 ## v0.6.0
 
 - import `.csv` annotation files offered by the desktop file dialog, including

@@ -33,16 +33,17 @@ must use a clean tracked worktree so the manifest and external
 Output goes to `release_artifacts/`:
 
 ```text
-fp_analysis_app_vX.Y.Z-windows.zip
-fp_analysis_app_vX.Y.Z-windows.zip.manifest.json
-fp_analysis_app_vX.Y.Z-windows.zip.sha256.txt
-fp_analysis_app_vX.Y.Z-windows.zip.build_env_requirements.txt
+fp_analysis_app_vX.Y_full.zip
+fp_analysis_app_vX.Y_full.zip.manifest.json
+fp_analysis_app_vX.Y_full.zip.sha256.txt
+fp_analysis_app_vX.Y_full.zip.build_env_requirements.txt
 ```
 
-The artifact filenames retain the full release version for provenance. Inside
-the ZIP, the top-level app folder uses only the major/minor release line:
-`fp_analysis_app_vX.Y`. Patch-level source updates can therefore update the app
-without leaving the installed folder name stale.
+The full ZIP and its top-level app folder both use the stable major/minor release
+line. Patch-level source updates can therefore update the app without leaving
+the installed path or package name stale. The exact patch version remains in
+the manifest and in the packaged app's window title, `--smoke` output, and
+`--check-update` output.
 
 The build:
 
@@ -72,6 +73,13 @@ C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe tools\build_update_as
 Repeat `--from-ref` for every compatible packaged baseline that should be able
 to jump to the new version. Attach the generated
 `fp_analysis_app_update_<version>.zip` to the matching GitHub Release.
+
+Keep that prefix-style update filename for releases based on the distributed
+`v0.6.0` package. Its bundled updater constructs the exact name
+`fp_analysis_app_update_<tag>.zip` during normal API-free discovery. A future
+suffix-style update name such as `fp_analysis_app_vX.Y.Z_update.zip` requires a
+shared-updater change, a new pinned dependency, and a new full-package baseline
+before later source-only releases can rely on it.
 
 For the installed-user test, run the baseline executable with
 `--check-update`. The command forces a release check even inside the normal

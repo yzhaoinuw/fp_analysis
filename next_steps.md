@@ -31,12 +31,23 @@ Updater 0.2.0 discovers the latest release through GitHub's ordinary redirect ra
 
 Because the updater is bundled inside the executable, the distributed `v0.6.0` package is the installed baseline for the first updater 0.2.0 source-only trial. A later release based on that package can exercise updater 0.2.0 through `fp_analysis_app_update_<version>.zip`.
 
+Compatibility boundary: keep that prefix-style update filename for the
+distributed `v0.6.0` baseline. Its bundled updater constructs the exact
+`fp_analysis_app_update_<tag>.zip` name during normal API-free discovery, so a
+suffix-style name such as `fp_analysis_app_vX.Y.Z_update.zip` would not be found.
+Adopting suffix-style update discovery requires changing the shared updater,
+pinning and bundling the new updater in the next full package, and using the new
+name only for later releases based on that full-package baseline.
+
 Remaining work:
 
 - Keep one extracted `v0.6.0` package unchanged as the user test baseline.
 - Choose the later normal source-update version when its app changes are ready; `v0.6.1` is available again after removal of the obsolete local tag.
 - Add the later source-only change, build an asset from `v0.6.0` with `tools/build_update_asset.py`, attach it to the following non-prerelease GitHub Release, and confirm the baseline executable updates its external `fp_analysis_app/` folder before import. For a prerelease-only gate, point `FP_ANALYSIS_UPDATE_ZIP_URL` directly at the test asset instead.
 - Run the baseline executable with `--check-update`, then run `--smoke` and the normal desktop launch from the updated folder.
+- When the next full-package baseline is planned, decide whether to add
+  suffix-style update discovery to the shared updater and redistribute that
+  capability before renaming any source-update assets.
 - Decide how much update status should be visible in the GUI versus console output.
 
 ## Desktop Runtime Convergence (gpt-5)

@@ -6,6 +6,42 @@ If today's date already appears at the top, add another `###` session under it r
 
 ## 2026-07-30
 
+### Move packaged-app installation to GitHub Releases (gpt-5)
+
+- Replaced the OneDrive installation path with direct public GitHub Releases
+  instructions: Windows users now look in a release's Assets for the app ZIP
+  ending in `_full.zip` and explicitly avoid GitHub's generated source archives.
+- Changed future full-package output to the stable
+  `fp_analysis_app_vX.Y_full.zip` convention while retaining the existing
+  `fp_analysis_app_vX.Y` extracted folder. Confirmed that the exact patch
+  version remains visible in the native window title, `--smoke`, and
+  `--check-update` output.
+- Audited the updater 0.2.0 installed in the distributed `v0.6.0` baseline. Its
+  normal redirect discovery constructs the exact
+  `fp_analysis_app_update_<tag>.zip` name, so the compatible prefix-style update
+  asset remains unchanged. Recorded suffix-style discovery as a shared-updater
+  and next-full-baseline task.
+- Relabeled the existing verified `v0.6.0` Windows archive without rebuilding
+  it. The new `fp_analysis_app_v0.6_full.zip` retains SHA-256
+  `75CD2BEC810B0F1A91601EC3D9BE1EEB870F1993CE84755BD12CCC194386A7E1`,
+  contains 3,335 entries under the single `fp_analysis_app_v0.6` root, and has
+  corrected manifest/checksum sidecars in both the task worktree and the
+  primary checkout's `release_artifacts/`.
+- Uploaded and verified all four replacement assets before deleting the four
+  stale `fp_analysis_app_v0.6.0-windows.zip` assets from GitHub. The deleted
+  assets remain recoverable from the unchanged local copies. The release title
+  and tag remain exactly `v0.6.0`, and the release body now gives direct
+  `_full.zip` installation instructions.
+- Verification:
+  - PowerShell parser checks for `make_full_app_zip.ps1` and `smoke_check_release.ps1` - passed.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis tests.test_startup_update tests.test_packaging` - 85 tests passed with 8 private-fixture skips.
+  - `$env:FP_ANALYSIS_SKIP_UPDATE='1'; C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe run_desktop_app.py --smoke` - printed `smoke ok: v0.6.0`.
+  - Active analysis-module import smoke - printed `import ok v0.6.0`.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe packaging\windows\package_folder_name.py --full-zip-name v0.6.0` - printed `fp_analysis_app_v0.6_full.zip`.
+  - Local ZIP/hash/manifest/root audit - confirmed byte identity with the original archive, corrected sidecar references, the expected stable root, and 3,335 entries.
+  - GitHub release page and public API audit - confirmed exactly the four replacement assets, matching local SHA-256 digests, tag-only title, published/latest production status, and updated install text.
+  - `C:\Users\yzhao\python_projects\agent_collab_treaty\.venv\Scripts\treaty.exe validate .` - passed.
+
 ### Restore the Perievent Tests workflow (gpt-5)
 
 - Traced the repeated GitHub Actions failures to the curated CI dependency

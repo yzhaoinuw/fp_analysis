@@ -6,6 +6,17 @@
 
 Users launch a small Python/pywebview desktop wrapper. The UI runs locally in Dash, opens native file dialogs, visualizes continuous signals, imports event or sleep-bout spreadsheets, and produces figures plus selectively chosen spreadsheet outputs. The current application version is defined in `fp_analysis_app/__init__.py`.
 
+## Packaging and Release Contract
+
+- Windows users install the self-contained GitHub Release asset named
+  `fp_analysis_app_vX.Y_full.zip`; GitHub's generated source archives are not
+  packaged applications.
+- The ZIP and extracted folder stay on the stable major/minor release line,
+  while the exact patch version appears in the release manifest and app title.
+- The distributed `v0.6.0` updater requires prefix-style source assets named
+  `fp_analysis_app_update_<tag>.zip`. Renaming source-update assets requires a
+  shared-updater change shipped in a later full-package baseline first.
+
 ## Active Runtime Path
 
 ### 1. Desktop entrypoint

@@ -3,14 +3,27 @@
 [![Agent Collab Treaty](https://img.shields.io/badge/Agent_Collab_Treaty-adopted-6d81f1?style=flat-square)](https://github.com/yzhaoinuw/agent_collab_treaty)
 
 ## Installation
-1. Go to the [fp_analysis folder](https://uofr-my.sharepoint.com/:f:/r/personal/yzhao38_ur_rochester_edu/Documents/fp_analysis_project?csf=1&web=1&e=JIeIs6) on OneDrive. Contact Yue if you can't access it.
-2. Download the current **fp_analysis_app_vX.Y.Z-windows.zip** package. Note that if you unzip it to the same location where the zip file is, you may end up with a nested folder. If this happens, move the inner app folder somewhere else and delete the empty outer folder.
-3. Examine the unzipped **fp_analysis_app_vX.Y** folder. The folder name stays on the major/minor release line because patch-level source updates are applied in place. It should contain **_internal**, **fp_analysis_app**, **run_fp_analysis_app.exe**, and **unblock_app.cmd**.
-4. If the package contains `unblock_app.cmd`, double-click it to unblock the downloaded files and start the app. For an older package without that helper, open PowerShell and run:
+
+1. Open the public [GitHub Releases page](https://github.com/yzhaoinuw/fp_analysis/releases).
+2. In a release's **Assets**, look for the app ZIP whose filename ends in
+   **`_full.zip`**, such as **`fp_analysis_app_v0.6_full.zip`**. This
+   self-contained release asset is the installable Windows package.
+3. Download that **`_full.zip`** file. Do not download GitHub's automatically
+   generated **Source code (zip)** or **Source code (tar.gz)** archives; they
+   are not the packaged app.
+4. Extract the ZIP and open the **`fp_analysis_app_vX.Y`** folder. The folder
+   name stays on the major/minor release line so patch updates do not make it
+   stale. It should contain **`_internal`**, **`fp_analysis_app`**,
+   **`run_fp_analysis_app.exe`**, and **`unblock_app.cmd`**. The exact installed
+   patch version remains visible in the app window title.
+5. Double-click `unblock_app.cmd` to unblock the downloaded files and start the
+   app. For an older package without that helper, open PowerShell and run:
+
 ```bash
 cd PATH_TO_YOUR_APP_FOLDER
 Get-ChildItem -Recurse | Unblock-File
 ```
+
 The first line navigates to the unzipped app folder. You need to supply the actual path to the app folder on your computer. The second line unblocks the dependencies related to webview, which provides the window to the app interface, as Windows may block them when the zip file is downloaded. Without unblocking them, the app may not start.
 
 
@@ -19,9 +32,16 @@ To open the app, double click "run_fp_analysis_app.exe" and it will open the app
 
 ### Startup Source Updates
 
-Starting with a full package that includes the shared updater dependency, the app checks its latest GitHub Release for a verified source-update zip before loading the interface. Ordinary launches make at most one release check per 24 hours using a small per-user state file; an explicit `--check-update` run bypasses that interval. Internet access is optional: if GitHub is unavailable or no compatible source asset exists, startup continues with the installed version.
+Starting with a full package that includes the shared updater dependency, the
+app checks its latest GitHub Release for a verified update before loading the
+interface. Ordinary launches make at most one release check per 24 hours using
+a small per-user state file; an explicit `--check-update` run bypasses that
+interval. Internet access is optional: if GitHub is unavailable or no
+compatible update exists, startup continues with the installed version.
 
-Source-update zips can replace only approved files under `fp_analysis_app/`. They verify downloaded hashes and known installed-file baselines, support jumping over compatible skipped versions, and refuse to overwrite unrecognized local edits. Dependency, packaging, build, generated-data, deletion, and rename changes still require a normal full packaged release.
+Updates verify their downloaded hashes and known installed-file baselines,
+support jumping over compatible skipped versions, and refuse to overwrite
+unrecognized local edits.
 
 ### Visualization
 Click "**Click here to select File**". After you select a file, the app will briefly validate the file selected and then show you the figures of the signals. Once the figures are shown, you can navigate and zoom in or out on the figures.
