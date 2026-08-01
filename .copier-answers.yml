@@ -1,8 +1,11 @@
 # Changes here will be overwritten by Copier; you should not edit this file manually.
-_commit: v0.3.2
+_commit: v0.6.0
 _src_path: gh:yzhaoinuw/agent_collab_treaty
 agent_pointers: []
 env_activation: conda activate fiber_photometry
+has_releases: true
+include_git_ownership_note: true
 include_treaty_badge: true
 integration_branch: main
-test_command: ''
+uses_precommit: false
+verification_command: C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis tests.test_startup_update tests.test_packaging

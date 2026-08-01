@@ -132,6 +132,10 @@ fp_analysis/
 
 ## What Looks Active vs. Legacy
 
+This section and the next are the two maps that keep an agent from editing the wrong file. Use whichever fits this repo — most benefit from both.
+
+Many repos accumulate parallel implementations during refactors; without an explicit map, an agent will frequently edit the superseded copy.
+
 ### Active / relevant now
 
 - `run_desktop_app.py`
@@ -156,7 +160,21 @@ fp_analysis/
 - Untracked files such as `event_analysis_dev.py` and cross-correlation sketches may contain ongoing local work. Do not assume they are disposable.
 - `setup.py`, `environment.yml`, and `change_log.txt` originated in the earlier sleep-scoring lineage. The obsolete changelog was removed during treaty migration; the remaining packaging metadata should be modernized only as a deliberate task.
 
-## Tests and Fixtures
+## Authored vs. Derived
+
+### Authored — hand-edit these
+
+- `run_desktop_app.py`, `startup_update_config.py`, and tracked files under `fp_analysis_app/` are application source and app-specific updater configuration.
+- `tests/`, `packaging/windows/`, `requirements.txt`, and the tracked Markdown documents are source-of-truth inputs.
+- Reusable updater implementation is authored in the pinned `desktop_app_source_updater` dependency, not copied into this repository.
+
+### Derived or local — regenerate; do not stage as source
+
+- `build/`, `dist/`, and `release_artifacts/` are created by the Windows packaging workflow.
+- `cache/`, `data/`, and runtime-generated content under `fp_analysis_app/assets/` may contain local recordings, results, or application output.
+- Inspect any generated or local artifact before changing or deleting it, and keep it out of focused commits unless explicitly requested.
+
+## Tests And Fixtures
 
 The focused suite is [`tests/test_perievent_analysis.py`](tests/test_perievent_analysis.py). It uses `unittest` and covers:
 
