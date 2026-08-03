@@ -1,0 +1,44 @@
+cff-version: 1.2.0
+title: "fp_analysis: An interactive desktop application for perievent analysis of fiber photometry recordings"
+message: "If you use this software, please cite it using the metadata from this file."
+type: software
+authors:
+  - given-names: Yue
+    family-names: Zhao
+    affiliation: "University of Rochester, Rochester, NY, USA"
+    orcid: "https://orcid.org/0000-0002-0819-5012"
+abstract: >-
+  An open-source desktop application for visualizing and analyzing fiber
+  photometry recordings. The app loads MATLAB .mat recordings containing up to
+  four photometry signal channels, presents them as synchronized interactive
+  traces that can be zoomed and navigated independently along either axis, and
+  aligns them to a list of events supplied as a spreadsheet in either a
+  transition-table or an event-table layout. For a chosen event type and a
+  chosen pair of baseline and analysis windows, it computes and plots the raw
+  and baseline-normalized perievent traces, their mean, and a per-occurrence
+  heatmap, together with summary metrics: area under the curve, positive and
+  negative peak values, time to first peak, and decay time. When two signals
+  are selected it also computes their mean normalized cross-correlation.
+  Results are exported to spreadsheet workbooks that are grouped by analysis
+  setup, so repeated exports accumulate subjects side by side rather than
+  duplicating them. The packaged Windows build runs without a Python
+  installation or an internet connection and updates its own source from
+  GitHub Releases at startup.
+repository-code: "https://github.com/yzhaoinuw/fp_analysis"
+license: MIT
+version: 0.6.0
+date-released: "2026-07-29"
+keywords:
+  - fiber photometry
+  - photometry
+  - neuroscience
+  - perievent analysis
+  - time series
+  - desktop application
+  - research software
+# Once the repository is archived on Zenodo, add the concept DOI here (and a
+# badge plus the DOI link in the README's Citation section), matching the
+# pattern used by sleep_scoring, timeseries_app_cookbook, and
+# desktop_app_source_updater. The concept DOI resolves to the newest release,
+# so it stays correct without further edits:
+# doi: "10.5281/zenodo.XXXXXXXX"

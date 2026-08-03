@@ -2,6 +2,14 @@
 
 [![Agent Collab Treaty](https://img.shields.io/badge/Agent_Collab_Treaty-adopted-6d81f1?style=flat-square)](https://github.com/yzhaoinuw/agent_collab_treaty)
 
+A desktop app for analyzing fiber photometry recordings. It visualizes up to
+four signal channels from a `.mat` recording, aligns them to a list of events
+you supply as a spreadsheet, and computes perievent statistics — area under
+the curve, peak values and timing, decay time, and the cross-correlation
+between two signals — which it exports to spreadsheets for downstream
+analysis. The packaged Windows build runs without Python or an internet
+connection and updates itself from GitHub Releases.
+
 ## Installation
 
 1. Open the public [GitHub Releases page](https://github.com/yzhaoinuw/fp_analysis/releases).
@@ -112,3 +120,18 @@ The input files to the app must be .mat (matlab) files preprocessed using [sleep
 
 **Explanations**
 1. **_signal_A_**  is just an example name for a fp signal. You can name it by its real signal name such as NE, but it must be listed as a name in **_fp_signal_names_**, in order to be visualized by the app.
+
+## Citation
+
+If you use this app in research, use GitHub's **Cite this repository** button
+or the repository's [CITATION.cff](CITATION.cff) file to obtain an APA or
+BibTeX entry.
+
+## Funding
+
+This work was supported by the BRAIN Initiative of the US National Institutes
+of Health (U19NS128613).
+
+## License
+
+Released under the [MIT License](LICENSE).
