@@ -41,6 +41,9 @@ Prepend new session notes to the top of this file. The live log holds at most th
 - Fast-forwarded remote `main` to the previously accepted treaty migration at
   `76c9d73`, then merged the citation PR head into `dev` without rewriting
   either history.
+- After final approval, fast-forwarded `main` to the validated `dev` merge at
+  `02d5543`; GitHub marked PR #1 merged, and local, tracking, and remote
+  `main`/`dev` refs were verified identical.
 - Resolved the overlapping work-log update by retaining the treaty-managed
   header, the August 1 treaty record, and the citation record under the current
   August 4 date. The independently created July archive was byte-identical on
