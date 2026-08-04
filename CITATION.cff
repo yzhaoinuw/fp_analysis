@@ -22,8 +22,8 @@ abstract: >-
   Results are exported to spreadsheet workbooks that are grouped by analysis
   setup, so repeated exports accumulate subjects side by side rather than
   duplicating them. The packaged Windows build runs without a Python
-  installation or an internet connection and updates its own source from
-  GitHub Releases at startup.
+  installation or an internet connection and checks GitHub Releases for
+  compatible source updates at startup.
 repository-code: "https://github.com/yzhaoinuw/fp_analysis"
 license: MIT
 version: 0.6.0
@@ -36,7 +36,11 @@ keywords:
   - time series
   - desktop application
   - research software
-# Once the repository is archived on Zenodo, add the concept DOI here (and a
+# Zenodo is enabled for this repository, but enabling it does not retroactively
+# archive the v0.6.0 release above. Archival starts with the next newly
+# published GitHub Release, so that release candidate must update the `version`
+# and `date-released` fields here alongside the app's other version surfaces
+# before it is published. Afterward, add the assigned concept DOI here (and a
 # badge plus the DOI link in the README's Citation section), matching the
 # pattern used by sleep_scoring, timeseries_app_cookbook, and
 # desktop_app_source_updater. The concept DOI resolves to the newest release,

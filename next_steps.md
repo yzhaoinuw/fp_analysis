@@ -31,6 +31,12 @@ Remaining work:
 - Build its update asset from `v0.6.0` with `tools/build_update_asset.py`, then attach it to the next non-prerelease GitHub Release.
 - From the unchanged v0.6.0 package, run `--check-update`, `--smoke`, and a normal desktop launch; confirm the external `fp_analysis_app/` folder updates before import.
 
+Zenodo archival rides on this same release:
+
+- Zenodo is enabled for the repository, but it did not retroactively archive `v0.6.0`. Archival begins with the next newly published release, and no citation-only release is planned to force it earlier.
+- Update `CITATION.cff` `version` and `date-released` in this release candidate, together with the app's other version and release surfaces, before publishing.
+- After publication, add the assigned concept DOI to `CITATION.cff` and a DOI badge plus link to the README's Citation section.
+
 ## Manual Sleep-Scoring Feature Decision (gpt-5)
 
 Status: paused pending a product decision.

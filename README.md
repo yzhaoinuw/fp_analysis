@@ -8,7 +8,7 @@ you supply as a spreadsheet, and computes perievent statistics — area under
 the curve, peak values and timing, decay time, and the cross-correlation
 between two signals — which it exports to spreadsheets for downstream
 analysis. The packaged Windows build runs without Python or an internet
-connection and updates itself from GitHub Releases.
+connection and checks GitHub Releases for compatible source updates.
 
 ## Installation
 
