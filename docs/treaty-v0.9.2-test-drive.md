@@ -56,4 +56,24 @@ All fault-injection checks ran in disposable copies, not the working project. Sy
 - `--data` provides a route to explicit answers, but does not discover which newly introduced defaults suit the adopter. Continue checking the answer summary.
 - Local raw outputs, fixture repositories, and probe scripts are retained under `.worktrees/treaty-evidence-v0.9.2` and adjacent `.worktrees/treaty_*.py` files. They are untracked local evidence, not required application artifacts.
 
-No new app follow-up was created, so `next_steps.md` was left intact. Potential upstream feedback is recorded here; nothing was posted to an issue or sent to another chat.
+No new app follow-up was created, so `next_steps.md` was left intact. At the end of the original test drive, nothing had been posted to an issue or sent to another chat. The subsequently authorized upstream feedback is recorded below.
+
+## Upstream feedback posted 2026-10-22
+
+At the maintainer's request, posted issue-specific assessments and read each comment back to verify its exact body. Existing issue states were left unchanged.
+
+| Thread | Posted assessment |
+| --- | --- |
+| [#25](https://github.com/yzhaoinuw/agent_collab_treaty/issues/25#issuecomment-6332928677) | Both safety refusals, the working narrow exception, matching visible conflicts, and the untested post-merge backstop. |
+| [#17](https://github.com/yzhaoinuw/agent_collab_treaty/issues/17#issuecomment-6332932310) | Explicit answers to a genuinely new question and existing answers; layout-override guard. |
+| [#30](https://github.com/yzhaoinuw/agent_collab_treaty/issues/30#issuecomment-6332932488) | Same nested fixture reports three at-risk sections in 0.9.1 and one in 0.9.2. |
+| [#15](https://github.com/yzhaoinuw/agent_collab_treaty/issues/15#issuecomment-6332932661) | Inline-verification message points to the problematic line and explains the correction. |
+| [#27](https://github.com/yzhaoinuw/agent_collab_treaty/issues/27#issuecomment-6332932842) | Missing-import warning is nonfatal and clears with the explicit import; Claude Code runtime not tested. |
+| [#28](https://github.com/yzhaoinuw/agent_collab_treaty/issues/28#issuecomment-6332933082) | New log checkpoints and decision examples arrived; longer-term behavioral effectiveness remains unproven. |
+| [#26](https://github.com/yzhaoinuw/agent_collab_treaty/issues/26#issuecomment-6332933367) | Conventions invariant arrived; remaining template and behavioral work remains distinct. |
+| [#23](https://github.com/yzhaoinuw/agent_collab_treaty/issues/23#issuecomment-6332933592) | Answer-override and version-warning evidence, without claiming first-run/placeholder issues were resolved. |
+| [#22](https://github.com/yzhaoinuw/agent_collab_treaty/issues/22#issuecomment-6332933785) | Successful flat-layout update and temporary-exclude workflow; suggestion to replace the blanket staging handoff. |
+
+Opened [#31: Windows update summary lists newline-only files that dry-run omits](https://github.com/yzhaoinuw/agent_collab_treaty/issues/31) after independently reproducing it in a clean disposable clone. Under `core.autocrlf=true`, refreshed the index for an LF `work_log.md` and confirmed empty status before updating. Preview omitted the log; apply listed it. The log went from 0 to 77 CRLF endings, normalized bytes stayed identical, and its content diff was empty. This is a minor reporting issue, not evidence of content loss. The issue includes standalone reproduction steps and the limits of the finding.
+
+Posting required a tooling fallback: initial automatic review required destination/disclosure checks; the connector verified both repositories as public and owned by the authenticated administrator, then its write attempt returned HTTP 403. The authenticated GitHub CLI posted the comments and new issue successfully. Readback used the connector. No project branch was pushed or merged.

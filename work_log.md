@@ -2,6 +2,19 @@
 
 Prepend new session notes to the top of this file. The live log holds at most the five most recent unique calendar dates; each archive file holds exactly five. See [Work Log Discipline](treaty_conventions.md#work-log-discipline) and [Work Log Rotation And Dating](treaty_conventions.md#work-log-rotation-and-dating).
 
+## 2026-10-22
+
+### Publish the Treaty adopter assessment (Codex, GPT-6; effort and token budget not exposed)
+
+- At the user's request, posted targeted evidence to upstream issues #15, #17, #22, #23, #25, #26, #27, #28, and #30. Kept the distinction between tested CLI behavior, delivered guidance, and unproven long-term effects. Existing issue states were unchanged; the [test-drive report](docs/treaty-v0.9.2-test-drive.md#upstream-feedback-posted-2026-10-22) records direct comment links.
+- Reproduced the newline-only summary discrepancy in a clean disposable clone before opening [upstream #31](https://github.com/yzhaoinuw/agent_collab_treaty/issues/31). Preview omitted `work_log.md`, apply listed it, and CRLF counts changed from 0 to 77 while normalized text and the Git content diff stayed unchanged. Classified it as reporting polish rather than content loss. Added the blanket-staging handoff suggestion to existing #22 rather than opening a duplicate workflow issue.
+- Verified the destination and adopter repositories are public and owned by the authenticated account. After destination checks resolved the initial automatic-review objection, the connector's write returned HTTP 403; authenticated `gh` successfully posted the authorized feedback. Every comment was read back and matched its prepared body. No branch push, PR, or integration merge was performed; local documentation remains on `chore/treaty`.
+- Verification:
+  - Read the current issue bodies and comments, and searched the repository's issue history before posting or opening #31.
+  - Disposable newline fixture: clean pre-update status, preview/apply exit 0, differing file lists, identical normalized log text, and empty `git diff -- work_log.md`.
+  - GitHub readback: all nine exact comment bodies matched; #31 exists with the intended title, reproduction, and scope.
+  - Treaty 0.9.2 `validate .` and `git diff --check` — passed after this documentation update. Application code was unchanged; the previous 85-test pass remains applicable.
+
 ## 2026-10-21
 
 ### Test-drive Treaty v0.9.2 (Codex, GPT-6; effort and token budget not exposed)
