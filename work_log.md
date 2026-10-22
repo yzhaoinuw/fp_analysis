@@ -2,6 +2,21 @@
 
 Prepend new session notes to the top of this file. The live log holds at most the five most recent unique calendar dates; each archive file holds exactly five. See [Work Log Discipline](treaty_conventions.md#work-log-discipline) and [Work Log Rotation And Dating](treaty_conventions.md#work-log-rotation-and-dating).
 
+## 2026-10-21
+
+### Test-drive Treaty v0.9.2 (Codex, GPT-6; effort and token budget not exposed)
+
+- Used local `chore/treaty` from `e7b3f7a` to assess the released updater before integration. The dedicated 0.9.2 CLI updated the v0.6.0 template without conflicts, retained `docs_dir: .` and the repository's answers, and left project guidance and application source intact. The generic conventions now include the pre-push/merge log checkpoint and the planning heading rules.
+- Kept unrelated untracked data, sketches, and linked worktrees available: temporarily excluded their exact paths during apply, then restored `.git/info/exclude` byte-for-byte. Used explicit staging. Preview preserved every tracked file hash; apply's extra `work_log.md` listing was newline-only, not content loss.
+- Recorded the process, issue-by-issue evidence, and limits in [the adopter test-drive report](docs/treaty-v0.9.2-test-drive.md). Disposable probes confirmed refusal of hidden rejects in both modes, a working `!*.rej` exception with matching visible conflicts, explicit answers to a genuinely new question, layout-override refusal, clearer verification errors, and nonfatal pointer/version warnings. On the same nested fixture, 0.9.1 reported three sections at risk while 0.9.2 correctly reported one.
+- The prose fixes arrived, but their ability to prevent missed logs over future sessions is not established. No app planning changed; `next_steps.md` remains intact. Branch is intentionally local for review; no push, PR, integration merge, tag, or release was performed.
+- Verification:
+  - Released Treaty 0.9.2 `validate .`, `diff .`, update preview, and apply; zero conflicts in the real adoption and zero conventions drift afterward.
+  - Disposable CLI/library probes and 0.9.1 comparison, with raw evidence under untracked `.worktrees/treaty-evidence-v0.9.2/`; details and untested paths are in the report.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis tests.test_startup_update tests.test_packaging` — 85 passed outside the sandbox after the initial sandbox run hit temporary-Git/updater restrictions.
+  - Active analysis-module import smoke — printed `import ok`.
+  - `git diff --check`, unmerged-index inspection, and line-anchored conflict-marker scan — passed.
+
 ## 2026-08-04
 
 ### Make the app licensed and citable (claude-opus-5)
