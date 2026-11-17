@@ -2,6 +2,20 @@
 
 Prepend new session notes to the top of this file. The live log holds at most the five most recent unique calendar dates; each archive file holds exactly five. See [Work Log Discipline](treaty_conventions.md#work-log-discipline) and [Work Log Rotation And Dating](treaty_conventions.md#work-log-rotation-and-dating).
 
+## 2026-11-17
+
+### Refresh Treaty to v0.11.1 (Codex; model/version, effort and token budget not exposed)
+
+- Updated the released CLI first, then adopted template v0.11.1 from v0.9.2 on the existing local `chore/treaty` branch. Preview with `--dry-run --diff` and apply agreed on the answers-file pin, maintained conventions, and archive README; neither conflicted. Existing project answers and the flat `docs_dir: .` layout remain intact. No application code or product planning changed.
+- The new conventions require upgrading the CLI before the template, running validation afterward, checking for Treaty updates on log rotation, and using the correct GitHub anchors in Currently Hot. The archive README also carries the rotation reminder. No relocation was requested.
+- Re-ran the original [upstream #31](https://github.com/yzhaoinuw/agent_collab_treaty/issues/31) fixture against CLI 0.11.1: preview and apply listed the same three content changes; the CRLF-only work-log rewrite was identified separately and normalized history was identical. The printed staging hint named every affected file and did not use blanket staging. Recorded this recheck in the [original adopter report](docs/treaty-v0.9.2-test-drive.md#recheck-with-v0111-on-2026-11-17).
+- Preserved the pre-existing photometry-investigation edits using a path-limited stash during the clean-tree update; they are restored separately as uncommitted work after this Treaty-only commit. Local exclude contents are restored byte-for-byte, unrelated artifacts remain in place, and no push, PR, merge, release, or new upstream comment was performed.
+- Verification:
+  - Released CLI 0.11.1 `validate .`, `diff .`, full-diff preview, and apply; preview preserved all tracked working-file SHA-256 hashes, and final conventions have zero drift.
+  - Original #31 disposable fixture with `core.autocrlf=true`: matching content lists, separate newline reporting, identical normalized log text, and explicit staging handoff — passed.
+  - `C:\Users\yzhao\miniconda3\envs\fiber_photometry\python.exe -m unittest tests.test_perievent_analysis tests.test_startup_update tests.test_packaging` — 85 tests passed; active analysis-module import smoke printed `import ok`.
+  - Whitespace, unmerged/conflict-marker, relative-link/anchor, and original-note preservation checks — passed.
+
 ## 2026-10-22
 
 ### Publish the Treaty adopter assessment (Codex, GPT-6; effort and token budget not exposed)
